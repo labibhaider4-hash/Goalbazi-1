@@ -548,7 +548,11 @@ def api_book_slot(slot_id):
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
-
+@app.before_request
+def initialize():
+    if not getattr(app, '_db_initialized', False):
+        seed_db()
+        app._db_initialized = True
 if __name__ == "__main__":
     with app.app_context():
         seed_db()
