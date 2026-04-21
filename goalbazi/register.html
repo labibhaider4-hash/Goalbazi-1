@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Goalbazi — Register</title>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    .auth-shell{min-height:100vh;display:grid;place-items:center;padding:20px}
+    .auth-card{width:100%;max-width:440px;background:var(--panel);border:1px solid var(--line);border-radius:28px;padding:36px;box-shadow:var(--shadow)}
+    .auth-logo{display:flex;align-items:center;gap:12px;margin-bottom:28px}
+    .auth-logo img{width:44px;border-radius:12px}
+    .auth-logo span{font-size:1.3rem;font-weight:800;letter-spacing:-.03em}
+    .auth-title{font-size:1.6rem;font-weight:800;letter-spacing:-.04em;margin:0 0 6px}
+    .auth-sub{color:var(--muted);margin:0 0 28px;line-height:1.6}
+    .auth-form{display:grid;gap:14px}
+    .auth-form label{display:grid;gap:8px}
+    .auth-form span{font-size:.85rem;color:var(--muted);font-weight:700}
+    .field-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .auth-switch{margin-top:18px;text-align:center;color:var(--muted);font-size:.9rem}
+    .auth-switch a{color:var(--brand);text-decoration:none;font-weight:700}
+    .error-msg{color:var(--danger);font-size:.88rem;display:none}
+    @media(max-width:500px){.field-grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="ambient ambient-a"></div>
+  <div class="ambient ambient-b"></div>
+  <div class="auth-shell">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <img src="/assets/goalbazi-logo.svg" alt="Goalbazi">
+        <span>Goalbazi</span>
+      </div>
+      <h1 class="auth-title">Join Goalbazi</h1>
+      <p class="auth-sub">Create your player account to book turfs, join games, and track leagues across Delhi NCR.</p>
+      <form class="auth-form" id="register-form">
+        <div class="field-grid">
+          <label>
+            <span>Full name</span>
+            <input name="name" placeholder="Arjun Rawat" required>
+          </label>
+          <label>
+            <span>Handle</span>
+            <input name="handle" placeholder="@arjun" required>
+          </label>
+        </div>
+        <label>
+          <span>Email</span>
+          <input type="email" name="email" placeholder="you@example.com" required autocomplete="email">
+        </label>
+        <label>
+          <span>Location</span>
+          <input name="location" placeholder="South Delhi" required>
+        </label>
+        <label>
+          <span>Password</span>
+          <input type="password" name="password" placeholder="Min 8 characters" required autocomplete="new-password">
+        </label>
+        <p class="error-msg" id="error-msg"></p>
+        <button class="primary-btn" type="submit" id="submit-btn">Create account</button>
+      </form>
+      <p class="auth-switch">Already have an account? <a href="/login">Sign in</a></p>
+    </div>
+  </div>
+  <script>
+    document.getElementById("register-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById("submit-btn");
+      const err = document.getElementById("error-msg");
+      const data = Object.fromEntries(new FormData(e.currentTarget).entries());
+      btn.textContent = "Creating account...";
+      btn.disabled = true;
+      err.style.display = "none";
+      try {
+        const res = await fetch("/api/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        });
+        if (res.ok) {
+          window.location.href = "/";
+        } else {
+          const body = await res.json();
+          err.textContent = body.error || "Registration failed";
+          err.style.display = "block";
+        }
+      } catch {
+        err.textContent = "Network error — please try again";
+        err.style.display = "block";
+      } finally {
+        btn.textContent = "Create account";
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
