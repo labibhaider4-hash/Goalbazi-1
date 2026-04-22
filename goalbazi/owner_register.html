@@ -7,22 +7,126 @@
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
   <style>
-    .auth-shell{min-height:100vh;display:grid;place-items:center;padding:20px}
-    .auth-card{width:100%;max-width:480px;background:var(--panel);border:1px solid var(--line);border-radius:28px;padding:36px;box-shadow:var(--shadow)}
-    .auth-logo{display:flex;align-items:center;gap:12px;margin-bottom:28px}
-    .auth-logo img{width:44px;border-radius:12px}
-    .auth-logo span{font-size:1.3rem;font-weight:800;letter-spacing:-.03em}
-    .auth-title{font-size:1.6rem;font-weight:800;letter-spacing:-.04em;margin:0 0 6px}
-    .auth-sub{color:var(--muted);margin:0 0 28px;line-height:1.6}
-    .auth-form{display:grid;gap:14px}
-    .auth-form label{display:grid;gap:8px}
-    .auth-form span{font-size:.85rem;color:var(--muted);font-weight:700}
-    .field-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-    .auth-switch{margin-top:18px;text-align:center;color:var(--muted);font-size:.9rem}
-    .auth-switch a{color:var(--brand);text-decoration:none;font-weight:700}
-    .error-msg{color:var(--danger);font-size:.88rem;display:none}
-    .role-badge{display:inline-block;padding:6px 14px;border-radius:999px;background:rgba(218,252,124,.12);border:1px solid rgba(218,252,124,.25);color:var(--brand-2);font-size:.82rem;font-weight:700;margin-bottom:20px}
-    @media(max-width:500px){.field-grid{grid-template-columns:1fr}}
+    /* ===== ELITE INPUTS (underline + glow) ===== */
+
+.auth-form label{
+  position:relative;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+
+/* INPUT + SELECT */
+.auth-form input,
+.auth-form select{
+  width:100%;
+  padding:12px 2px;
+  border:none;
+  border-bottom:1px solid rgba(255,255,255,0.15);
+  background:transparent;
+  color:#fff;
+  font-size:.95rem;
+  outline:none;
+  transition:.3s ease;
+  appearance:none;
+}
+
+/* Placeholder */
+.auth-form input::placeholder{
+  color:rgba(255,255,255,0.35);
+}
+
+/* Dropdown fix */
+.auth-form select{
+  cursor:pointer;
+}
+
+/* 🔥 animated glow line */
+.auth-form label::after{
+  content:"";
+  position:absolute;
+  left:0;
+  bottom:0;
+  width:0%;
+  height:2px;
+  background:linear-gradient(90deg,#3F7E2A,#6CFF5E);
+  transition:width .35s ease;
+  box-shadow:0 0 12px rgba(63,126,42,.6);
+}
+
+/* focus trigger */
+.auth-form label:focus-within::after{
+  width:100%;
+}
+
+.auth-form input:focus,
+.auth-form select:focus{
+  border-bottom-color:transparent;
+}
+
+/* label text */
+.auth-form span{
+  color:rgba(255,255,255,0.65);
+  font-size:.8rem;
+  font-weight:600;
+}
+
+/* ===== ELITE BUTTON ===== */
+
+.primary-btn{
+  margin-top:10px;
+  width:100%;
+  padding:14px;
+  border-radius:12px;
+  border:1px solid rgba(63,126,42,0.4);
+  background:linear-gradient(135deg,#3F7E2A,#2a5a1d);
+  color:#fff;
+  font-weight:700;
+  cursor:pointer;
+  position:relative;
+  overflow:hidden;
+  transition:all .3s ease;
+}
+
+/* shine effect */
+.primary-btn::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:linear-gradient(120deg,transparent,rgba(255,255,255,0.25),transparent);
+  opacity:0;
+}
+
+/* hover */
+.primary-btn:hover{
+  transform:translateY(-2px);
+  box-shadow:
+    0 10px 30px rgba(63,126,42,.4),
+    0 0 20px rgba(63,126,42,.25);
+}
+
+.primary-btn:hover::before{
+  opacity:1;
+  animation:shine 1s linear;
+}
+
+/* click */
+.primary-btn:active{
+  transform:scale(.97);
+}
+
+/* disabled */
+.primary-btn:disabled{
+  opacity:.6;
+  cursor:not-allowed;
+  box-shadow:none;
+}
+
+/* animation */
+@keyframes shine{
+  0%{transform:translateX(-100%)}
+  100%{transform:translateX(100%)}
+}
   </style>
 </head>
 <body>
