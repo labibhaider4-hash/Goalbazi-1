@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Goalbazi — Turf Owner Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:#09110e; --panel:#13201b; --panel-soft:#172822;
+      --line:rgba(255,255,255,.08); --text:#eff7f3; --muted:#8ea89c;
+      --brand:#84f255; --brand-2:#dafc7c; --danger:#ff8366;
+      --shadow:0 24px 90px rgba(0,0,0,.28);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{font-family:"Manrope",sans-serif;background:radial-gradient(circle at 15% 20%,rgba(132,242,85,.10),transparent 24%),linear-gradient(180deg,var(--bg) 0%,#050807 100%);color:var(--text);min-height:100vh}
+
+    /* Header */
+    .header{background:var(--panel);border-bottom:1px solid var(--line);padding:16px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+    .header-left{display:flex;align-items:center;gap:14px}
+    .header-logo{font-size:1.1rem;font-weight:800;color:var(--brand)}
+    .turf-name{font-size:1rem;font-weight:700}
+    .turf-meta{color:var(--muted);font-size:.82rem;margin-top:2px}
+    .header-right{display:flex;align-items:center;gap:10px}
+    .btn{padding:10px 16px;border-radius:12px;border:none;font-weight:700;font-size:.88rem;cursor:pointer}
+    .btn-primary{background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#08110d}
+    .btn-ghost{background:rgba(255,255,255,.04);color:var(--text);border:1px solid var(--line)}
+    .btn-danger{background:rgba(255,131,102,.1);color:var(--danger);border:1px solid rgba(255,131,102,.2)}
+    .btn-sm{padding:6px 12px;font-size:.8rem;border-radius:8px}
+
+    /* Layout */
+    .shell{max-width:1200px;margin:0 auto;padding:28px 20px}
+
+    /* Stats */
+    .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px}
+    .stat-card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:var(--shadow)}
+    .stat-value{font-size:2rem;font-weight:800;color:var(--brand)}
+    .stat-label{color:var(--muted);font-size:.85rem;margin-top:4px}
+
+    /* Tabs */
+    .tabs{display:flex;gap:8px;margin-bottom:24px;border-bottom:1px solid var(--line);padding-bottom:0}
+    .tab{padding:10px 18px;border-radius:12px 12px 0 0;border:none;background:transparent;color:var(--muted);font-weight:700;font-size:.9rem;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+    .tab.active{color:var(--brand);border-bottom-color:var(--brand)}
+
+    /* Cards */
+    .table-card{background:var(--panel);border:1px solid var(--line);border-radius:20px;overflow:hidden;box-shadow:var(--shadow);margin-bottom:20px}
+    .card-head{padding:18px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
+    .card-head h3{font-size:1rem;font-weight:800}
+    table{width:100%;border-collapse:collapse}
+    th{text-align:left;padding:12px 16px;color:var(--muted);font-size:.8rem;font-weight:700;border-bottom:1px solid var(--line)}
+    td{padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.03);font-size:.9rem;vertical-align:middle}
+    tr:last-child td{border-bottom:none}
+    tr:hover td{background:rgba(255,255,255,.02)}
+    .empty{color:var(--muted);padding:32px;text-align:center;font-size:.9rem}
+
+    .pill{display:inline-block;padding:4px 10px;border-radius:999px;font-size:.75rem;font-weight:700}
+    .pill-pending{background:rgba(241,214,111,.12);color:#f1d66f;border:1px solid rgba(241,214,111,.25)}
+    .pill-confirmed{background:rgba(132,242,85,.12);color:var(--brand);border:1px solid rgba(132,242,85,.2)}
+    .pill-rejected{background:rgba(255,131,102,.12);color:var(--danger);border:1px solid rgba(255,131,102,.2)}
+
+    /* Booking detail card */
+    .booking-card{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:22px;margin-bottom:14px;box-shadow:var(--shadow)}
+    .booking-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}
+    .booking-title{font-size:1rem;font-weight:800}
+    .booking-meta{color:var(--muted);font-size:.88rem;margin-top:4px;line-height:1.6}
+    .utr-box{background:var(--panel-soft);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:12px 0}
+    .utr-label{font-size:.78rem;color:var(--muted);font-weight:700;margin-bottom:4px}
+    .utr-value{font-size:1rem;font-weight:800;color:var(--brand-2)}
+    .action-row{display:flex;gap:10px;margin-top:14px}
+
+    /* UPI info */
+    .upi-card{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:24px;box-shadow:var(--shadow);margin-bottom:20px}
+    .upi-id{font-size:1.4rem;font-weight:800;color:var(--brand);margin:8px 0}
+    .upi-note{color:var(--muted);font-size:.88rem;line-height:1.6}
+
+    /* Slots manager */
+    .slots-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:14px}
+    .slot-item{padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:var(--panel-soft);display:flex;flex-direction:column;gap:6px}
+    .slot-time{font-weight:800;font-size:.95rem}
+    .slot-status{font-size:.78rem;font-weight:700}
+    .slot-available{color:var(--brand)}
+    .slot-booked{color:var(--muted)}
+    .slot-pending{color:#f1d66f}
+
+    @media(max-width:700px){
+      .stats-row{grid-template-columns:1fr 1fr}
+      .header{flex-direction:column;align-items:flex-start}
+      td,th{padding:10px 12px;font-size:.82rem}
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="header-logo">⚽ Goalbazi</div>
+    <div>
+      <div class="turf-name" id="owner-turf-name">Loading...</div>
+      <div class="turf-meta" id="owner-turf-meta"></div>
+    </div>
+  </div>
+  <div class="header-right">
+    <span style="color:var(--muted);font-size:.85rem" id="owner-name-display"></span>
+    <button class="btn btn-ghost btn-sm" id="logout-btn">Log out</button>
+  </div>
+</div>
+
+<div class="shell">
+
+  <div class="stats-row" id="owner-stats"></div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="bookings">Bookings</button>
+    <button class="tab" data-tab="slots">Manage slots</button>
+    <button class="tab" data-tab="upi">UPI & Payments</button>
+    <button class="tab" data-tab="settings">Turf settings</button>
+  </div>
+
+  <!-- Bookings tab -->
+  <div class="tab-content" id="tab-bookings">
+    <div id="bookings-list"></div>
+  </div>
+
+  <!-- Slots tab -->
+  <div class="tab-content" id="tab-slots" style="display:none">
+    <div class="table-card">
+      <div class="card-head">
+        <h3>Today's slots</h3>
+        <input type="date" id="slot-date-filter" style="padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel-soft);color:var(--text);font-family:inherit;font-size:.85rem">
+      </div>
+      <div style="padding:16px">
+        <div class="slots-grid" id="slots-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- UPI tab -->
+  <div class="tab-content" id="tab-upi" style="display:none">
+    <div class="upi-card">
+      <div style="color:var(--muted);font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em">Your UPI ID</div>
+      <div class="upi-id" id="upi-display">Loading...</div>
+      <div class="upi-note">Players will see this UPI ID when booking a slot. They pay directly to this UPI and enter their UTR number to confirm payment. You then verify and approve the booking.</div>
+    </div>
+    <div class="table-card">
+      <div class="card-head"><h3>Recent payments received</h3></div>
+      <table>
+        <thead><tr><th>Player</th><th>Slot</th><th>Amount</th><th>UTR</th><th>Status</th></tr></thead>
+        <tbody id="payments-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Settings tab -->
+  <div class="tab-content" id="tab-settings" style="display:none">
+    <div class="table-card">
+      <div class="card-head"><h3>Turf details</h3></div>
+      <div style="padding:22px">
+        <form id="settings-form" style="display:grid;gap:14px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <label style="display:grid;gap:8px">
+              <span style="font-size:.85rem;color:var(--muted);font-weight:700">Turf name</span>
+              <input name="turf_name" id="settings-name" style="padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--panel-soft);color:var(--text);font-family:inherit">
+            </label>
+            <label style="display:grid;gap:8px">
+              <span style="font-size:.85rem;color:var(--muted);font-weight:700">Area</span>
+              <input name="area" id="settings-area" style="padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--panel-soft);color:var(--text);font-family:inherit">
+            </label>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <label style="display:grid;gap:8px">
+              <span style="font-size:.85rem;color:var(--muted);font-weight:700">Price per hour (₹)</span>
+              <input type="number" name="price_per_hour" id="settings-price" style="padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--panel-soft);color:var(--text);font-family:inherit">
+            </label>
+            <label style="display:grid;gap:8px">
+              <span style="font-size:.85rem;color:var(--muted);font-weight:700">UPI ID</span>
+              <input name="upi_id" id="settings-upi" style="padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--panel-soft);color:var(--text);font-family:inherit">
+            </label>
+          </div>
+          <button class="btn btn-primary" type="submit" style="justify-self:start">Save changes</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let ownerData = null;
+
+  async function api(path, options = {}) {
+    const res = await fetch(path, { headers: { "Content-Type": "application/json" }, ...options });
+    if (res.status === 401) { window.location.href = "/owner/login"; return null; }
+    return res.json();
+  }
+
+  function showToast(msg) {
+    let t = document.getElementById("toast");
+    if (!t) { t = document.createElement("div"); t.id = "toast"; t.style.cssText = "position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#13211b;border:1px solid rgba(255,255,255,.08);color:#eff7f3;padding:12px 18px;border-radius:14px;font-family:Manrope,sans-serif;font-weight:700;z-index:999;transition:.2s"; document.body.appendChild(t); }
+    t.textContent = msg;
+    t.style.opacity = "1";
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.style.opacity = "0", 2500);
+  }
+
+  async function loadDashboard() {
+    const data = await api("/api/owner/dashboard");
+    if (!data) return;
+    ownerData = data;
+
+    document.getElementById("owner-turf-name").textContent = data.turf.name;
+    document.getElementById("owner-turf-meta").textContent = `${data.turf.area} · ${data.turf.surface} · ₹${data.turf.price_per_hour}/hr`;
+    document.getElementById("owner-name-display").textContent = data.owner.name;
+    document.getElementById("upi-display").textContent = data.turf.upi_id || "Not set";
+
+    // Stats
+    document.getElementById("owner-stats").innerHTML = [
+      { value: data.stats.pending, label: "Pending approvals" },
+      { value: data.stats.confirmed_today, label: "Confirmed today" },
+      { value: `₹${data.stats.revenue_today}`, label: "Revenue today" },
+      { value: data.stats.total_bookings, label: "Total bookings" },
+    ].map(s => `
+      <div class="stat-card">
+        <div class="stat-value">${s.value}</div>
+        <div class="stat-label">${s.label}</div>
+      </div>
+    `).join("");
+
+    renderBookings(data.bookings);
+    renderPayments(data.bookings);
+    prefillSettings(data.turf);
+  }
+
+  function renderBookings(bookings) {
+    const pending = bookings.filter(b => b.status === "pending");
+    const others = bookings.filter(b => b.status !== "pending");
+
+    let html = "";
+
+    if (pending.length > 0) {
+      html += `<div style="font-size:.82rem;font-weight:800;color:var(--brand);text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px">⏳ Awaiting approval (${pending.length})</div>`;
+      html += pending.map(b => bookingCard(b)).join("");
+    }
+
+    if (others.length > 0) {
+      html += `<div style="font-size:.82rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin:20px 0 12px">Past & confirmed</div>`;
+      html += others.map(b => bookingCard(b)).join("");
+    }
+
+    if (bookings.length === 0) {
+      html = `<div class="empty">No bookings yet. Share your turf link to get started!</div>`;
+    }
+
+    document.getElementById("bookings-list").innerHTML = html;
+  }
+
+  function bookingCard(b) {
+    const pillClass = b.status === "pending" ? "pill-pending" : b.status === "confirmed" ? "pill-confirmed" : "pill-rejected";
+    const pillText = b.status.charAt(0).toUpperCase() + b.status.slice(1);
+    return `
+      <div class="booking-card">
+        <div class="booking-top">
+          <div>
+            <div class="booking-title">${b.player_name}</div>
+            <div class="booking-meta">${b.slot_date} · ${b.slot_time} · ${b.player_email}</div>
+          </div>
+          <span class="pill ${pillClass}">${pillText}</span>
+        </div>
+        <div class="utr-box">
+          <div class="utr-label">UPI Transaction / UTR number</div>
+          <div class="utr-value">${b.utr_number || "Not provided"}</div>
+        </div>
+        <div class="booking-meta">Amount: <strong style="color:var(--text)">₹${b.amount}</strong></div>
+        ${b.status === "pending" ? `
+        <div class="action-row">
+          <button class="btn btn-primary btn-sm" onclick="approveBooking(${b.id})">✓ Approve</button>
+          <button class="btn btn-danger btn-sm" onclick="rejectBooking(${b.id})">✗ Reject</button>
+        </div>` : ""}
+      </div>
+    `;
+  }
+
+  function renderPayments(bookings) {
+    const confirmed = bookings.filter(b => b.status === "confirmed");
+    document.getElementById("payments-body").innerHTML = confirmed.map(b => `
+      <tr>
+        <td>${b.player_name}</td>
+        <td>${b.slot_date} ${b.slot_time}</td>
+        <td style="color:var(--brand)">₹${b.amount}</td>
+        <td style="color:var(--brand-2);font-family:monospace">${b.utr_number || "—"}</td>
+        <td><span class="pill pill-confirmed">Confirmed</span></td>
+      </tr>
+    `).join("") || '<tr><td colspan="5" class="empty">No confirmed payments yet</td></tr>';
+  }
+
+  function prefillSettings(turf) {
+    document.getElementById("settings-name").value = turf.name;
+    document.getElementById("settings-area").value = turf.area;
+    document.getElementById("settings-price").value = turf.price_per_hour;
+    document.getElementById("settings-upi").value = turf.upi_id || "";
+  }
+
+  async function approveBooking(id) {
+    await api(`/api/owner/bookings/${id}/approve`, { method: "POST" });
+    showToast("Booking approved ✓");
+    await loadDashboard();
+  }
+
+  async function rejectBooking(id) {
+    if (!confirm("Reject this booking?")) return;
+    await api(`/api/owner/bookings/${id}/reject`, { method: "POST" });
+    showToast("Booking rejected");
+    await loadDashboard();
+  }
+
+  async function loadSlots() {
+    const date = document.getElementById("slot-date-filter").value;
+    const data = await api(`/api/owner/slots?date=${date}`);
+    if (!data) return;
+    document.getElementById("slots-grid").innerHTML = data.slots.map(s => {
+      const cls = s.status === "available" ? "slot-available" : s.status === "pending" ? "slot-pending" : "slot-booked";
+      const label = s.status === "available" ? "Available" : s.status === "pending" ? "Pending" : `Booked — ${s.player_name || ""}`;
+      return `
+        <div class="slot-item">
+          <div class="slot-time">${s.slot_time}</div>
+          <div class="slot-status ${cls}">${label}</div>
+        </div>
+      `;
+    }).join("") || '<div style="color:var(--muted);padding:16px">No slots for this date</div>';
+  }
+
+  // Tabs
+  document.querySelectorAll(".tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+      document.querySelectorAll(".tab-content").forEach(c => c.style.display = "none");
+      tab.classList.add("active");
+      document.getElementById(`tab-${tab.dataset.tab}`).style.display = "block";
+      if (tab.dataset.tab === "slots") loadSlots();
+    });
+  });
+
+  // Slot date filter
+  const today = new Date().toISOString().slice(0, 10);
+  document.getElementById("slot-date-filter").value = today;
+  document.getElementById("slot-date-filter").addEventListener("change", loadSlots);
+
+  // Settings form
+  document.getElementById("settings-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.currentTarget).entries());
+    await api("/api/owner/settings", { method: "PUT", body: JSON.stringify(data) });
+    showToast("Settings saved ✓");
+    await loadDashboard();
+  });
+
+  // Logout
+  document.getElementById("logout-btn").addEventListener("click", async () => {
+    await fetch("/api/owner/logout", { method: "POST" });
+    window.location.href = "/owner/login";
+  });
+
+  loadDashboard();
+</script>
+</body>
+</html>
