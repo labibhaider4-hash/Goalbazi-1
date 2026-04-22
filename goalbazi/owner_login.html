@@ -21,6 +21,48 @@
     .auth-switch a{color:var(--brand);text-decoration:none;font-weight:700}
     .error-msg{color:var(--danger);font-size:.88rem;display:none}
     .role-badge{display:inline-block;padding:6px 14px;border-radius:999px;background:rgba(218,252,124,.12);border:1px solid rgba(218,252,124,.25);color:var(--brand-2);font-size:.82rem;font-weight:700;margin-bottom:20px}
+    /* Structural fixes for inputs */
+.auth-form input {
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--panel); /* Keeps your theme color */
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: inherit;
+  font-family: inherit;
+  font-size: 1rem;
+  box-sizing: border-box; /* Prevents boxes from overflowing the card */
+  transition: border-color 0.2s;
+}
+
+.auth-form input:focus {
+  outline: none;
+  border-color: var(--brand);
+}
+
+/* Structural fixes for the sign-in button */
+.primary-btn {
+  width: 100%;
+  padding: 14px;
+  background: var(--brand); /* Uses your brand color */
+  color: #000; /* Standard contrast for the brand green */
+  border: none;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'Manrope', sans-serif;
+  transition: opacity 0.2s;
+}
+
+.primary-btn:hover {
+  opacity: 0.9;
+}
+
+.primary-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
   </style>
 </head>
 <body>
