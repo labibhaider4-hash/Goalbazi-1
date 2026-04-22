@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Goalbazi — Games</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/goalbazi-logo.svg">
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    .games-shell { padding: 28px 20px 80px; }
+    .page-header { margin-bottom: 24px; }
+    .page-header h1 { font-size: clamp(1.6rem,5vw,2.4rem); font-weight: 800; letter-spacing:-.04em; }
+    .page-header p { color: var(--muted); margin-top: 4px; }
+
+    /* Tabs */
+    .tabs { display: flex; gap: 6px; margin-bottom: 24px; border-bottom: 1px solid var(--line); padding-bottom: 0; }
+    .tab-btn { padding: 10px 18px; background: none; border: none; color: var(--muted); font-weight: 600; font-size: .92rem; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; font-family: inherit; transition: color .15s; }
+    .tab-btn.active { color: var(--brand); border-bottom-color: var(--brand); }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* Game cards */
+    .games-list { display: grid; gap: 12px; }
+    .game-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      text-decoration: none;
+      color: var(--text);
+      transition: border-color .2s, transform .15s;
+      cursor: pointer;
+    }
+    .game-card:hover { border-color: rgba(127,255,69,.25); transform: translateY(-1px); }
+    .game-card-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1rem; margin-bottom: 6px; }
+    .game-card-meta { color: var(--muted); font-size: .85rem; line-height: 1.6; }
+    .game-card-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+
+    /* Create form */
+    .create-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 24px;
+      max-width: 560px;
+    }
+
+    @media (min-width: 768px) {
+      .games-shell { padding: 36px 28px 80px; }
+    }
+  </style>
+</head>
+<body>
+<nav class="navbar" id="navbar"></nav>
+<div class="nav-drawer" id="nav-drawer"></div>
+<div class="ambient ambient-a"></div>
+<div class="ambient ambient-b"></div>
+
+<div class="page-wrap">
+  <div class="container games-shell">
+    <div class="page-header">
+      <h1>Games</h1>
+      <p>Find open matches near you or create your own</p>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="browse">Browse games</button>
+      <button class="tab-btn" data-tab="create">+ Create game</button>
+    </div>
+
+    <!-- Browse -->
+    <div class="tab-panel active" id="tab-browse">
+      <div id="games-list">
+        <div class="page-loader"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- Create -->
+    <div class="tab-panel" id="tab-create">
+      <div class="create-card">
+        <div class="section-title" style="font-size:1.2rem;margin-bottom:4px">Create a match</div>
+        <div class="section-sub">This saves directly to the database</div>
+        <form id="create-form" class="form-grid" style="gap:14px">
+          <div class="form-group">
+            <label class="form-label">Game title</label>
+            <input name="title" class="form-input" placeholder="Sunday morning 5-a-side" required>
+          </div>
+          <div class="form-grid form-grid-2">
+            <div class="form-group">
+              <label class="form-label">Format</label>
+              <select name="format" class="form-input" id="format-select"></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Skill level</label>
+              <select name="skill" class="form-input" id="skill-select"></select>
+            </div>
+          </div>
+          <div class="form-grid form-grid-2">
+            <div class="form-group">
+              <label class="form-label">Date</label>
+              <input type="date" name="date" id="date-input" class="form-input" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Kick-off time</label>
+              <input type="time" name="time" class="form-input" value="18:30" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Turf</label>
+            <select name="turf_id" class="form-input" id="turf-select"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Visibility</label>
+            <select name="visibility" class="form-input">
+              <option value="open">Open to all players</option>
+              <option value="invite">Invite only</option>
+              <option value="squad">Team draft</option>
+            </select>
+          </div>
+          <button class="btn btn-primary btn-full" type="submit">Create game</button>
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/nav.js"></script>
+<script>
+  initNav("games");
+
+  // Tabs
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById(`tab-${btn.dataset.tab}`).classList.add("active");
+    });
+  });
+
+  // Check if ?create=1
+  if (new URLSearchParams(location.search).get("create") === "1") {
+    document.querySelector('[data-tab="create"]').click();
+  }
+
+  function formatDate(d) {
+    return new Intl.DateTimeFormat("en-IN", { weekday: "short", month: "short", day: "numeric" }).format(new Date(d));
+  }
+
+  async function loadGames() {
+    const data = await apiFetch("/api/dashboard");
+    if (!data) return;
+
+    const el = document.getElementById("games-list");
+    if (data.games.length === 0) {
+      el.innerHTML = `<div class="empty-state"><div class="empty-icon">🎮</div><div class="empty-title">No games yet</div><p>Be the first to create one!</p></div>`;
+      return;
+    }
+
+    el.innerHTML = `<div class="games-list">${data.games.map(g => `
+      <div class="game-card" onclick="window.location.href='/lobby?id=${g.id}'">
+        <div style="flex:1;min-width:0">
+          <div class="game-card-title">${g.title}</div>
+          <div class="game-card-meta">${formatDate(g.game_date)} · ${g.game_time} · ${g.location}</div>
+          <div class="game-card-tags">
+            <span class="pill pill-muted">${g.format}</span>
+            <span class="pill pill-muted">${g.skill_level}</span>
+            <span class="pill pill-accent">${g.confirmed_players} players</span>
+          </div>
+        </div>
+        <span class="pill pill-green">${g.status}</span>
+      </div>
+    `).join("")}</div>`;
+
+    // Populate turf select
+    document.getElementById("turf-select").innerHTML = data.turfs.map(t =>
+      `<option value="${t.id}">${t.name} / ${t.area}</option>`
+    ).join("");
+  }
+
+  // Setup form selects
+  document.getElementById("format-select").innerHTML = ["5v5","7v7","11v11"].map(f => `<option>${f}</option>`).join("");
+  document.getElementById("skill-select").innerHTML = ["Beginner","Intermediate","Competitive"].map(s => `<option>${s}</option>`).join("");
+  document.getElementById("date-input").value = new Date().toISOString().slice(0,10);
+
+  document.getElementById("create-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    const btn = e.currentTarget.querySelector("button[type=submit]");
+    btn.textContent = "Creating...";
+    btn.disabled = true;
+    try {
+      const data = Object.fromEntries(new FormData(e.currentTarget).entries());
+      const result = await apiFetch("/api/games", { method: "POST", body: JSON.stringify(data) });
+      showToast("Game created!");
+      window.location.href = `/lobby?id=${result.id}`;
+    } catch (err) {
+      showToast("Error: " + err.message);
+      btn.textContent = "Create game";
+      btn.disabled = false;
+    }
+  });
+
+  loadGames();
+</script>
+</body>
+</html>

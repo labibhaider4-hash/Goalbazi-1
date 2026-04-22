@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Goalbazi — Leagues</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/goalbazi-logo.svg">
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    .leagues-shell { padding: 28px 20px 80px; }
+    .page-header { margin-bottom: 24px; }
+    .page-header h1 { font-size: clamp(1.6rem,5vw,2.4rem); font-weight:800; letter-spacing:-.04em; }
+    .page-header p { color: var(--muted); margin-top:4px; }
+
+    .leagues-grid { display:grid; gap:14px; margin-bottom:36px; }
+    .league-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 20px;
+      transition: border-color .2s;
+    }
+    .league-card:hover { border-color: rgba(127,255,69,.2); }
+    .league-name { font-family:'Syne',sans-serif; font-weight:800; font-size:1.05rem; margin-bottom:6px; }
+    .league-desc { color:var(--muted); font-size:.88rem; line-height:1.6; margin-bottom:12px; }
+    .league-tags { display:flex; gap:8px; flex-wrap:wrap; }
+
+    .standings-card { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; }
+    .standings-head { padding:16px 20px; border-bottom:1px solid var(--line); font-family:'Syne',sans-serif; font-weight:800; }
+    table { width:100%; border-collapse:collapse; }
+    th { text-align:left; padding:10px 14px; color:var(--muted); font-size:.78rem; font-weight:700; border-bottom:1px solid var(--line); }
+    td { padding:12px 14px; border-bottom:1px solid rgba(255,255,255,.03); font-size:.9rem; }
+    tr:last-child td { border-bottom:none; }
+    tr:hover td { background:rgba(255,255,255,.02); }
+    .rank-num { font-family:'Syne',sans-serif; font-weight:800; color:var(--muted); }
+    .rank-1 { color:var(--brand); }
+    .form-dots { display:flex; gap:4px; }
+    .form-dot { width:10px; height:10px; border-radius:50%; }
+    .form-w { background:var(--brand); }
+    .form-d { background:var(--warn); }
+    .form-l { background:var(--danger); }
+
+    @media (min-width:640px) {
+      .leagues-grid { grid-template-columns:1fr 1fr; }
+    }
+    @media (min-width:1024px) {
+      .leagues-grid { grid-template-columns:repeat(3,1fr); }
+      .leagues-shell { padding:36px 28px 80px; }
+    }
+  </style>
+</head>
+<body>
+<nav class="navbar" id="navbar"></nav>
+<div class="nav-drawer" id="nav-drawer"></div>
+<div class="ambient ambient-a"></div>
+<div class="ambient ambient-b"></div>
+
+<div class="page-wrap">
+  <div class="container leagues-shell">
+    <div class="page-header">
+      <h1>Leagues</h1>
+      <p>Active competitions and standings across Delhi NCR</p>
+    </div>
+
+    <div class="section-title" style="font-size:1rem;margin-bottom:14px">Active leagues</div>
+    <div class="leagues-grid" id="leagues-grid">
+      <div class="page-loader"><div class="spinner"></div></div>
+    </div>
+
+    <div class="section-title" style="font-size:1rem;margin-bottom:14px">Standings</div>
+    <div class="standings-card">
+      <div class="standings-head">Delhi Premier 5v5 — Week 4 of 7</div>
+      <table>
+        <thead>
+          <tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>Pts</th><th>Form</th></tr>
+        </thead>
+        <tbody id="standings-body">
+          <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/nav.js"></script>
+<script>
+  initNav("leagues");
+
+  async function load() {
+    const data = await apiFetch("/api/dashboard");
+    if (!data) return;
+
+    // Leagues
+    document.getElementById("leagues-grid").innerHTML = data.leagues.map(l => `
+      <div class="league-card">
+        <div class="league-name">${l.name}</div>
+        <div class="league-desc">${l.description}</div>
+        <div class="league-tags">
+          <span class="pill pill-muted">${l.format}</span>
+          <span class="pill pill-muted">${l.stage}</span>
+          <span class="pill ${l.status === 'Live' ? 'pill-green' : 'pill-accent'}">${l.status}</span>
+        </div>
+      </div>
+    `).join("");
+
+    // Standings
+    document.getElementById("standings-body").innerHTML = data.standings.map((r, i) => `
+      <tr>
+        <td><span class="rank-num ${i === 0 ? 'rank-1' : ''}">${r.rank}</span></td>
+        <td style="font-weight:600">${r.team_name}</td>
+        <td style="color:var(--muted)">${r.played}</td>
+        <td style="color:var(--muted)">${r.won}</td>
+        <td style="font-weight:700;color:var(--brand)">${r.points}</td>
+        <td>
+          <div class="form-dots">
+            ${r.form.split(",").map(f => `<div class="form-dot form-${f.toLowerCase()}"></div>`).join("")}
+          </div>
+        </td>
+      </tr>
+    `).join("");
+  }
+
+  load();
+</script>
+</body>
+</html>

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Goalbazi — Dashboard</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/goalbazi-logo.svg">
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    .dash-shell { padding: 28px 20px 60px; }
+    .welcome-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 28px; flex-wrap: wrap; }
+    .welcome-text h1 { font-size: clamp(1.4rem, 4vw, 2rem); font-weight: 800; letter-spacing: -.04em; }
+    .welcome-text p { color: var(--muted); font-size: .9rem; margin-top: 4px; }
+
+    .dash-grid { display: grid; gap: 16px; }
+
+    .quick-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 8px; }
+    .quick-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 20px;
+      text-decoration: none;
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: border-color .2s, transform .2s;
+    }
+    .quick-card:hover { border-color: rgba(127,255,69,.25); transform: translateY(-2px); color: var(--text); }
+    .quick-card .qc-icon { font-size: 1.6rem; }
+    .quick-card .qc-label { font-family: 'Syne', sans-serif; font-weight: 700; font-size: .95rem; }
+    .quick-card .qc-sub { color: var(--muted); font-size: .8rem; }
+
+    .section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .section-head h2 { font-size: 1.1rem; font-weight: 700; }
+    .section-head a { font-size: .85rem; color: var(--brand); }
+
+    .game-item {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      text-decoration: none;
+      color: var(--text);
+      margin-bottom: 10px;
+      transition: border-color .15s;
+    }
+    .game-item:hover { border-color: rgba(127,255,69,.2); color: var(--text); }
+    .game-item-title { font-weight: 700; font-size: .95rem; }
+    .game-item-meta { color: var(--muted); font-size: .82rem; margin-top: 3px; }
+
+    @media (min-width: 768px) {
+      .dash-shell { padding: 36px 28px 60px; }
+      .dash-grid { grid-template-columns: 2fr 1fr; }
+      .quick-actions { grid-template-columns: repeat(4, 1fr); }
+    }
+  </style>
+</head>
+<body>
+<nav class="navbar" id="navbar"></nav>
+<div class="nav-drawer" id="nav-drawer"></div>
+<div class="ambient ambient-a"></div>
+<div class="ambient ambient-b"></div>
+
+<div class="page-wrap">
+  <div class="container dash-shell">
+
+    <div class="welcome-row">
+      <div class="welcome-text">
+        <h1 id="welcome-title">Welcome back 👋</h1>
+        <p id="welcome-sub">Here's what's happening in Delhi NCR</p>
+      </div>
+      <a href="/games?create=1" class="btn btn-primary btn-sm">+ Create game</a>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid" style="margin-bottom:20px" id="dash-stats"></div>
+
+    <!-- Quick actions -->
+    <div class="quick-actions">
+      <a href="/games" class="quick-card">
+        <div class="qc-icon">🎮</div>
+        <div class="qc-label">Browse games</div>
+        <div class="qc-sub">Find open matches</div>
+      </a>
+      <a href="/turfs" class="quick-card">
+        <div class="qc-icon">🏟️</div>
+        <div class="qc-label">Book a turf</div>
+        <div class="qc-sub">Check availability</div>
+      </a>
+      <a href="/leagues" class="quick-card">
+        <div class="qc-icon">🏆</div>
+        <div class="qc-label">Leagues</div>
+        <div class="qc-sub">View standings</div>
+      </a>
+      <a href="/profile" class="quick-card">
+        <div class="qc-icon">👤</div>
+        <div class="qc-label">My profile</div>
+        <div class="qc-sub">Edit your details</div>
+      </a>
+    </div>
+
+    <div class="dash-grid" style="margin-top:20px">
+      <!-- Recent games -->
+      <div>
+        <div class="section-head">
+          <h2>Upcoming games</h2>
+          <a href="/games">See all →</a>
+        </div>
+        <div id="recent-games">
+          <div class="page-loader"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+      <!-- Profile snapshot -->
+      <div>
+        <div class="section-head">
+          <h2>Your profile</h2>
+          <a href="/profile">Edit →</a>
+        </div>
+        <div class="card" id="profile-snap">
+          <div class="page-loader"><div class="spinner"></div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/nav.js"></script>
+<script>
+  initNav("dashboard");
+
+  async function load() {
+    const data = await apiFetch("/api/dashboard");
+    if (!data) return;
+
+    // Welcome
+    document.getElementById("welcome-title").textContent = `Welcome back, ${data.profile.name.split(" ")[0]} 👋`;
+
+    // Stats
+    document.getElementById("dash-stats").innerHTML = data.stats.map(s => `
+      <div class="stat-card">
+        <div class="stat-value">${s.value}</div>
+        <div class="stat-label">${s.label}</div>
+      </div>
+    `).join("");
+
+    // Games
+    const gamesEl = document.getElementById("recent-games");
+    if (data.games.length === 0) {
+      gamesEl.innerHTML = `<div class="empty-state"><div class="empty-icon">🎮</div><div class="empty-title">No games yet</div><p>Be the first to create one!</p></div>`;
+    } else {
+      gamesEl.innerHTML = data.games.slice(0, 4).map(g => `
+        <a href="/lobby?id=${g.id}" class="game-item">
+          <div>
+            <div class="game-item-title">${g.title}</div>
+            <div class="game-item-meta">${g.game_date} · ${g.game_time} · ${g.location}</div>
+          </div>
+          <span class="pill pill-green">${g.status}</span>
+        </a>
+      `).join("");
+    }
+
+    // Profile snap
+    const p = data.profile;
+    const initials = p.name.split(" ").map(x => x[0]).slice(0,2).join("").toUpperCase();
+    document.getElementById("profile-snap").innerHTML = `
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+        <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#060d08;display:grid;place-items:center;font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;flex-shrink:0">${initials}</div>
+        <div>
+          <div style="font-weight:700">${p.name}</div>
+          <div style="color:var(--muted);font-size:.85rem">${p.handle}</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${[p.position, p.preferred_format, p.skill].filter(Boolean).map(t => `<span class="pill pill-green">${t}</span>`).join("")}
+      </div>
+      ${p.bio ? `<div style="color:var(--muted);font-size:.88rem;margin-top:12px;line-height:1.6">${p.bio}</div>` : ""}
+    `;
+  }
+
+  load();
+</script>
+</body>
+</html>

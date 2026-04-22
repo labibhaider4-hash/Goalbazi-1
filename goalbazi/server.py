@@ -94,6 +94,16 @@ def seed_db():
     cur = conn.cursor()
 
     cur.execute("""
+        CREATE TABLE IF NOT EXISTS turf_owners (
+            id SERIAL PRIMARY KEY,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL UNIQUE,
+            phone TEXT NOT NULL DEFAULT '',
+            password_hash TEXT NOT NULL
+        )
+    """)
+
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
             name TEXT NOT NULL,
@@ -120,6 +130,10 @@ def seed_db():
         )
     """)
 
+    # Add new columns to turfs if they don't exist
+    cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS owner_id INTEGER REFERENCES turf_owners(id)")
+    cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS upi_id TEXT DEFAULT ''")
+
     cur.execute("""
         CREATE TABLE IF NOT EXISTS turf_slots (
             id SERIAL PRIMARY KEY,
@@ -127,7 +141,24 @@ def seed_db():
             slot_date TEXT NOT NULL,
             slot_time TEXT NOT NULL,
             is_booked INTEGER NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'available',
             booked_by INTEGER REFERENCES users(id)
+        )
+    """)
+
+    cur.execute("ALTER TABLE turf_slots ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'available'")
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS bookings (
+            id SERIAL PRIMARY KEY,
+            slot_id INTEGER NOT NULL REFERENCES turf_slots(id),
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            player_name TEXT NOT NULL,
+            player_email TEXT NOT NULL,
+            utr_number TEXT DEFAULT '',
+            amount INTEGER NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'pending',
+            created_at TEXT NOT NULL DEFAULT '' 
         )
     """)
 
@@ -388,10 +419,7 @@ def api_me():
 # App routes
 # ---------------------------------------------------------------------------
 
-@app.route("/")
-@login_required
-def index():
-    return send_from_directory(".", "index.html")
+# / route now handled by multi-page routes below
 
 
 @app.route("/app.js")
@@ -537,12 +565,41 @@ def api_leave_game(game_id):
 @app.route("/api/bookings/<int:slot_id>", methods=["POST"])
 @login_required
 def api_book_slot(slot_id):
-    query(
-        "UPDATE turf_slots SET is_booked = 1, booked_by = %s WHERE id = %s AND is_booked = 0",
+    data = request.get_json() or {}
+    utr_number = data.get("utr_number", "").strip()
+    amount = data.get("amount", 0)
+    user = get_profile(current_user_id())
+    conn = get_db()
+    cur = conn.cursor()
+    slot = query("SELECT * FROM turf_slots WHERE id = %s", (slot_id,), one=True)
+    if not slot:
+        return jsonify({"error": "Slot not found"}), 404
+    cur.execute(
+        "UPDATE turf_slots SET is_booked = 1, status = 'pending', booked_by = %s WHERE id = %s",
         (current_user_id(), slot_id),
-        commit=True,
     )
+    cur.execute(
+        """INSERT INTO bookings (slot_id, user_id, player_name, player_email, utr_number, amount, status)
+           VALUES (%s, %s, %s, %s, %s, %s, 'pending') RETURNING id""",
+        (slot_id, current_user_id(), user["name"], user["email"], utr_number, amount),
+    )
+    conn.commit()
     return jsonify({"ok": True}), 201
+
+
+@app.route("/api/bookings/<int:slot_id>/info")
+@login_required
+def api_slot_info(slot_id):
+    info = query(
+        """SELECT t.upi_id, t.price_per_hour, t.name as turf_name
+           FROM turf_slots ts JOIN turfs t ON t.id = ts.turf_id
+           WHERE ts.id = %s""",
+        (slot_id,), one=True,
+    )
+    if not info:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify(dict(info))
+
 
 
 # ---------------------------------------------------------------------------
@@ -568,7 +625,7 @@ def admin_required(f):
 def admin_page():
     user = query("SELECT email FROM users WHERE id = %s", (current_user_id(),), one=True)
     if not user or user["email"] != ADMIN_EMAIL:
-        return redirect("/")
+        return redirect("/dashboard")
     return send_from_directory(".", "admin.html")
 
 
@@ -694,3 +751,236 @@ def initialize():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8000)), debug=False)
+
+
+# ---------------------------------------------------------------------------
+# Turf owner auth + routes
+# ---------------------------------------------------------------------------
+
+def owner_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if "owner_id" not in session:
+            if request.path.startswith("/api/"):
+                return jsonify({"error": "Unauthorized"}), 401
+            return redirect("/owner/login")
+        return f(*args, **kwargs)
+    return decorated
+
+
+def current_owner_id():
+    return session.get("owner_id")
+
+
+@app.route("/owner/register")
+def owner_register_page():
+    return send_from_directory(".", "owner_register.html")
+
+
+@app.route("/owner/login")
+def owner_login_page():
+    return send_from_directory(".", "owner_login.html")
+
+
+@app.route("/owner/dashboard")
+@owner_required
+def owner_dashboard_page():
+    return send_from_directory(".", "owner_dashboard.html")
+
+
+@app.route("/api/owner/register", methods=["POST"])
+def api_owner_register():
+    data = request.get_json()
+    name = data.get("name", "").strip()
+    email = data.get("email", "").strip().lower()
+    password = data.get("password", "")
+    phone = data.get("phone", "").strip()
+    turf_name = data.get("turf_name", "").strip()
+    area = data.get("area", "").strip()
+    price_per_hour = int(data.get("price_per_hour", 0))
+    surface = data.get("surface", "Astroturf")
+    distance_km = float(data.get("distance_km", 0))
+    upi_id = data.get("upi_id", "").strip()
+    if not all([name, email, password, turf_name, area, upi_id]):
+        return jsonify({"error": "All fields are required"}), 400
+    if len(password) < 8:
+        return jsonify({"error": "Password must be at least 8 characters"}), 400
+    existing = query("SELECT id FROM turf_owners WHERE email = %s", (email,), one=True)
+    if existing:
+        return jsonify({"error": "Email already registered"}), 409
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO turf_owners (name, email, phone, password_hash) VALUES (%s,%s,%s,%s) RETURNING id",
+        (name, email, phone, hash_password(password)),
+    )
+    owner_id = cur.fetchone()["id"]
+    cur.execute(
+        "INSERT INTO turfs (name, area, distance_km, surface, rating, price_per_hour, owner_id, upi_id) VALUES (%s,%s,%s,%s,4.5,%s,%s,%s) RETURNING id",
+        (turf_name, area, distance_km, surface, price_per_hour, owner_id, upi_id),
+    )
+    turf_id = cur.fetchone()["id"]
+    default_times = ["06:00", "07:00", "08:00", "09:00", "17:00", "18:00", "19:00", "20:00"]
+    for day_offset in range(7):
+        slot_date = (datetime.now() + timedelta(days=day_offset)).date().isoformat()
+        for slot_time in default_times:
+            cur.execute(
+                "INSERT INTO turf_slots (turf_id, slot_date, slot_time, is_booked, status) VALUES (%s,%s,%s,0,'available')",
+                (turf_id, slot_date, slot_time),
+            )
+    conn.commit()
+    session["owner_id"] = owner_id
+    return jsonify({"ok": True}), 201
+
+
+@app.route("/api/owner/login", methods=["POST"])
+def api_owner_login():
+    data = request.get_json()
+    email = data.get("email", "").strip().lower()
+    password = data.get("password", "")
+    owner = query("SELECT id, password_hash FROM turf_owners WHERE email = %s", (email,), one=True)
+    if not owner or not verify_password(password, owner["password_hash"]):
+        return jsonify({"error": "Invalid email or password"}), 401
+    session["owner_id"] = owner["id"]
+    return jsonify({"ok": True})
+
+
+@app.route("/api/owner/logout", methods=["POST"])
+def api_owner_logout():
+    session.pop("owner_id", None)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/owner/dashboard")
+@owner_required
+def api_owner_dashboard():
+    owner = query("SELECT id, name, email FROM turf_owners WHERE id = %s", (current_owner_id(),), one=True)
+    turf = query("SELECT * FROM turfs WHERE owner_id = %s", (current_owner_id(),), one=True)
+    if not turf:
+        return jsonify({"error": "No turf found"}), 404
+    today = datetime.now().date().isoformat()
+    bookings = [dict(r) for r in query(
+        """SELECT b.id, b.player_name, b.player_email, b.utr_number, b.amount, b.status,
+           ts.slot_date, ts.slot_time
+           FROM bookings b JOIN turf_slots ts ON ts.id = b.slot_id
+           WHERE ts.turf_id = %s ORDER BY b.id DESC""",
+        (turf["id"],),
+    )]
+    pending_count = sum(1 for b in bookings if b["status"] == "pending")
+    confirmed_today = sum(1 for b in bookings if b["status"] == "confirmed" and b["slot_date"] == today)
+    revenue_today = sum(b["amount"] for b in bookings if b["status"] == "confirmed" and b["slot_date"] == today)
+    return jsonify({
+        "owner": dict(owner),
+        "turf": dict(turf),
+        "bookings": bookings,
+        "stats": {
+            "pending": pending_count,
+            "confirmed_today": confirmed_today,
+            "revenue_today": revenue_today,
+            "total_bookings": len(bookings),
+        },
+    })
+
+
+@app.route("/api/owner/bookings/<int:booking_id>/approve", methods=["POST"])
+@owner_required
+def api_owner_approve(booking_id):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("UPDATE bookings SET status = 'confirmed' WHERE id = %s", (booking_id,))
+    cur.execute("UPDATE turf_slots SET status = 'confirmed' WHERE id = (SELECT slot_id FROM bookings WHERE id = %s)", (booking_id,))
+    conn.commit()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/owner/bookings/<int:booking_id>/reject", methods=["POST"])
+@owner_required
+def api_owner_reject(booking_id):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("UPDATE bookings SET status = 'rejected' WHERE id = %s", (booking_id,))
+    cur.execute("UPDATE turf_slots SET is_booked = 0, status = 'available', booked_by = NULL WHERE id = (SELECT slot_id FROM bookings WHERE id = %s)", (booking_id,))
+    conn.commit()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/owner/slots")
+@owner_required
+def api_owner_slots():
+    date = request.args.get("date", datetime.now().date().isoformat())
+    turf = query("SELECT id FROM turfs WHERE owner_id = %s", (current_owner_id(),), one=True)
+    if not turf:
+        return jsonify({"slots": []})
+    slots = [dict(r) for r in query(
+        """SELECT ts.slot_time, ts.status, b.player_name
+           FROM turf_slots ts LEFT JOIN bookings b ON b.slot_id = ts.id AND b.status != 'rejected'
+           WHERE ts.turf_id = %s AND ts.slot_date = %s ORDER BY ts.slot_time""",
+        (turf["id"], date),
+    )]
+    return jsonify({"slots": slots})
+
+
+@app.route("/api/owner/settings", methods=["PUT"])
+@owner_required
+def api_owner_settings():
+    data = request.get_json()
+    query(
+        "UPDATE turfs SET name=%s, area=%s, price_per_hour=%s, upi_id=%s WHERE owner_id=%s",
+        (data.get("turf_name"), data.get("area"), int(data.get("price_per_hour", 0)), data.get("upi_id"), current_owner_id()),
+        commit=True,
+    )
+    return jsonify({"ok": True})
+
+
+# ---------------------------------------------------------------------------
+# Multi-page routes
+# ---------------------------------------------------------------------------
+
+@app.route("/")
+def root():
+    if "user_id" in session:
+        return redirect("/dashboard")
+    return send_from_directory(".", "landing.html")
+
+@app.route("/dashboard")
+@login_required
+def dashboard_page():
+    return send_from_directory(".", "dashboard.html")
+
+@app.route("/games")
+@login_required
+def games_page():
+    return send_from_directory(".", "games.html")
+
+@app.route("/lobby")
+@login_required
+def lobby_page():
+    return send_from_directory(".", "lobby.html")
+
+@app.route("/turfs")
+@login_required
+def turfs_page():
+    return send_from_directory(".", "turfs.html")
+
+@app.route("/leagues")
+@login_required
+def leagues_page():
+    return send_from_directory(".", "leagues.html")
+
+@app.route("/profile")
+@login_required
+def profile_page():
+    return send_from_directory(".", "profile.html")
+
+@app.route("/nav.js")
+def serve_nav_js():
+    return send_from_directory(".", "nav.js")
+
+@app.route("/api/public/stats")
+def api_public_stats():
+    return jsonify({
+        "players": query("SELECT COUNT(*) FROM users", one=True)["count"],
+        "games": query("SELECT COUNT(*) FROM games", one=True)["count"],
+        "turfs": query("SELECT COUNT(*) FROM turfs", one=True)["count"],
+        "leagues": query("SELECT COUNT(*) FROM leagues", one=True)["count"],
+    })

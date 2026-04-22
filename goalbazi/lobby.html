@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Goalbazi — Lobby</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/goalbazi-logo.svg">
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    .lobby-shell { padding: 28px 20px 80px; }
+
+    .back-link { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: .88rem; margin-bottom: 20px; text-decoration: none; }
+    .back-link:hover { color: var(--text); }
+
+    /* Hero bar */
+    .lobby-hero {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .lobby-title { font-family: 'Syne', sans-serif; font-size: clamp(1.3rem,4vw,1.8rem); font-weight: 800; letter-spacing:-.04em; margin-bottom: 6px; }
+    .lobby-meta { color: var(--muted); font-size: .88rem; line-height: 1.7; }
+    .lobby-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+
+    /* Countdown */
+    .countdown {
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .countdown-label { color: var(--muted); font-size: .75rem; font-weight: 600; margin-bottom: 4px; }
+    .countdown-time { font-family: 'Syne', sans-serif; font-size: 1.4rem; font-weight: 800; color: var(--brand); letter-spacing: .05em; }
+
+    /* Action buttons */
+    .lobby-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    /* Teams */
+    .teams-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px; }
+    .team-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
+    .team-label { font-family: 'Syne', sans-serif; font-weight: 800; font-size: .85rem; color: var(--brand); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 12px; }
+    .player-slot { padding: 10px 12px; border-radius: var(--radius-xs); background: var(--panel-2); border: 1px solid var(--line); margin-bottom: 8px; }
+    .player-slot:last-child { margin-bottom: 0; }
+    .slot-name { font-weight: 600; font-size: .9rem; }
+    .slot-role { color: var(--muted); font-size: .78rem; margin-top: 2px; }
+    .slot-open .slot-name { color: var(--muted); font-style: italic; }
+
+    /* Chat */
+    .chat-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
+    .chat-head { font-family: 'Syne', sans-serif; font-weight: 700; font-size: .95rem; margin-bottom: 14px; }
+    .chat-feed { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; margin-bottom: 14px; padding-right: 4px; }
+    .chat-feed::-webkit-scrollbar { width: 4px; }
+    .chat-feed::-webkit-scrollbar-track { background: transparent; }
+    .chat-feed::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 2px; }
+    .chat-msg { background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px 12px; }
+    .chat-sender { font-size: .78rem; font-weight: 700; color: var(--brand); margin-bottom: 3px; }
+    .chat-text { font-size: .9rem; line-height: 1.5; }
+    .chat-system { text-align: center; color: var(--muted); font-size: .8rem; padding: 4px 0; }
+    .chat-form { display: flex; gap: 8px; }
+    .chat-form input { flex: 1; }
+
+    @media (max-width: 500px) {
+      .teams-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (min-width: 768px) {
+      .lobby-shell { padding: 36px 28px 80px; }
+      .lobby-grid { display: grid; grid-template-columns: 1fr 360px; gap: 20px; align-items: start; }
+    }
+  </style>
+</head>
+<body>
+<nav class="navbar" id="navbar"></nav>
+<div class="nav-drawer" id="nav-drawer"></div>
+<div class="ambient ambient-a"></div>
+<div class="ambient ambient-b"></div>
+
+<div class="page-wrap">
+  <div class="container lobby-shell">
+    <a href="/games" class="back-link">← Back to games</a>
+
+    <div id="lobby-content">
+      <div class="page-loader"><div class="spinner"></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/nav.js"></script>
+<script>
+  initNav("games");
+
+  const gameId = new URLSearchParams(location.search).get("id");
+  if (!gameId) window.location.href = "/games";
+
+  let countdownInterval = null;
+
+  function formatDate(d) {
+    return new Intl.DateTimeFormat("en-IN", { weekday: "short", month: "short", day: "numeric" }).format(new Date(d));
+  }
+
+  function formatCountdown(iso) {
+    const diff = new Date(iso).getTime() - Date.now();
+    if (diff <= 0) return "Kicked off";
+    const s = Math.floor(diff / 1000);
+    const h = String(Math.floor(s / 3600)).padStart(2,"0");
+    const m = String(Math.floor((s % 3600) / 60)).padStart(2,"0");
+    const sec = String(s % 60).padStart(2,"0");
+    return `${h}:${m}:${sec}`;
+  }
+
+  function renderSlots(players, max) {
+    const slots = [...players];
+    while (slots.length < max) slots.push(null);
+    return slots.map(p => {
+      if (!p) return `<div class="player-slot slot-open"><div class="slot-name">Open slot</div><div class="slot-role">Waiting for a player</div></div>`;
+      return `<div class="player-slot"><div class="slot-name">${p.player_name}${p.is_captain ? " 🏅" : ""}</div><div class="slot-role">${p.player_role}</div></div>`;
+    }).join("");
+  }
+
+  async function loadLobby() {
+    const game = await apiFetch(`/api/games/${gameId}`);
+    if (!game) return;
+
+    document.title = `${game.title} — Goalbazi`;
+
+    const teamA = game.players.filter(p => p.team_name === "A");
+    const teamB = game.players.filter(p => p.team_name === "B");
+
+    document.getElementById("lobby-content").innerHTML = `
+      <div class="lobby-hero">
+        <div class="lobby-top">
+          <div>
+            <div class="lobby-title">${game.title}</div>
+            <div class="lobby-meta">
+              ${formatDate(game.game_date)} · ${game.game_time}<br>
+              📍 ${game.location} · ${game.format} · ${game.skill_level}
+            </div>
+          </div>
+          <div class="countdown">
+            <div class="countdown-label">Kick-off in</div>
+            <div class="countdown-time" id="countdown-display">${formatCountdown(game.kickoff_at)}</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+          <span class="pill pill-green">${game.status}</span>
+          <span class="pill pill-muted">${game.confirmed_players} confirmed</span>
+        </div>
+        <div class="lobby-actions">
+          <button class="btn btn-primary btn-sm" id="confirm-btn">✓ Confirm attendance</button>
+          <button class="btn btn-ghost btn-sm" id="leave-btn">Leave lobby</button>
+        </div>
+      </div>
+
+      <div class="lobby-grid">
+        <div>
+          <div class="teams-grid">
+            <div class="team-card">
+              <div class="team-label">Team A</div>
+              ${renderSlots(teamA, game.players_per_team)}
+            </div>
+            <div class="team-card">
+              <div class="team-label">Team B</div>
+              ${renderSlots(teamB, game.players_per_team)}
+            </div>
+          </div>
+        </div>
+
+        <div class="chat-card">
+          <div class="chat-head">💬 Lobby chat</div>
+          <div class="chat-feed" id="chat-feed">
+            ${game.messages.map(m => m.is_system
+              ? `<div class="chat-system">${m.message}</div>`
+              : `<div class="chat-msg"><div class="chat-sender">${m.sender_name}</div><div class="chat-text">${m.message}</div></div>`
+            ).join("")}
+          </div>
+          <form class="chat-form" id="chat-form">
+            <input class="form-input" id="chat-input" placeholder="Say something..." maxlength="140">
+            <button class="btn btn-primary btn-sm" type="submit">Send</button>
+          </form>
+        </div>
+      </div>
+    `;
+
+    // Scroll chat to bottom
+    const feed = document.getElementById("chat-feed");
+    if (feed) feed.scrollTop = feed.scrollHeight;
+
+    // Countdown
+    if (countdownInterval) clearInterval(countdownInterval);
+    countdownInterval = setInterval(() => {
+      const el = document.getElementById("countdown-display");
+      if (el) el.textContent = formatCountdown(game.kickoff_at);
+    }, 1000);
+
+    // Confirm
+    document.getElementById("confirm-btn").addEventListener("click", async () => {
+      await apiFetch(`/api/games/${gameId}/attendance`, { method: "POST" });
+      showToast("Attendance confirmed ✓");
+      loadLobby();
+    });
+
+    // Leave
+    document.getElementById("leave-btn").addEventListener("click", async () => {
+      await apiFetch(`/api/games/${gameId}/attendance`, { method: "DELETE" });
+      showToast("You left the lobby");
+      loadLobby();
+    });
+
+    // Chat
+    document.getElementById("chat-form").addEventListener("submit", async e => {
+      e.preventDefault();
+      const input = document.getElementById("chat-input");
+      const msg = input.value.trim();
+      if (!msg) return;
+      input.value = "";
+      await apiFetch(`/api/games/${gameId}/messages`, { method: "POST", body: JSON.stringify({ message: msg }) });
+      loadLobby();
+    });
+  }
+
+  loadLobby();
+</script>
+</body>
+</html>

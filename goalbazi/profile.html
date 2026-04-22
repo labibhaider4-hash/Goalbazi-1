@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Goalbazi — Profile</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/goalbazi-logo.svg">
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    .profile-shell { padding: 28px 20px 80px; max-width: 680px; }
+    .page-header { margin-bottom: 24px; }
+    .page-header h1 { font-size: clamp(1.6rem,5vw,2.4rem); font-weight:800; letter-spacing:-.04em; }
+
+    .profile-hero {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 24px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .profile-avatar {
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      color: #060d08;
+      display: grid;
+      place-items: center;
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 1.5rem;
+      flex-shrink: 0;
+    }
+    .profile-info-name { font-family:'Syne',sans-serif; font-weight:800; font-size:1.3rem; }
+    .profile-info-meta { color:var(--muted); font-size:.88rem; margin-top:3px; }
+    .profile-tags { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+
+    .edit-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 24px;
+    }
+    .edit-card h2 { font-family:'Syne',sans-serif; font-weight:700; font-size:1rem; margin-bottom:18px; }
+
+    @media (min-width:768px) { .profile-shell { padding:36px 28px 80px; } }
+  </style>
+</head>
+<body>
+<nav class="navbar" id="navbar"></nav>
+<div class="nav-drawer" id="nav-drawer"></div>
+<div class="ambient ambient-a"></div>
+<div class="ambient ambient-b"></div>
+
+<div class="page-wrap">
+  <div class="container profile-shell">
+    <div class="page-header">
+      <h1>My profile</h1>
+    </div>
+
+    <!-- Hero card -->
+    <div class="profile-hero" id="profile-hero">
+      <div class="page-loader"><div class="spinner"></div></div>
+    </div>
+
+    <!-- Edit form -->
+    <div class="edit-card">
+      <h2>Edit details</h2>
+      <form id="profile-form" class="form-grid" style="gap:14px">
+        <div class="form-grid form-grid-2">
+          <div class="form-group">
+            <label class="form-label">Full name</label>
+            <input name="name" id="f-name" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Handle</label>
+            <input name="handle" id="f-handle" class="form-input" required>
+          </div>
+        </div>
+        <div class="form-grid form-grid-2">
+          <div class="form-group">
+            <label class="form-label">Location</label>
+            <input name="location" id="f-location" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Preferred format</label>
+            <input name="preferred_format" id="f-format" class="form-input" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Bio</label>
+          <textarea name="bio" id="f-bio" class="form-input" rows="3" style="resize:vertical"></textarea>
+        </div>
+        <button class="btn btn-primary" type="submit" id="save-btn">Save changes</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/nav.js"></script>
+<script>
+  initNav("profile");
+
+  async function load() {
+    const data = await apiFetch("/api/dashboard");
+    if (!data) return;
+    const p = data.profile;
+    const initials = p.name.split(" ").map(x => x[0]).slice(0,2).join("").toUpperCase();
+
+    document.getElementById("profile-hero").innerHTML = `
+      <div class="profile-avatar">${initials}</div>
+      <div>
+        <div class="profile-info-name">${p.name}</div>
+        <div class="profile-info-meta">${p.handle} · ${p.location}</div>
+        <div class="profile-tags">
+          ${[p.position, p.preferred_format, p.skill].filter(Boolean).map(t => `<span class="pill pill-green">${t}</span>`).join("")}
+        </div>
+        ${p.bio ? `<div style="color:var(--muted);font-size:.85rem;margin-top:10px;line-height:1.6">${p.bio}</div>` : ""}
+      </div>
+    `;
+
+    document.getElementById("f-name").value = p.name;
+    document.getElementById("f-handle").value = p.handle;
+    document.getElementById("f-location").value = p.location;
+    document.getElementById("f-format").value = p.preferred_format;
+    document.getElementById("f-bio").value = p.bio || "";
+  }
+
+  document.getElementById("profile-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    const btn = document.getElementById("save-btn");
+    btn.textContent = "Saving...";
+    btn.disabled = true;
+    try {
+      const data = Object.fromEntries(new FormData(e.currentTarget).entries());
+      await apiFetch("/api/profile", { method: "PUT", body: JSON.stringify(data) });
+      showToast("Profile saved ✓");
+      load();
+    } catch (err) {
+      showToast("Error: " + err.message);
+    } finally {
+      btn.textContent = "Save changes";
+      btn.disabled = false;
+    }
+  });
+
+  load();
+</script>
+</body>
+</html>
