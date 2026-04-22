@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Goalbazi Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #09110e;
+      --panel: #13201b;
+      --panel-soft: #172822;
+      --line: rgba(255,255,255,.08);
+      --text: #eff7f3;
+      --muted: #8ea89c;
+      --brand: #84f255;
+      --brand-2: #dafc7c;
+      --danger: #ff8366;
+      --shadow: 0 24px 90px rgba(0,0,0,.28);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      font-family: "Manrope", sans-serif;
+      background: radial-gradient(circle at 15% 20%, rgba(132,242,85,.10), transparent 24%),
+                  linear-gradient(180deg, var(--bg) 0%, #050807 100%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .shell { display: flex; min-height: 100vh; }
+
+    /* Sidebar */
+    .sidebar {
+      width: 220px;
+      background: var(--panel);
+      border-right: 1px solid var(--line);
+      padding: 28px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+    }
+    .sidebar-brand {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--brand);
+      padding: 0 10px 20px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 10px;
+    }
+    .sidebar-brand span { color: var(--muted); font-size: .78rem; font-weight: 500; display: block; margin-top: 2px; }
+    .nav-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-weight: 600;
+      font-size: .9rem;
+      cursor: pointer;
+      width: 100%;
+      text-align: left;
+      transition: .15s;
+    }
+    .nav-btn:hover { background: rgba(255,255,255,.04); color: var(--text); }
+    .nav-btn.active { background: rgba(132,242,85,.1); color: var(--brand); }
+    .nav-icon { font-size: 1rem; width: 20px; text-align: center; }
+    .sidebar-bottom { margin-top: auto; }
+    .logout-btn {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--danger);
+      font-weight: 700;
+      font-size: .88rem;
+      cursor: pointer;
+    }
+
+    /* Main content */
+    .main { margin-left: 220px; padding: 32px; flex: 1; }
+    .page { display: none; }
+    .page.active { display: block; }
+
+    .page-title {
+      font-size: 1.6rem;
+      font-weight: 800;
+      letter-spacing: -.04em;
+      margin-bottom: 6px;
+    }
+    .page-sub { color: var(--muted); margin-bottom: 28px; }
+
+    /* Stats row */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .stat-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 20px;
+      box-shadow: var(--shadow);
+    }
+    .stat-value { font-size: 2rem; font-weight: 800; color: var(--brand); }
+    .stat-label { color: var(--muted); font-size: .85rem; margin-top: 4px; }
+
+    /* Tables */
+    .table-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      margin-bottom: 24px;
+    }
+    .table-head {
+      padding: 18px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--line);
+    }
+    .table-head h3 { font-size: 1rem; font-weight: 800; }
+    .count-chip {
+      background: rgba(132,242,85,.1);
+      color: var(--brand);
+      border: 1px solid rgba(132,242,85,.2);
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: .78rem;
+      font-weight: 700;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      text-align: left;
+      padding: 12px 16px;
+      color: var(--muted);
+      font-size: .8rem;
+      font-weight: 700;
+      border-bottom: 1px solid var(--line);
+    }
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(255,255,255,.03);
+      font-size: .9rem;
+      vertical-align: middle;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,.02); }
+
+    .pill {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: .75rem;
+      font-weight: 700;
+    }
+    .pill-green { background: rgba(132,242,85,.12); color: var(--brand); border: 1px solid rgba(132,242,85,.2); }
+    .pill-muted { background: rgba(255,255,255,.04); color: var(--muted); border: 1px solid var(--line); }
+    .pill-red { background: rgba(255,131,102,.12); color: var(--danger); border: 1px solid rgba(255,131,102,.2); }
+
+    .action-btn {
+      padding: 5px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--danger);
+      font-size: .78rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .action-btn:hover { background: rgba(255,131,102,.1); }
+
+    /* Search bar */
+    .search-bar {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--panel-soft);
+      color: var(--text);
+      font-family: inherit;
+      font-size: .9rem;
+      margin-bottom: 16px;
+      outline: none;
+    }
+
+    /* Loading */
+    .loading { color: var(--muted); padding: 20px; text-align: center; }
+
+    /* Empty */
+    .empty { color: var(--muted); padding: 32px; text-align: center; font-size: .9rem; }
+
+    @media (max-width: 900px) {
+      .sidebar { width: 60px; padding: 16px 8px; }
+      .sidebar-brand, .nav-btn span, .sidebar-brand span { display: none; }
+      .nav-btn { justify-content: center; padding: 10px; }
+      .main { margin-left: 60px; padding: 20px; }
+      .stats-row { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="shell">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      ⚽ Goalbazi
+      <span>Admin Panel</span>
+    </div>
+    <button class="nav-btn active" data-page="overview">
+      <span class="nav-icon">📊</span>
+      <span>Overview</span>
+    </button>
+    <button class="nav-btn" data-page="users">
+      <span class="nav-icon">👥</span>
+      <span>Users</span>
+    </button>
+    <button class="nav-btn" data-page="games">
+      <span class="nav-icon">🎮</span>
+      <span>Games</span>
+    </button>
+    <button class="nav-btn" data-page="turfs">
+      <span class="nav-icon">🏟️</span>
+      <span>Turfs</span>
+    </button>
+    <button class="nav-btn" data-page="bookings">
+      <span class="nav-icon">📅</span>
+      <span>Bookings</span>
+    </button>
+    <button class="nav-btn" data-page="messages">
+      <span class="nav-icon">💬</span>
+      <span>Messages</span>
+    </button>
+    <div class="sidebar-bottom">
+      <button class="nav-btn" onclick="window.location.href='/'">
+        <span class="nav-icon">🏠</span>
+        <span>Back to site</span>
+      </button>
+      <button class="logout-btn" id="logout-btn">Log out</button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+
+    <!-- Overview -->
+    <div class="page active" id="page-overview">
+      <div class="page-title">Overview</div>
+      <div class="page-sub">Live snapshot of your Goalbazi platform</div>
+      <div class="stats-row" id="admin-stats"></div>
+      <div class="table-card">
+        <div class="table-head">
+          <h3>Recent signups</h3>
+          <span class="count-chip" id="recent-count">—</span>
+        </div>
+        <table>
+          <thead><tr><th>Name</th><th>Handle</th><th>Email</th><th>Location</th></tr></thead>
+          <tbody id="recent-users-body"></tbody>
+        </table>
+      </div>
+      <div class="table-card">
+        <div class="table-head">
+          <h3>Recent games</h3>
+        </div>
+        <table>
+          <thead><tr><th>Title</th><th>Format</th><th>Date</th><th>Status</th><th>Players</th></tr></thead>
+          <tbody id="recent-games-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Users -->
+    <div class="page" id="page-users">
+      <div class="page-title">Users</div>
+      <div class="page-sub">All registered players on Goalbazi</div>
+      <input class="search-bar" id="user-search" placeholder="Search by name, handle or email...">
+      <div class="table-card">
+        <div class="table-head">
+          <h3>All users</h3>
+          <span class="count-chip" id="users-count">—</span>
+        </div>
+        <table>
+          <thead><tr><th>Name</th><th>Handle</th><th>Email</th><th>Location</th><th>Skill</th><th>Action</th></tr></thead>
+          <tbody id="users-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Games -->
+    <div class="page" id="page-games">
+      <div class="page-title">Games</div>
+      <div class="page-sub">All matches created on the platform</div>
+      <div class="table-card">
+        <div class="table-head">
+          <h3>All games</h3>
+          <span class="count-chip" id="games-count">—</span>
+        </div>
+        <table>
+          <thead><tr><th>Title</th><th>Format</th><th>Skill</th><th>Date</th><th>Time</th><th>Status</th><th>Players</th><th>Action</th></tr></thead>
+          <tbody id="games-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Turfs -->
+    <div class="page" id="page-turfs">
+      <div class="page-title">Turfs</div>
+      <div class="page-sub">All registered turfs and their availability</div>
+      <div class="table-card">
+        <div class="table-head">
+          <h3>All turfs</h3>
+          <span class="count-chip" id="turfs-count">—</span>
+        </div>
+        <table>
+          <thead><tr><th>Name</th><th>Area</th><th>Surface</th><th>Rating</th><th>Price/hr</th><th>Distance</th></tr></thead>
+          <tbody id="turfs-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Bookings -->
+    <div class="page" id="page-bookings">
+      <div class="page-title">Bookings</div>
+      <div class="page-sub">All turf slot bookings</div>
+      <div class="table-card">
+        <div class="table-head">
+          <h3>Booked slots</h3>
+          <span class="count-chip" id="bookings-count">—</span>
+        </div>
+        <table>
+          <thead><tr><th>Turf</th><th>Date</th><th>Time</th><th>Booked by</th></tr></thead>
+          <tbody id="bookings-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Messages -->
+    <div class="page" id="page-messages">
+      <div class="page-title">Messages</div>
+      <div class="page-sub">All lobby chat messages across games</div>
+      <div class="table-card">
+        <div class="table-head">
+          <h3>All messages</h3>
+          <span class="count-chip" id="messages-count">—</span>
+        </div>
+        <table>
+          <thead><tr><th>Game</th><th>Sender</th><th>Message</th><th>Type</th><th>Time</th></tr></thead>
+          <tbody id="messages-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  let allUsers = [];
+  let allGames = [];
+
+  async function api(path) {
+    const res = await fetch(path);
+    if (res.status === 401) { window.location.href = "/login"; return null; }
+    if (res.status === 403) { document.body.innerHTML = '<div style="padding:40px;color:#ff8366;font-family:Manrope,sans-serif;font-size:1.1rem;">⛔ Access denied. Admin only.</div>'; return null; }
+    return res.json();
+  }
+
+  async function loadOverview() {
+    const data = await api("/api/admin/overview");
+    if (!data) return;
+
+    document.getElementById("admin-stats").innerHTML = data.stats.map(s => `
+      <div class="stat-card">
+        <div class="stat-value">${s.value}</div>
+        <div class="stat-label">${s.label}</div>
+      </div>
+    `).join("");
+
+    document.getElementById("recent-count").textContent = data.recent_users.length;
+    document.getElementById("recent-users-body").innerHTML = data.recent_users.map(u => `
+      <tr>
+        <td>${u.name}</td>
+        <td style="color:var(--muted)">${u.handle}</td>
+        <td style="color:var(--muted)">${u.email}</td>
+        <td>${u.location}</td>
+      </tr>
+    `).join("") || '<tr><td colspan="4" class="empty">No users yet</td></tr>';
+
+    document.getElementById("recent-games-body").innerHTML = data.recent_games.map(g => `
+      <tr>
+        <td>${g.title}</td>
+        <td>${g.format}</td>
+        <td style="color:var(--muted)">${g.game_date}</td>
+        <td><span class="pill pill-green">${g.status}</span></td>
+        <td>${g.player_count}</td>
+      </tr>
+    `).join("") || '<tr><td colspan="5" class="empty">No games yet</td></tr>';
+  }
+
+  async function loadUsers() {
+    const data = await api("/api/admin/users");
+    if (!data) return;
+    allUsers = data.users;
+    document.getElementById("users-count").textContent = allUsers.length;
+    renderUsers(allUsers);
+  }
+
+  function renderUsers(users) {
+    document.getElementById("users-body").innerHTML = users.map(u => `
+      <tr>
+        <td><strong>${u.name}</strong></td>
+        <td style="color:var(--muted)">${u.handle}</td>
+        <td style="color:var(--muted)">${u.email}</td>
+        <td>${u.location}</td>
+        <td><span class="pill pill-muted">${u.skill}</span></td>
+        <td><button class="action-btn" onclick="deleteUser(${u.id}, '${u.name}')">Remove</button></td>
+      </tr>
+    `).join("") || '<tr><td colspan="6" class="empty">No users</td></tr>';
+  }
+
+  async function deleteUser(id, name) {
+    if (!confirm(`Remove user "${name}"? This cannot be undone.`)) return;
+    await fetch(`/api/admin/users/${id}`, { method: "DELETE" });
+    await loadUsers();
+  }
+
+  async function loadGames() {
+    const data = await api("/api/admin/games");
+    if (!data) return;
+    allGames = data.games;
+    document.getElementById("games-count").textContent = allGames.length;
+    document.getElementById("games-body").innerHTML = allGames.map(g => `
+      <tr>
+        <td><strong>${g.title}</strong></td>
+        <td>${g.format}</td>
+        <td><span class="pill pill-muted">${g.skill_level}</span></td>
+        <td style="color:var(--muted)">${g.game_date}</td>
+        <td style="color:var(--muted)">${g.game_time}</td>
+        <td><span class="pill pill-green">${g.status}</span></td>
+        <td>${g.player_count}</td>
+        <td><button class="action-btn" onclick="deleteGame(${g.id}, '${g.title}')">Delete</button></td>
+      </tr>
+    `).join("") || '<tr><td colspan="8" class="empty">No games</td></tr>';
+  }
+
+  async function deleteGame(id, title) {
+    if (!confirm(`Delete game "${title}"? This cannot be undone.`)) return;
+    await fetch(`/api/admin/games/${id}`, { method: "DELETE" });
+    await loadGames();
+  }
+
+  async function loadTurfs() {
+    const data = await api("/api/admin/turfs");
+    if (!data) return;
+    document.getElementById("turfs-count").textContent = data.turfs.length;
+    document.getElementById("turfs-body").innerHTML = data.turfs.map(t => `
+      <tr>
+        <td><strong>${t.name}</strong></td>
+        <td>${t.area}</td>
+        <td><span class="pill pill-muted">${t.surface}</span></td>
+        <td style="color:var(--brand)">★ ${t.rating}</td>
+        <td>₹${t.price_per_hour}/hr</td>
+        <td>${t.distance_km} km</td>
+      </tr>
+    `).join("") || '<tr><td colspan="6" class="empty">No turfs</td></tr>';
+  }
+
+  async function loadBookings() {
+    const data = await api("/api/admin/bookings");
+    if (!data) return;
+    document.getElementById("bookings-count").textContent = data.bookings.length;
+    document.getElementById("bookings-body").innerHTML = data.bookings.map(b => `
+      <tr>
+        <td><strong>${b.turf_name}</strong></td>
+        <td style="color:var(--muted)">${b.slot_date}</td>
+        <td>${b.slot_time}</td>
+        <td>${b.booked_by_name || "—"}</td>
+      </tr>
+    `).join("") || '<tr><td colspan="4" class="empty">No bookings yet</td></tr>';
+  }
+
+  async function loadMessages() {
+    const data = await api("/api/admin/messages");
+    if (!data) return;
+    document.getElementById("messages-count").textContent = data.messages.length;
+    document.getElementById("messages-body").innerHTML = data.messages.map(m => `
+      <tr>
+        <td style="color:var(--muted);font-size:.82rem">${m.game_title}</td>
+        <td style="color:var(--brand);font-size:.82rem">${m.sender_name}</td>
+        <td>${m.message}</td>
+        <td><span class="pill ${m.is_system ? 'pill-muted' : 'pill-green'}">${m.is_system ? 'System' : 'Chat'}</span></td>
+        <td style="color:var(--muted);font-size:.78rem">${m.created_at?.slice(0,16) || ""}</td>
+      </tr>
+    `).join("") || '<tr><td colspan="5" class="empty">No messages yet</td></tr>';
+  }
+
+  // Nav
+  const pages = { overview: loadOverview, users: loadUsers, games: loadGames, turfs: loadTurfs, bookings: loadBookings, messages: loadMessages };
+  let loaded = new Set();
+
+  document.querySelectorAll(".nav-btn[data-page]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+      btn.classList.add("active");
+      const page = btn.dataset.page;
+      document.getElementById(`page-${page}`).classList.add("active");
+      if (!loaded.has(page)) { pages[page](); loaded.add(page); }
+    });
+  });
+
+  // User search
+  document.getElementById("user-search").addEventListener("input", e => {
+    const q = e.target.value.toLowerCase();
+    renderUsers(allUsers.filter(u =>
+      u.name.toLowerCase().includes(q) ||
+      u.handle.toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q)
+    ));
+  });
+
+  // Logout
+  document.getElementById("logout-btn").addEventListener("click", async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/login";
+  });
+
+  // Init
+  loadOverview();
+  loaded.add("overview");
+</script>
+</body>
+</html>

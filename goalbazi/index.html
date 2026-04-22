@@ -19,7 +19,7 @@
       <img class="brand-logo" src="/assets/goalbazi-logo.svg" alt="Goalbazi logo">
       <div>
         <div class="brand-name">Football bookings, squads, leagues, and live community play</div>
-        <div class="brand-sub">Logo extracted from your provided design and embedded directly into the site.</div>
+        <div class="brand-sub">Delhi NCR's community football platform</div>
       </div>
     </div>
     <div class="header-actions">
@@ -27,6 +27,7 @@
       <button class="ghost-btn" data-jump="turfs">Turfs</button>
       <button class="ghost-btn" data-jump="leagues">Leagues</button>
       <button class="primary-btn" data-jump="create">Create match</button>
+      <button class="ghost-btn" id="logout-btn">Log out</button>
     </div>
   </header>
 
@@ -34,9 +35,9 @@
     <section class="hero-panel">
       <p class="eyebrow">Now running on a real local database</p>
       <h1>Turn your football concept into a working website with live bookings, squads, and league data.</h1>
-      <p class="hero-copy">This version is powered by a Python backend and SQLite database, so updates to profile, bookings, chats, attendance, and created games persist instead of resetting every refresh.</p>
+      <p class="hero-copy">This version is powered by a Python backend and PostgreSQL database, so updates to profile, bookings, chats, attendance, and created games persist instead of resetting every refresh.</p>
       <div class="hero-badges">
-        <span class="badge-chip">SQLite</span>
+        <span class="badge-chip">PostgreSQL</span>
         <span class="badge-chip">Bookings</span>
         <span class="badge-chip">Chat</span>
         <span class="badge-chip">Attendance</span>
@@ -221,5 +222,11 @@
   <div class="toast" id="toast" aria-live="polite"></div>
 
   <script src="/app.js"></script>
+  <script>
+    document.getElementById("logout-btn").addEventListener("click", async () => {
+      await fetch("/api/auth/logout", { method: "POST" });
+      window.location.href = "/login";
+    });
+  </script>
 </body>
 </html>

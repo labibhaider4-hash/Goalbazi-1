@@ -546,14 +546,151 @@ def api_book_slot(slot_id):
 
 
 # ---------------------------------------------------------------------------
-# Entry point
+# Admin routes
 # ---------------------------------------------------------------------------
+
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "")
+
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if "user_id" not in session:
+            return jsonify({"error": "Unauthorized"}), 401
+        user = query("SELECT email FROM users WHERE id = %s", (current_user_id(),), one=True)
+        if not user or user["email"] != ADMIN_EMAIL:
+            return jsonify({"error": "Forbidden"}), 403
+        return f(*args, **kwargs)
+    return decorated
+
+
+@app.route("/admin")
+@login_required
+def admin_page():
+    user = query("SELECT email FROM users WHERE id = %s", (current_user_id(),), one=True)
+    if not user or user["email"] != ADMIN_EMAIL:
+        return redirect("/")
+    return send_from_directory(".", "admin.html")
+
+
+@app.route("/api/admin/overview")
+@admin_required
+def api_admin_overview():
+    stats = [
+        {"value": query("SELECT COUNT(*) FROM users", one=True)["count"], "label": "Total users"},
+        {"value": query("SELECT COUNT(*) FROM games", one=True)["count"], "label": "Total games"},
+        {"value": query("SELECT COUNT(*) FROM turf_slots WHERE is_booked = 1", one=True)["count"], "label": "Bookings"},
+        {"value": query("SELECT COUNT(*) FROM game_messages WHERE is_system = 0", one=True)["count"], "label": "Chat messages"},
+    ]
+    recent_users = [dict(r) for r in query(
+        "SELECT id, name, handle, email, location FROM users ORDER BY id DESC LIMIT 5"
+    )]
+    recent_games = [dict(r) for r in query(
+        """SELECT g.id, g.title, g.format, g.game_date, g.status,
+           COUNT(gp.id) as player_count
+           FROM games g LEFT JOIN game_players gp ON gp.game_id = g.id
+           GROUP BY g.id ORDER BY g.id DESC LIMIT 5"""
+    )]
+    return jsonify({"stats": stats, "recent_users": recent_users, "recent_games": recent_games})
+
+
+@app.route("/api/admin/users")
+@admin_required
+def api_admin_users():
+    users = [dict(r) for r in query(
+        "SELECT id, name, handle, email, location, skill, preferred_format FROM users ORDER BY id DESC"
+    )]
+    return jsonify({"users": users})
+
+
+@app.route("/api/admin/users/<int:user_id>", methods=["DELETE"])
+@admin_required
+def api_admin_delete_user(user_id):
+    if user_id == current_user_id():
+        return jsonify({"error": "Cannot delete yourself"}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM game_players WHERE user_id = %s", (user_id,))
+    cur.execute("UPDATE turf_slots SET is_booked = 0, booked_by = NULL WHERE booked_by = %s", (user_id,))
+    cur.execute("DELETE FROM users WHERE id = %s", (user_id,))
+    conn.commit()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/admin/games")
+@admin_required
+def api_admin_games():
+    games = [dict(r) for r in query(
+        """SELECT g.id, g.title, g.format, g.skill_level, g.game_date, g.game_time, g.status,
+           COUNT(gp.id) as player_count
+           FROM games g LEFT JOIN game_players gp ON gp.game_id = g.id
+           GROUP BY g.id ORDER BY g.id DESC"""
+    )]
+    return jsonify({"games": games})
+
+
+@app.route("/api/admin/games/<int:game_id>", methods=["DELETE"])
+@admin_required
+def api_admin_delete_game(game_id):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM game_players WHERE game_id = %s", (game_id,))
+    cur.execute("DELETE FROM game_messages WHERE game_id = %s", (game_id,))
+    cur.execute("DELETE FROM games WHERE id = %s", (game_id,))
+    conn.commit()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/admin/turfs")
+@admin_required
+def api_admin_turfs():
+    turfs = [dict(r) for r in query("SELECT * FROM turfs ORDER BY id ASC")]
+    return jsonify({"turfs": turfs})
+
+
+@app.route("/api/admin/bookings")
+@admin_required
+def api_admin_bookings():
+    bookings = [dict(r) for r in query(
+        """SELECT ts.id, t.name as turf_name, ts.slot_date, ts.slot_time,
+           u.name as booked_by_name
+           FROM turf_slots ts
+           JOIN turfs t ON t.id = ts.turf_id
+           LEFT JOIN users u ON u.id = ts.booked_by
+           WHERE ts.is_booked = 1
+           ORDER BY ts.slot_date DESC, ts.slot_time DESC"""
+    )]
+    return jsonify({"bookings": bookings})
+
+
+@app.route("/api/admin/messages")
+@admin_required
+def api_admin_messages():
+    messages = [dict(r) for r in query(
+        """SELECT gm.id, g.title as game_title, gm.sender_name, gm.message, gm.is_system, gm.created_at
+           FROM game_messages gm
+           JOIN games g ON g.id = gm.game_id
+           ORDER BY gm.id DESC LIMIT 100"""
+    )]
+    return jsonify({"messages": messages})
+
+
+# ---------------------------------------------------------------------------
+# Auto-initialize DB on first request
+# ---------------------------------------------------------------------------
+
+_db_ready = False
+
 @app.before_request
 def initialize():
-    if not getattr(app, '_db_initialized', False):
+    global _db_ready
+    if not _db_ready:
         seed_db()
-        app._db_initialized = True
+        _db_ready = True
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
 if __name__ == "__main__":
-    with app.app_context():
-        seed_db()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8000)), debug=False)
