@@ -37,6 +37,14 @@
       color: #060d08; font-size: .75rem;
       display: grid; place-items: center; cursor: pointer; font-weight: 800;
     }
+    .avatar-remove-btn {
+      position: absolute; top: 2px; right: 2px;
+      width: 22px; height: 22px; border-radius: 50%;
+      background: var(--danger); border: 2px solid var(--bg);
+      color: #fff; font-size: .65rem;
+      display: grid; place-items: center; cursor: pointer; font-weight: 800;
+      line-height: 1;
+    }
 
     .profile-info { flex: 1; min-width: 0; }
     .profile-name { font-family: 'Syne', sans-serif; font-size: 1.5rem; font-weight: 800; letter-spacing: -.04em; }
@@ -87,6 +95,43 @@
     .teammate-rating { color: var(--warn); font-size: .78rem; margin-top: 3px; }
 
     @media (min-width: 768px) { .profile-shell { padding: 36px 28px 80px; } }
+
+    /* Crop modal */
+    .crop-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.85); z-index: 500;
+      place-items: center; padding: 20px;
+    }
+    .crop-overlay.open { display: grid; }
+    .crop-box {
+      background: var(--panel); border: 1px solid var(--line-2);
+      border-radius: 24px; padding: 24px; width: 100%;
+      max-width: 360px; box-shadow: var(--shadow-lg);
+    }
+    .crop-title { font-family: "Syne",sans-serif; font-weight: 800; font-size: 1.1rem; margin-bottom: 6px; }
+    .crop-sub { color: var(--muted); font-size: .85rem; margin-bottom: 16px; }
+    .crop-canvas-wrap {
+      position: relative; width: 280px; height: 280px;
+      margin: 0 auto 16px; border-radius: 50%;
+      overflow: hidden; border: 3px solid var(--brand);
+      cursor: move; background: #000; touch-action: none;
+    }
+    .crop-canvas-wrap img {
+      position: absolute; transform-origin: center;
+      user-select: none; pointer-events: none;
+    }
+    .crop-controls { display: grid; gap: 10px; margin-bottom: 16px; }
+    .crop-zoom-row { display: flex; align-items: center; gap: 10px; }
+    .crop-zoom-label { color: var(--muted); font-size: .8rem; font-weight: 600; white-space: nowrap; }
+    .crop-zoom-slider {
+      flex: 1; -webkit-appearance: none; appearance: none;
+      height: 4px; border-radius: 2px; background: var(--line-2); outline: none;
+    }
+    .crop-zoom-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 16px; height: 16px;
+      border-radius: 50%; background: var(--brand); cursor: pointer;
+    }
+    .crop-actions { display: flex; gap: 10px; }
     @media (max-width: 400px) { .stats-row { grid-template-columns: 1fr 1fr; } }
   </style>
 </head>
@@ -96,6 +141,27 @@
 <div class="ambient ambient-a"></div>
 <div class="ambient ambient-b"></div>
 <input type="file" id="avatar-file-input" accept="image/*" style="display:none">
+
+<!-- Crop Modal -->
+<div class="crop-overlay" id="crop-overlay">
+  <div class="crop-box">
+    <div class="crop-title">Crop your photo</div>
+    <div class="crop-sub">Drag to reposition · Use slider to zoom</div>
+    <div class="crop-canvas-wrap" id="crop-wrap">
+      <img id="crop-img" src="" alt="">
+    </div>
+    <div class="crop-controls">
+      <div class="crop-zoom-row">
+        <span class="crop-zoom-label">🔍 Zoom</span>
+        <input type="range" class="crop-zoom-slider" id="crop-zoom" min="1" max="3" step="0.01" value="1">
+      </div>
+    </div>
+    <div class="crop-actions">
+      <button class="btn btn-primary btn-full" id="crop-save-btn">Save photo</button>
+      <button class="btn btn-ghost" id="crop-cancel-btn" style="flex-shrink:0">Cancel</button>
+    </div>
+  </div>
+</div>
 
 <div class="page-wrap">
   <div class="container profile-shell">
@@ -119,16 +185,16 @@
     <div class="tab-panel active" id="tab-edit">
       <div class="edit-card">
         <h3>Your details</h3>
-        <form id="profile-form" style="display:grid;gap:14px">
+        <form id="profile-form" style="display:grid;gap:14px" autocomplete="off">
           <div class="form-grid form-grid-2">
-            <div class="form-group"><label class="form-label">Full name</label><input name="name" id="f-name" class="form-input" required></div>
-            <div class="form-group"><label class="form-label">Handle</label><input name="handle" id="f-handle" class="form-input" required></div>
+            <div class="form-group"><label class="form-label">Full name</label><input name="name" id="f-name" class="form-input" required autocomplete="new-password" data-lpignore="true" data-form-type="other"></div>
+            <div class="form-group"><label class="form-label">Handle</label><input name="handle" id="f-handle" class="form-input" required autocomplete="new-password" data-lpignore="true" data-form-type="other"></div>
           </div>
           <div class="form-grid form-grid-2">
-            <div class="form-group"><label class="form-label">Location</label><input name="location" id="f-location" class="form-input" required></div>
-            <div class="form-group"><label class="form-label">Preferred format</label><input name="preferred_format" id="f-format" class="form-input" required></div>
+            <div class="form-group"><label class="form-label">Location</label><input name="location" id="f-location" class="form-input" required autocomplete="new-password" data-lpignore="true" data-form-type="other"></div>
+            <div class="form-group"><label class="form-label">Preferred format</label><input name="preferred_format" id="f-format" class="form-input" required autocomplete="new-password" data-lpignore="true" data-form-type="other"></div>
           </div>
-          <div class="form-group"><label class="form-label">Bio</label><textarea name="bio" id="f-bio" class="form-input" rows="3" style="resize:vertical"></textarea></div>
+          <div class="form-group"><label class="form-label">Bio</label><textarea name="bio" id="f-bio" class="form-input" rows="3" style="resize:vertical" autocomplete="off"></textarea></div>
           <button class="btn btn-primary" type="submit" id="save-btn">Save changes</button>
         </form>
       </div>
@@ -164,17 +230,19 @@
   function makeAvatar(user, size=88) {
     if (user.avatar_base64) return `<img src="${user.avatar_base64}" class="avatar-img" style="width:${size}px;height:${size}px">`;
     const i = user.name.split(" ").map(x=>x[0]).slice(0,2).join("").toUpperCase();
-    return `<div class="avatar-initials" style="width:${size}px;height:${size}px;font-size:${Math.round(size/2.5)}rem">${i}</div>`;
+    return `<div class="avatar-initials" style="width:${size}px;height:${size}px;font-size:${Math.round(size/2.5)}px">${i}</div>`;
   }
 
   async function loadProfile() {
     const data = await apiFetch("/api/dashboard");
     if (!data) return;
     const p = data.profile;
+    const hasPhoto = !!p.avatar_base64;
     document.getElementById("profile-hero").innerHTML = `
       <div class="avatar-wrap" id="avatar-wrap">
         ${makeAvatar(p)}
-        <div class="avatar-upload-btn" title="Change photo">📷</div>
+        <div class="avatar-upload-btn" id="avatar-upload-btn" title="Change photo">📷</div>
+        ${hasPhoto ? `<div class="avatar-remove-btn" id="avatar-remove-btn" title="Remove photo">✕</div>` : ""}
       </div>
       <div class="profile-info">
         <div class="profile-name">${p.name}</div>
@@ -184,13 +252,23 @@
         <div id="rating-display"><div class="no-rating">No ratings yet — play games to get rated</div></div>
       </div>
     `;
-    document.getElementById("avatar-wrap").addEventListener("click", () => document.getElementById("avatar-file-input").click());
+    document.getElementById("avatar-upload-btn").addEventListener("click", () => document.getElementById("avatar-file-input").click());
+    if (hasPhoto) {
+      document.getElementById("avatar-remove-btn").addEventListener("click", async (e) => {
+        e.stopPropagation();
+        if (!confirm("Remove your profile photo?")) return;
+        try {
+          await apiFetch("/api/profile/avatar", { method: "POST", body: JSON.stringify({ avatar_base64: "" }) });
+          showToast("Photo removed ✓");
+          loadProfile();
+        } catch { showToast("Failed to remove photo"); }
+      });
+    }
     document.getElementById("f-name").value = p.name;
     document.getElementById("f-handle").value = p.handle;
     document.getElementById("f-location").value = p.location;
     document.getElementById("f-format").value = p.preferred_format;
     document.getElementById("f-bio").value = p.bio || "";
-    // Load stats for rating display
     loadStats();
   }
 
@@ -268,19 +346,125 @@
     }
   }
 
-  // Avatar file upload
-  document.getElementById("avatar-file-input").addEventListener("change", async e => {
+  // ── Crop logic ──
+  let cropState = { x: 0, y: 0, zoom: 1, dragging: false, startX: 0, startY: 0, imgW: 0, imgH: 0 };
+  const CROP_SIZE = 280;
+
+  function applyCropTransform() {
+    const img = document.getElementById("crop-img");
+    const w = cropState.imgW * cropState.zoom;
+    const h = cropState.imgH * cropState.zoom;
+    // Clamp so image always covers circle
+    const maxX = (w - CROP_SIZE) / 2;
+    const maxY = (h - CROP_SIZE) / 2;
+    cropState.x = Math.max(-maxX, Math.min(maxX, cropState.x));
+    cropState.y = Math.max(-maxY, Math.min(maxY, cropState.y));
+    img.style.width = w + "px";
+    img.style.height = h + "px";
+    img.style.left = ((CROP_SIZE - w) / 2 + cropState.x) + "px";
+    img.style.top  = ((CROP_SIZE - h) / 2 + cropState.y) + "px";
+  }
+
+  function openCropper(src) {
+    const img = document.getElementById("crop-img");
+    const overlay = document.getElementById("crop-overlay");
+    const zoom = document.getElementById("crop-zoom");
+    img.src = src;
+    img.onload = () => {
+      // Scale so smallest side = CROP_SIZE
+      const scale = CROP_SIZE / Math.min(img.naturalWidth, img.naturalHeight);
+      cropState = { x: 0, y: 0, zoom: 1, dragging: false, startX: 0, startY: 0,
+                    imgW: img.naturalWidth * scale, imgH: img.naturalHeight * scale };
+      zoom.value = 1;
+      applyCropTransform();
+    };
+    overlay.classList.add("open");
+  }
+
+  // Drag (mouse)
+  const wrap = document.getElementById("crop-wrap");
+  wrap.addEventListener("mousedown", e => {
+    cropState.dragging = true;
+    cropState.startX = e.clientX - cropState.x;
+    cropState.startY = e.clientY - cropState.y;
+    e.preventDefault();
+  });
+  document.addEventListener("mousemove", e => {
+    if (!cropState.dragging) return;
+    cropState.x = e.clientX - cropState.startX;
+    cropState.y = e.clientY - cropState.startY;
+    applyCropTransform();
+  });
+  document.addEventListener("mouseup", () => cropState.dragging = false);
+
+  // Drag (touch)
+  wrap.addEventListener("touchstart", e => {
+    cropState.dragging = true;
+    cropState.startX = e.touches[0].clientX - cropState.x;
+    cropState.startY = e.touches[0].clientY - cropState.y;
+    e.preventDefault();
+  }, { passive: false });
+  document.addEventListener("touchmove", e => {
+    if (!cropState.dragging) return;
+    cropState.x = e.touches[0].clientX - cropState.startX;
+    cropState.y = e.touches[0].clientY - cropState.startY;
+    applyCropTransform();
+  }, { passive: true });
+  document.addEventListener("touchend", () => cropState.dragging = false);
+
+  // Zoom slider
+  document.getElementById("crop-zoom").addEventListener("input", e => {
+    cropState.zoom = parseFloat(e.target.value);
+    applyCropTransform();
+  });
+
+  // Cancel
+  document.getElementById("crop-cancel-btn").addEventListener("click", () => {
+    document.getElementById("crop-overlay").classList.remove("open");
+    document.getElementById("avatar-file-input").value = "";
+  });
+
+  // Save — draw cropped circle onto canvas, export as JPEG
+  document.getElementById("crop-save-btn").addEventListener("click", async () => {
+    const btn = document.getElementById("crop-save-btn");
+    btn.textContent = "Saving..."; btn.disabled = true;
+    try {
+      const img = document.getElementById("crop-img");
+      const canvas = document.createElement("canvas");
+      const OUT = 400;
+      canvas.width = OUT; canvas.height = OUT;
+      const ctx = canvas.getContext("2d");
+
+      // Clip to circle
+      ctx.beginPath();
+      ctx.arc(OUT/2, OUT/2, OUT/2, 0, Math.PI*2);
+      ctx.clip();
+
+      // Scale factor from display to output
+      const scale = OUT / CROP_SIZE;
+      const w = cropState.imgW * cropState.zoom * scale;
+      const h = cropState.imgH * cropState.zoom * scale;
+      const dx = ((CROP_SIZE - cropState.imgW * cropState.zoom) / 2 + cropState.x) * scale;
+      const dy = ((CROP_SIZE - cropState.imgH * cropState.zoom) / 2 + cropState.y) * scale;
+      ctx.drawImage(img, dx, dy, w, h);
+
+      const b64 = canvas.toDataURL("image/jpeg", 0.88);
+      await apiFetch("/api/profile/avatar", { method:"POST", body: JSON.stringify({ avatar_base64: b64 }) });
+      document.getElementById("crop-overlay").classList.remove("open");
+      document.getElementById("avatar-file-input").value = "";
+      showToast("Photo updated ✓");
+      loadProfile();
+    } catch { showToast("Upload failed"); }
+    finally { btn.textContent = "Save photo"; btn.disabled = false; }
+  });
+
+  // Avatar file upload — open cropper instead of direct upload
+  document.getElementById("avatar-file-input").addEventListener("change", e => {
     const file = e.target.files[0];
     if (!file) return;
-    if (file.size > 1_500_000) { showToast("Image too large — max 1.5MB"); return; }
+    if (file.size > 10_000_000) { showToast("Image too large — max 10MB"); return; }
     const reader = new FileReader();
-    reader.onload = async ev => {
-      try {
-        await apiFetch("/api/profile/avatar", { method:"POST", body: JSON.stringify({ avatar_base64: ev.target.result }) });
-        showToast("Photo updated ✓");
-        loadProfile();
-      } catch { showToast("Upload failed"); }
-    };
+    reader.onload = ev => openCropper(ev.target.result);
     reader.readAsDataURL(file);
   });
 
