@@ -1,10 +1,28 @@
-
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Goalbazi Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #09110e;
+      --panel: #13201b;
+      --panel-soft: #172822;
+      --line: rgba(255,255,255,.08);
+      --text: #eff7f3;
+      --muted: #8ea89c;
+      --brand: #84f255;
+      --brand-2: #dafc7c;
+      --danger: #ff8366;
+      --shadow: 0 24px 90px rgba(0,0,0,.28);
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
       font-family: "Manrope", sans-serif;
       background: radial-gradient(circle at 15% 20%, rgba(132,242,85,.10), transparent 24%),
                   linear-gradient(180deg, var(--bg) 0%, #050807 100%);
-      background: radial-gradient(circle at 15% 20%, rgba(132,242,85,.10), transparent 24%), linear-gradient(180deg, var(--bg) 0%, #050807 100%);
       color: var(--text);
       min-height: 100vh;
     }
@@ -14,14 +32,38 @@
     .sidebar {
       width: 220px;
       background: var(--panel);
+      border-right: 1px solid var(--line);
+      padding: 28px 16px;
+      display: flex;
       flex-direction: column;
       gap: 6px;
       position: fixed;
       top: 0; left: 0; bottom: 0;
-      inset: 0 auto 0 0;
     }
     .sidebar-brand {
       font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--brand);
+      padding: 0 10px 20px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 10px;
+    }
+    .sidebar-brand span { color: var(--muted); font-size: .78rem; font-weight: 500; display: block; margin-top: 2px; }
+    .nav-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-weight: 600;
+      font-size: .9rem;
+      cursor: pointer;
+      width: 100%;
+      text-align: left;
+      transition: .15s;
     }
     .nav-btn:hover { background: rgba(255,255,255,.04); color: var(--text); }
     .nav-btn.active { background: rgba(132,242,85,.1); color: var(--brand); }
@@ -29,6 +71,12 @@
     .sidebar-bottom { margin-top: auto; }
     .logout-btn {
       width: 100%;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--danger);
+      font-weight: 700;
       font-size: .88rem;
       cursor: pointer;
     }
@@ -54,17 +102,12 @@
       margin-bottom: 28px;
     }
     .stat-card {
-    .page-title { font-size: 1.6rem; font-weight: 800; letter-spacing: -.04em; margin-bottom: 6px; }
-    .page-sub { color: var(--muted); margin-bottom: 24px; }
-    .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 24px; }
-    .stat-card, .table-card {
       background: var(--panel);
       border: 1px solid var(--line);
       border-radius: 18px;
       padding: 20px;
       box-shadow: var(--shadow);
     }
-    .stat-card { padding: 20px; }
     .stat-value { font-size: 2rem; font-weight: 800; color: var(--brand); }
     .stat-label { color: var(--muted); font-size: .85rem; margin-top: 4px; }
 
@@ -77,20 +120,21 @@
       box-shadow: var(--shadow);
       margin-bottom: 24px;
     }
-    .table-card { overflow: hidden; margin-bottom: 18px; }
     .table-head {
       padding: 18px 20px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       border-bottom: 1px solid var(--line);
-      gap: 12px;
     }
     .table-head h3 { font-size: 1rem; font-weight: 800; }
-    .table-body { padding: 20px; }
     .count-chip {
       background: rgba(132,242,85,.1);
       color: var(--brand);
+      border: 1px solid rgba(132,242,85,.2);
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: .78rem;
       font-weight: 700;
     }
     table { width: 100%; border-collapse: collapse; }
@@ -108,14 +152,15 @@
       font-size: .9rem;
       vertical-align: middle;
     }
-    th, td { text-align: left; padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,.03); vertical-align: top; }
-    th { color: var(--muted); font-size: .8rem; font-weight: 700; border-bottom-color: var(--line); }
     tr:last-child td { border-bottom: none; }
     tr:hover td { background: rgba(255,255,255,.02); }
 
     .pill {
       display: inline-block;
       padding: 3px 10px;
+      border-radius: 999px;
+      font-size: .75rem;
+      font-weight: 700;
     }
     .pill-green { background: rgba(132,242,85,.12); color: var(--brand); border: 1px solid rgba(132,242,85,.2); }
     .pill-muted { background: rgba(255,255,255,.04); color: var(--muted); border: 1px solid var(--line); }
@@ -124,21 +169,22 @@
     .action-btn {
       padding: 5px 12px;
       border-radius: 8px;
-      padding: 8px 12px;
-      border-radius: 10px;
       border: 1px solid var(--line);
       background: transparent;
       color: var(--danger);
+      font-size: .78rem;
       font-weight: 700;
       cursor: pointer;
     }
     .action-btn:hover { background: rgba(255,131,102,.1); }
 
     /* Search bar */
-    .action-btn.brand { color: var(--brand); border-color: rgba(132,242,85,.25); }
     .search-bar {
       width: 100%;
       padding: 11px 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--panel-soft);
       color: var(--text);
       font-family: inherit;
       font-size: .9rem;
@@ -158,29 +204,6 @@
       .nav-btn { justify-content: center; padding: 10px; }
       .main { margin-left: 60px; padding: 20px; }
       .stats-row { grid-template-columns: 1fr 1fr; }
-    .form-grid { display: grid; gap: 12px; }
-    .avatar, .logo-box {
-      width: 56px;
-      height: 56px;
-      border-radius: 14px;
-      object-fit: cover;
-      border: 1px solid rgba(255,255,255,.12);
-    }
-    .placeholder {
-      display: grid;
-      place-items: center;
-      color: var(--muted);
-      border: 1px dashed var(--line);
-      background: var(--panel-soft);
-    }
-    .empty { color: var(--muted); padding: 24px; text-align: center; }
-    .league-group { border-top: 1px solid var(--line); }
-    .league-group:first-child { border-top: none; }
-    @media (max-width: 980px) {
-      .sidebar { width: 64px; padding: 16px 8px; }
-      .sidebar-brand span, .sidebar-brand, .nav-btn span { display: none; }
-      .main { margin-left: 64px; padding: 20px; }
-      .stats-row { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -224,22 +247,11 @@
       <span class="nav-icon">💬</span>
       <span>Messages</span>
     </button>
-    <div class="sidebar-brand">Goalbazi<span>Admin Panel</span></div>
-    <button class="nav-btn active" data-page="overview"><span>Overview</span></button>
-    <button class="nav-btn" data-page="analytics"><span>Analytics</span></button>
-    <button class="nav-btn" data-page="users"><span>Players</span></button>
-    <button class="nav-btn" data-page="games"><span>Games</span></button>
-    <button class="nav-btn" data-page="leagues"><span>Leagues</span></button>
-    <button class="nav-btn" data-page="turfs"><span>Turfs</span></button>
-    <button class="nav-btn" data-page="venues"><span>Venues</span></button>
-    <button class="nav-btn" data-page="bookings"><span>Bookings</span></button>
-    <button class="nav-btn" data-page="messages"><span>Messages</span></button>
     <div class="sidebar-bottom">
       <button class="nav-btn" onclick="window.location.href='/'">
         <span class="nav-icon">🏠</span>
         <span>Back to site</span>
       </button>
-      <button class="nav-btn" onclick="window.location.href='/'"><span>Back to site</span></button>
       <button class="logout-btn" id="logout-btn">Log out</button>
     </div>
   </aside>
@@ -251,7 +263,6 @@
     <div class="page active" id="page-overview">
       <div class="page-title">Overview</div>
       <div class="page-sub">Live snapshot of your Goalbazi platform</div>
-      <div class="page-sub">Live snapshot of your platform</div>
       <div class="stats-row" id="admin-stats"></div>
       <div class="table-card">
         <div class="table-head">
@@ -262,8 +273,6 @@
           <thead><tr><th>Name</th><th>Handle</th><th>Email</th><th>Location</th></tr></thead>
           <tbody id="recent-users-body"></tbody>
         </table>
-        <div class="table-head"><h3>Recent signups</h3><span class="count-chip" id="recent-count">0</span></div>
-        <table><thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Location</th></tr></thead><tbody id="recent-users-body"></tbody></table>
       </div>
       <div class="table-card">
         <div class="table-head">
@@ -273,8 +282,6 @@
           <thead><tr><th>Title</th><th>Format</th><th>Date</th><th>Status</th><th>Players</th></tr></thead>
           <tbody id="recent-games-body"></tbody>
         </table>
-        <div class="table-head"><h3>Recent games</h3></div>
-        <table><thead><tr><th>Title</th><th>Format</th><th>Date</th><th>Status</th><th>Players</th></tr></thead><tbody id="recent-games-body"></tbody></table>
       </div>
     </div>
 
@@ -282,7 +289,6 @@
     <div class="page" id="page-analytics">
       <div class="page-title">Analytics</div>
       <div class="page-sub">Page traffic and tracked activity across the platform</div>
-      <div class="page-sub">Page traffic and tracked actions</div>
       <div class="table-card">
         <div class="table-head">
           <h3>Most visited pages</h3>
@@ -291,8 +297,6 @@
           <thead><tr><th>Page</th><th>Visits</th></tr></thead>
           <tbody id="analytics-pages-body"></tbody>
         </table>
-        <div class="table-head"><h3>Most visited pages</h3></div>
-        <table><thead><tr><th>Page</th><th>Visits</th></tr></thead><tbody id="analytics-pages-body"></tbody></table>
       </div>
       <div class="table-card">
         <div class="table-head">
@@ -302,8 +306,6 @@
           <thead><tr><th>Action</th><th>Total</th></tr></thead>
           <tbody id="analytics-actions-body"></tbody>
         </table>
-        <div class="table-head"><h3>Top actions</h3></div>
-        <table><thead><tr><th>Action</th><th>Total</th></tr></thead><tbody id="analytics-actions-body"></tbody></table>
       </div>
     </div>
 
@@ -312,37 +314,23 @@
       <div class="page-title">Users</div>
       <div class="page-sub">All registered players on Goalbazi</div>
       <div class="table-card" style="margin-bottom:16px">
-      <div class="page-title">Players</div>
-      <div class="page-sub">Create players, edit levels, and upload profile photos</div>
-      <div class="table-card">
         <div class="table-head"><h3>Create player</h3></div>
         <div style="padding:20px">
           <form id="add-user-form" style="display:grid;gap:12px">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
               <input class="search-bar" style="margin:0" name="name" placeholder="Player name" required>
               <input class="search-bar" style="margin:0" name="handle" placeholder="username" required>
-        <div class="table-body">
-          <form id="add-user-form" class="form-grid">
-            <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr">
-              <input class="search-bar" name="name" placeholder="Player name" required>
-              <input class="search-bar" name="handle" placeholder="username" required>
-              <input class="search-bar" name="email" placeholder="Email" required>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
               <input class="search-bar" style="margin:0" name="email" placeholder="Email" required>
               <input class="search-bar" style="margin:0" name="location" placeholder="Location" value="Delhi NCR" required>
               <input class="search-bar" style="margin:0" name="password" placeholder="Password" required>
-            <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr">
-              <input class="search-bar" name="location" placeholder="Location" value="Delhi NCR" required>
-              <input class="search-bar" name="password" placeholder="Password" required>
-              <button class="action-btn brand" type="submit">Create player</button>
             </div>
             <button class="action-btn" style="width:max-content;color:var(--brand);border-color:rgba(127,255,69,.25)" type="submit">Create player</button>
           </form>
         </div>
       </div>
       <input class="search-bar" id="user-search" placeholder="Search by name, handle or email...">
-      <input class="search-bar" id="user-search" placeholder="Search players...">
       <div class="table-card">
         <div class="table-head">
           <h3>All users</h3>
@@ -352,8 +340,6 @@
           <thead><tr><th>Name</th><th>Handle</th><th>Email</th><th>Location</th><th>Skill</th><th>Role</th><th>Action</th></tr></thead>
           <tbody id="users-body"></tbody>
         </table>
-        <div class="table-head"><h3>All players</h3><span class="count-chip" id="users-count">0</span></div>
-        <table><thead><tr><th>Player</th><th>Profile</th><th>Level</th><th>Photo</th><th>Actions</th></tr></thead><tbody id="users-body"></tbody></table>
       </div>
     </div>
 
@@ -362,8 +348,6 @@
       <div class="page-title">Games</div>
       <div class="page-sub">All matches created on the platform</div>
       <div class="table-card" style="margin-bottom:16px">
-      <div class="page-sub">Create and remove games</div>
-      <div class="table-card">
         <div class="table-head"><h3>Create game</h3></div>
         <div style="padding:20px">
           <form id="add-game-form" style="display:grid;gap:12px">
@@ -371,27 +355,15 @@
               <input class="search-bar" style="margin:0" name="title" placeholder="Game title" required>
               <select class="search-bar" style="margin:0" name="format"><option>5v5</option><option>7v7</option><option>11v11</option></select>
               <select class="search-bar" style="margin:0" name="skill"><option>Beginner</option><option>Intermediate</option><option>Competitive</option></select>
-        <div class="table-body">
-          <form id="add-game-form" class="form-grid">
-            <div class="form-grid" style="grid-template-columns:2fr 1fr 1fr">
-              <input class="search-bar" name="title" placeholder="Game title" required>
-              <select class="search-bar" name="format"><option>5v5</option><option>7v7</option><option>11v11</option></select>
-              <select class="search-bar" name="skill"><option>Beginner</option><option>Intermediate</option><option>Competitive</option></select>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
               <input class="search-bar" style="margin:0" type="date" name="date" required>
               <input class="search-bar" style="margin:0" type="time" name="time" required>
               <select class="search-bar" style="margin:0" name="turf_id" id="game-turf-select-admin"></select>
               <select class="search-bar" style="margin:0" name="created_by" id="game-player-select-admin"></select>
-            <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr 1fr">
-              <input class="search-bar" type="date" name="date" required>
-              <input class="search-bar" type="time" name="time" required>
-              <select class="search-bar" name="turf_id" id="game-turf-select-admin"></select>
-              <select class="search-bar" name="created_by" id="game-player-select-admin"></select>
             </div>
             <input type="hidden" name="visibility" value="Public">
             <button class="action-btn" style="width:max-content;color:var(--brand);border-color:rgba(127,255,69,.25)" type="submit">Create game</button>
-            <button class="action-btn brand" type="submit">Create game</button>
           </form>
         </div>
       </div>
@@ -404,8 +376,6 @@
           <thead><tr><th>Title</th><th>Format</th><th>Skill</th><th>Date</th><th>Time</th><th>Status</th><th>Players</th><th>Action</th></tr></thead>
           <tbody id="games-body"></tbody>
         </table>
-        <div class="table-head"><h3>All games</h3><span class="count-chip" id="games-count">0</span></div>
-        <table><thead><tr><th>Title</th><th>Format</th><th>Skill</th><th>Date</th><th>Time</th><th>Status</th><th>Players</th><th>Action</th></tr></thead><tbody id="games-body"></tbody></table>
       </div>
     </div>
 
@@ -413,25 +383,10 @@
     <div class="page" id="page-turfs">
       <div class="page-title">Turfs</div>
       <div class="page-sub">All registered turfs and their availability</div>
-    <div class="page" id="page-leagues">
-      <div class="page-title">Leagues</div>
-      <div class="page-sub">Create leagues, add teams, edit points, and upload logos</div>
       <div class="table-card">
         <div class="table-head">
           <h3>All turfs</h3>
           <span class="count-chip" id="turfs-count">—</span>
-        <div class="table-head"><h3>Create league</h3></div>
-        <div class="table-body">
-          <form id="add-league-form" class="form-grid">
-            <div class="form-grid" style="grid-template-columns:1.2fr 1fr 1fr 1fr">
-              <input class="search-bar" name="name" placeholder="League name" required>
-              <input class="search-bar" name="format" value="5v5" required>
-              <input class="search-bar" name="stage" value="Registration" required>
-              <input class="search-bar" name="status" value="Open" required>
-            </div>
-            <textarea class="search-bar" name="description" placeholder="League description"></textarea>
-            <button class="action-btn brand" type="submit">Create league</button>
-          </form>
         </div>
         <table>
           <thead><tr><th>Name</th><th>Area</th><th>Surface</th><th>Rating</th><th>Price/hr</th><th>Distance</th><th>Map</th></tr></thead>
@@ -448,36 +403,11 @@
         <div class="table-head">
           <h3>Booked slots</h3>
           <span class="count-chip" id="bookings-count">—</span>
-        <div class="table-head"><h3>Create team</h3></div>
-        <div class="table-body">
-          <form id="add-team-form" class="form-grid">
-            <div class="form-grid" style="grid-template-columns:1.3fr 1fr 1fr">
-              <input class="search-bar" name="team_name" placeholder="Team name" required>
-              <select class="search-bar" name="league_id" id="team-league-select" required></select>
-              <input class="search-bar" name="rank" type="number" value="1" required>
-            </div>
-            <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr 1fr">
-              <input class="search-bar" name="played" type="number" value="0" required>
-              <input class="search-bar" name="won" type="number" value="0" required>
-              <input class="search-bar" name="points" type="number" value="0" required>
-              <input class="search-bar" name="form" value="-" required>
-            </div>
-            <input type="hidden" name="team_logo_base64" id="new-team-logo-input">
-            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-              <button class="action-btn brand" type="button" id="team-logo-upload-btn">Upload logo</button>
-              <div id="new-team-logo-preview" class="empty" style="padding:0">No logo selected</div>
-            </div>
-            <button class="action-btn brand" type="submit">Create team</button>
-          </form>
         </div>
         <table>
           <thead><tr><th>Turf</th><th>Date</th><th>Time</th><th>Booked by</th></tr></thead>
           <tbody id="bookings-body"></tbody>
         </table>
-      </div>
-      <div class="table-card">
-        <div class="table-head"><h3>League manager</h3></div>
-        <table><thead><tr><th>Name</th><th>Details</th><th>Stats</th><th>Logo</th><th>Actions</th></tr></thead><tbody id="leagues-body"></tbody></table>
       </div>
     </div>
 
@@ -485,9 +415,6 @@
     <div class="page" id="page-messages">
       <div class="page-title">Messages</div>
       <div class="page-sub">All lobby chat messages across games</div>
-    <div class="page" id="page-turfs">
-      <div class="page-title">Turfs</div>
-      <div class="page-sub">All registered turfs</div>
       <div class="table-card">
         <div class="table-head">
           <h3>All messages</h3>
@@ -497,8 +424,6 @@
           <thead><tr><th>Game</th><th>Sender</th><th>Message</th><th>Type</th><th>Time</th></tr></thead>
           <tbody id="messages-body"></tbody>
         </table>
-        <div class="table-head"><h3>All turfs</h3><span class="count-chip" id="turfs-count">0</span></div>
-        <table><thead><tr><th>Name</th><th>Area</th><th>Surface</th><th>Rating</th><th>Price/hr</th><th>Distance</th><th>Map</th></tr></thead><tbody id="turfs-body"></tbody></table>
       </div>
     </div>
 
@@ -515,14 +440,6 @@
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
               <label style="display:grid;gap:8px"><span style="font-size:.85rem;color:var(--muted);font-weight:700">Turf name</span><input name="name" class="search-bar" style="margin:0" placeholder="Siri Fort Complex" required></label>
               <label style="display:grid;gap:8px"><span style="font-size:.85rem;color:var(--muted);font-weight:700">Area</span><input name="area" class="search-bar" style="margin:0" placeholder="South Delhi" required></label>
-      <div class="page-sub">Add, edit, and remove venues</div>
-      <div class="table-card">
-        <div class="table-head"><h3>Add venue</h3></div>
-        <div class="table-body">
-          <form id="add-turf-form" class="form-grid">
-            <div class="form-grid" style="grid-template-columns:1fr 1fr">
-              <input class="search-bar" name="name" placeholder="Venue name" required>
-              <input class="search-bar" name="area" placeholder="Area" required>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
               <label style="display:grid;gap:8px"><span style="font-size:.85rem;color:var(--muted);font-weight:700">Surface</span>
@@ -530,72 +447,37 @@
               </label>
               <label style="display:grid;gap:8px"><span style="font-size:.85rem;color:var(--muted);font-weight:700">Price/hr (₹)</span><input type="number" name="price_per_hour" class="search-bar" style="margin:0" placeholder="600" required></label>
               <label style="display:grid;gap:8px"><span style="font-size:.85rem;color:var(--muted);font-weight:700">Distance (km)</span><input type="number" name="distance_km" class="search-bar" style="margin:0" placeholder="2.5" step="0.1"></label>
-            <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr">
-              <input class="search-bar" name="surface" value="Astroturf">
-              <input class="search-bar" type="number" name="price_per_hour" placeholder="Price per hour" required>
-              <input class="search-bar" type="number" step="0.1" name="distance_km" placeholder="Distance km">
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
               <label style="display:grid;gap:8px"><span style="font-size:.85rem;color:var(--muted);font-weight:700">Rating (1-5)</span><input type="number" name="rating" class="search-bar" style="margin:0" placeholder="4.5" step="0.1" min="1" max="5"></label>
               <label style="display:grid;gap:8px"><span style="font-size:.85rem;color:var(--muted);font-weight:700">UPI ID</span><input name="upi_id" class="search-bar" style="margin:0" placeholder="turf@upi"></label>
-            <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr">
-              <input class="search-bar" type="number" step="0.1" min="1" max="5" name="rating" placeholder="Rating">
-              <input class="search-bar" name="upi_id" placeholder="UPI ID">
-              <input class="search-bar" name="map_link" placeholder="Map link">
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
               <label style="display:grid;gap:8px"><span style="font-size:.85rem;color:var(--muted);font-weight:700">Map link</span><input name="map_link" class="search-bar" style="margin:0" placeholder="Google Maps link"></label>
               <label style="display:grid;gap:8px"><span style="font-size:.85rem;color:var(--muted);font-weight:700">Latitude</span><input name="latitude" class="search-bar" style="margin:0" placeholder="28.6139"></label>
               <label style="display:grid;gap:8px"><span style="font-size:.85rem;color:var(--muted);font-weight:700">Longitude</span><input name="longitude" class="search-bar" style="margin:0" placeholder="77.2090"></label>
-            <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr">
-              <input class="search-bar" name="latitude" placeholder="Latitude">
-              <input class="search-bar" name="longitude" placeholder="Longitude">
-              <select class="search-bar" name="owner_id" id="venue-owner-select"></select>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
               <label style="display:grid;gap:8px"><span style="font-size:.85rem;color:var(--muted);font-weight:700">Assign owner</span><select name="owner_id" id="venue-owner-select" class="search-bar" style="margin:0"></select></label>
               <label style="display:grid;gap:8px"><span style="font-size:.85rem;color:var(--muted);font-weight:700">Quick GPS</span><button class="action-btn" style="width:max-content;color:var(--brand);border-color:rgba(127,255,69,.25)" id="venue-gps-btn" type="button">Use current location</button></label>
-            <div style="display:flex;gap:12px;flex-wrap:wrap">
-              <button class="action-btn brand" type="button" id="venue-gps-btn">Use current location</button>
-              <button class="action-btn brand" type="submit">Add venue</button>
             </div>
             <button class="btn-primary" type="submit" style="padding:11px 20px;border-radius:12px;border:none;font-weight:800;cursor:pointer;font-family:inherit;justify-self:start">+ Add venue</button>
           </form>
         </div>
       </div>
-      <div class="table-card">
-        <div class="table-head"><h3>All venues</h3><span class="count-chip" id="venues-count">0</span></div>
-        <table><thead><tr><th>Name</th><th>Area</th><th>Surface</th><th>Price/hr</th><th>Rating</th><th>Settings</th><th>Actions</th></tr></thead><tbody id="venues-body"></tbody></table>
-      </div>
-    </div>
 
       <!-- Existing turfs table -->
-    <div class="page" id="page-bookings">
-      <div class="page-title">Bookings</div>
-      <div class="page-sub">All slot bookings</div>
       <div class="table-card">
         <div class="card-head"><h3>All venues</h3><span class="count-chip" id="venues-count">—</span></div>
         <table>
           <thead><tr><th>Name</th><th>Area</th><th>Surface</th><th>Price/hr</th><th>Rating</th><th>UPI</th><th>Actions</th></tr></thead>
           <tbody id="venues-body"></tbody>
         </table>
-        <div class="table-head"><h3>Booked slots</h3><span class="count-chip" id="bookings-count">0</span></div>
-        <table><thead><tr><th>Turf</th><th>Date</th><th>Time</th><th>Booked by</th></tr></thead><tbody id="bookings-body"></tbody></table>
       </div>
     </div>
 
-    <div class="page" id="page-messages">
-      <div class="page-title">Messages</div>
-      <div class="page-sub">Game chat and system activity</div>
-      <div class="table-card">
-        <div class="table-head"><h3>All messages</h3><span class="count-chip" id="messages-count">0</span></div>
-        <table><thead><tr><th>Game</th><th>Sender</th><th>Message</th><th>Type</th><th>Time</th></tr></thead><tbody id="messages-body"></tbody></table>
-      </div>
-    </div>
   </main>
 </div>
-
-<input type="file" id="admin-image-input" accept="image/*" style="display:none">
 
 <script>
   let allUsers = [];
@@ -604,19 +486,14 @@
   let allPlayers = [];
   let allOwners = [];
   let overviewData = null;
-  let allLeagues = [];
-  let allTeams = [];
-  let pendingImageTarget = null;
 
   async function api(path, options = {}) {
     const res = await fetch(path, {
       headers: { "Content-Type": "application/json" },
       ...options,
     });
-    const res = await fetch(path, { headers: { "Content-Type": "application/json" }, ...options });
     if (res.status === 401) { window.location.href = "/login"; return null; }
     if (res.status === 403) { document.body.innerHTML = '<div style="padding:40px;color:#ff8366;font-family:Manrope,sans-serif;font-size:1.1rem;">⛔ Access denied. Admin only.</div>'; return null; }
-    if (res.status === 403) { document.body.innerHTML = '<div style="padding:40px;color:#ff8366;font-family:Manrope,sans-serif;font-size:1.1rem;">Access denied. Admin only.</div>'; return null; }
     const text = await res.text();
     const body = text ? JSON.parse(text) : {};
     if (!res.ok) throw new Error(body.error || "Request failed");
@@ -627,19 +504,6 @@
     const data = await api("/api/admin/overview");
     if (!data) return;
     overviewData = data;
-  function showToast(msg) {
-    let t = document.getElementById("admintoast");
-    if (!t) {
-      t = document.createElement("div");
-      t.id = "admintoast";
-      t.style.cssText = "position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#13211b;border:1px solid rgba(255,255,255,.1);color:#eff7f3;padding:12px 18px;border-radius:12px;font-family:Manrope,sans-serif;font-weight:700;z-index:999;transition:.2s;opacity:0";
-      document.body.appendChild(t);
-    }
-    t.textContent = msg;
-    t.style.opacity = "1";
-    clearTimeout(t._t);
-    t._t = setTimeout(() => t.style.opacity = "0", 2500);
-  }
 
     document.getElementById("admin-stats").innerHTML = data.stats.map(s => `
       <div class="stat-card">
@@ -647,9 +511,6 @@
         <div class="stat-label">${s.label}</div>
       </div>
     `).join("");
-  function esc(value) {
-    return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-  }
 
     document.getElementById("recent-count").textContent = data.recent_users.length;
     document.getElementById("recent-users-body").innerHTML = data.recent_users.map(u => `
@@ -660,28 +521,6 @@
         <td>${u.location}</td>
       </tr>
     `).join("") || '<tr><td colspan="4" class="empty">No users yet</td></tr>';
-  async function cropImageToSquare(file, size = 320) {
-    const dataUrl = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-    const img = await new Promise((resolve, reject) => {
-      const image = new Image();
-      image.onload = () => resolve(image);
-      image.onerror = reject;
-      image.src = dataUrl;
-    });
-    const side = Math.min(img.width, img.height);
-    const sx = (img.width - side) / 2;
-    const sy = (img.height - side) / 2;
-    const canvas = document.createElement("canvas");
-    canvas.width = size;
-    canvas.height = size;
-    canvas.getContext("2d").drawImage(img, sx, sy, side, side, 0, 0, size, size);
-    return canvas.toDataURL("image/png");
-  }
 
     document.getElementById("recent-games-body").innerHTML = data.recent_games.map(g => `
       <tr>
@@ -692,15 +531,6 @@
         <td>${g.player_count}</td>
       </tr>
     `).join("") || '<tr><td colspan="5" class="empty">No games yet</td></tr>';
-  function renderAvatar(base64, name) {
-    if (base64) return `<img src="${base64}" class="avatar">`;
-    const initials = (name || "P").split(" ").map(part => part[0]).slice(0, 2).join("").toUpperCase();
-    return `<div class="avatar placeholder">${initials}</div>`;
-  }
-
-  function renderLogo(base64) {
-    return base64 ? `<img src="${base64}" class="logo-box">` : `<div class="logo-box placeholder">Logo</div>`;
-  }
 
     document.getElementById("analytics-pages-body").innerHTML = data.analytics.top_pages.map(row => `
       <tr><td>${row.path}</td><td>${row.visits}</td></tr>
@@ -708,22 +538,13 @@
     document.getElementById("analytics-actions-body").innerHTML = data.analytics.top_actions.map(row => `
       <tr><td>${row.event_type}</td><td>${row.total}</td></tr>
     `).join("") || '<tr><td colspan="2" class="empty">No actions yet</td></tr>';
-  async function loadOverview() {
-    const data = await api("/api/admin/overview");
-    if (!data) return;
-    document.getElementById("admin-stats").innerHTML = data.stats.map(item => `<div class="stat-card"><div class="stat-value">${item.value}</div><div class="stat-label">${esc(item.label)}</div></div>`).join("");
-    document.getElementById("recent-count").textContent = data.recent_users.length;
-    document.getElementById("recent-users-body").innerHTML = data.recent_users.map(u => `<tr><td>${esc(u.name)}</td><td>@${esc(u.handle)}</td><td>${esc(u.email)}</td><td>${esc(u.location)}</td></tr>`).join("") || '<tr><td colspan="4" class="empty">No users yet</td></tr>';
-    document.getElementById("recent-games-body").innerHTML = data.recent_games.map(g => `<tr><td>${esc(g.title)}</td><td>${esc(g.format)}</td><td>${esc(g.game_date)}</td><td><span class="pill pill-green">${esc(g.status)}</span></td><td>${g.player_count}</td></tr>`).join("") || '<tr><td colspan="5" class="empty">No games yet</td></tr>';
-    document.getElementById("analytics-pages-body").innerHTML = data.analytics.top_pages.map(row => `<tr><td>${esc(row.path)}</td><td>${row.visits}</td></tr>`).join("") || '<tr><td colspan="2" class="empty">No page views yet</td></tr>';
-    document.getElementById("analytics-actions-body").innerHTML = data.analytics.top_actions.map(row => `<tr><td>${esc(row.event_type)}</td><td>${row.total}</td></tr>`).join("") || '<tr><td colspan="2" class="empty">No actions yet</td></tr>';
   }
 
   async function loadUsers() {
+    const data = await api("/api/admin/users");
     if (!data) return;
     allUsers = data.users;
     document.getElementById("users-count").textContent = allUsers.length;
-    document.getElementById("game-player-select-admin").innerHTML = allUsers.map(user => `<option value="${user.id}">${esc(user.name)}</option>`).join("");
     renderUsers(allUsers);
   }
 
@@ -737,57 +558,14 @@
         <td><span class="pill pill-muted">${u.skill}</span></td>
         <td><span class="pill ${u.is_admin ? "pill-green" : "pill-muted"}">${u.is_admin ? "Admin" : "Player"}</span></td>
         <td><button class="action-btn" onclick="deleteUser(${u.id}, '${u.name.replace(/'/g, "\\'")}')">Remove</button></td>
-    document.getElementById("users-body").innerHTML = users.map(user => `
-      <tr id="user-row-${user.id}">
-        <td>
-          <input class="search-bar" data-field="name" value="${esc(user.name)}">
-          <input class="search-bar" data-field="handle" value="${esc(user.handle)}" style="margin-top:8px" placeholder="username">
-        </td>
-        <td>
-          <input class="search-bar" data-field="email" value="${esc(user.email)}">
-          <input class="search-bar" data-field="location" value="${esc(user.location)}" style="margin-top:8px">
-        </td>
-        <td>
-          <input class="search-bar" data-field="skill" value="${esc(user.skill)}">
-          <input class="search-bar" data-field="preferred_format" value="${esc(user.preferred_format)}" style="margin-top:8px">
-          <input class="search-bar" data-field="position" value="${esc(user.position || "")}" style="margin-top:8px" placeholder="Position">
-        </td>
-        <td>
-          <div style="display:grid;gap:8px;justify-items:start">
-            ${renderAvatar(user.avatar_base64, user.name)}
-            <button class="action-btn brand" onclick="triggerImageUpload('user-avatar', ${user.id})">Upload photo</button>
-          </div>
-        </td>
-        <td>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="action-btn brand" onclick="saveUser(${user.id})">Save</button>
-            <button class="action-btn" onclick="deleteUser(${user.id})">Delete</button>
-          </div>
-        </td>
       </tr>
     `).join("") || '<tr><td colspan="7" class="empty">No users</td></tr>';
-    `).join("") || '<tr><td colspan="5" class="empty">No players found</td></tr>';
   }
 
   async function deleteUser(id, name) {
     if (!confirm(`Remove user "${name}"? This cannot be undone.`)) return;
     await fetch(`/api/admin/users/${id}`, { method: "DELETE" });
-  async function saveUser(id) {
-    const row = document.getElementById(`user-row-${id}`);
-    const payload = {};
-    row.querySelectorAll("[data-field]").forEach(input => payload[input.dataset.field] = input.value);
-    payload.handle = (payload.handle || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-    await api(`/api/admin/users/${id}`, { method: "PUT", body: JSON.stringify(payload) });
-    showToast("Player updated");
     await loadUsers();
-  }
-
-  async function deleteUser(id) {
-    if (!confirm("Delete this player?")) return;
-    await api(`/api/admin/users/${id}`, { method: "DELETE" });
-    showToast("Player deleted");
-    await loadUsers();
-    await loadOverview();
   }
 
   async function loadGames() {
@@ -807,101 +585,12 @@
         <td><button class="action-btn" onclick="deleteGame(${g.id}, '${g.title.replace(/'/g, "\\'")}')">Delete</button></td>
       </tr>
     `).join("") || '<tr><td colspan="8" class="empty">No games</td></tr>';
-    document.getElementById("games-count").textContent = data.games.length;
-    document.getElementById("games-body").innerHTML = data.games.map(game => `
-      <tr><td>${esc(game.title)}</td><td>${esc(game.format)}</td><td>${esc(game.skill_level)}</td><td>${esc(game.game_date)}</td><td>${esc(game.game_time)}</td><td>${esc(game.status)}</td><td>${game.player_count}</td><td><button class="action-btn" onclick="deleteGame(${game.id})">Delete</button></td></tr>
-    `).join("") || '<tr><td colspan="8" class="empty">No games yet</td></tr>';
   }
 
   async function deleteGame(id, title) {
     if (!confirm(`Delete game "${title}"? This cannot be undone.`)) return;
     await fetch(`/api/admin/games/${id}`, { method: "DELETE" });
-  async function deleteGame(id) {
-    if (!confirm("Delete this game?")) return;
-    await api(`/api/admin/games/${id}`, { method: "DELETE" });
-    showToast("Game deleted");
     await loadGames();
-    await loadOverview();
-  }
-
-  async function loadLeagues() {
-    const data = await api("/api/admin/leagues");
-    if (!data) return;
-    allLeagues = data.leagues;
-    allTeams = data.teams;
-    document.getElementById("team-league-select").innerHTML = allLeagues.map(league => `<option value="${league.id}">${esc(league.name)}</option>`).join("");
-    document.getElementById("leagues-body").innerHTML = allLeagues.map(league => {
-      const teams = allTeams.filter(team => team.league_id === league.id);
-      return `
-        <tr id="league-row-${league.id}" class="league-group">
-          <td><input class="search-bar" data-field="name" value="${esc(league.name)}"></td>
-          <td>
-            <textarea class="search-bar" data-field="description">${esc(league.description)}</textarea>
-            <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:8px">
-              <input class="search-bar" data-field="format" value="${esc(league.format)}">
-              <input class="search-bar" data-field="stage" value="${esc(league.stage)}">
-              <input class="search-bar" data-field="status" value="${esc(league.status)}">
-            </div>
-          </td>
-          <td>${teams.length} teams</td>
-          <td>League</td>
-          <td><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="action-btn brand" onclick="saveLeague(${league.id})">Save league</button><button class="action-btn" onclick="deleteLeague(${league.id})">Delete league</button></div></td>
-        </tr>
-        ${teams.map(team => `
-          <tr id="team-row-${team.id}">
-            <td style="padding-left:32px"><input class="search-bar" data-field="team_name" value="${esc(team.team_name)}"></td>
-            <td>
-              <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr 1fr">
-                <input class="search-bar" data-field="rank" type="number" value="${team.rank}">
-                <input class="search-bar" data-field="played" type="number" value="${team.played}">
-                <input class="search-bar" data-field="won" type="number" value="${team.won}">
-                <input class="search-bar" data-field="points" type="number" value="${team.points}">
-              </div>
-              <div class="form-grid" style="grid-template-columns:1fr 1fr;margin-top:8px">
-                <input class="search-bar" data-field="form" value="${esc(team.form)}">
-                <select class="search-bar" data-field="league_id">${allLeagues.map(item => `<option value="${item.id}" ${item.id === team.league_id ? "selected" : ""}>${esc(item.name)}</option>`).join("")}</select>
-              </div>
-            </td>
-            <td>${esc(team.league_name)}</td>
-            <td><div style="display:grid;gap:8px;justify-items:start">${renderLogo(team.team_logo_base64)}<button class="action-btn brand" onclick="triggerImageUpload('team-logo', ${team.id})">Upload logo</button></div></td>
-            <td><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="action-btn brand" onclick="saveTeam(${team.id})">Save team</button><button class="action-btn" onclick="deleteTeam(${team.id})">Delete team</button></div></td>
-          </tr>
-        `).join("") || '<tr><td colspan="5" class="empty">No teams in this league yet</td></tr>'}
-      `;
-    }).join("") || '<tr><td colspan="5" class="empty">No leagues yet</td></tr>';
-  }
-
-  async function saveLeague(id) {
-    const row = document.getElementById(`league-row-${id}`);
-    const payload = {};
-    row.querySelectorAll("[data-field]").forEach(input => payload[input.dataset.field] = input.value);
-    await api(`/api/admin/leagues/${id}`, { method: "PUT", body: JSON.stringify(payload) });
-    showToast("League updated");
-    await loadLeagues();
-  }
-
-  async function deleteLeague(id) {
-    if (!confirm("Delete this league and all its teams?")) return;
-    await api(`/api/admin/leagues/${id}`, { method: "DELETE" });
-    showToast("League deleted");
-    await loadLeagues();
-    await loadOverview();
-  }
-
-  async function saveTeam(id) {
-    const row = document.getElementById(`team-row-${id}`);
-    const payload = {};
-    row.querySelectorAll("[data-field]").forEach(input => payload[input.dataset.field] = input.value);
-    await api(`/api/admin/teams/${id}`, { method: "PUT", body: JSON.stringify(payload) });
-    showToast("Team updated");
-    await loadLeagues();
-  }
-
-  async function deleteTeam(id) {
-    if (!confirm("Delete this team?")) return;
-    await api(`/api/admin/teams/${id}`, { method: "DELETE" });
-    showToast("Team deleted");
-    await loadLeagues();
   }
 
   async function loadTurfs() {
@@ -920,58 +609,11 @@
         <td>₹${t.price_per_hour}/hr</td>
         <td>${t.distance_km} km</td>
         <td>${t.map_link ? `<a href="${t.map_link}" target="_blank" rel="noopener noreferrer" style="color:var(--brand)">Open</a>` : "—"}</td>
-    document.getElementById("turfs-count").textContent = allTurfs.length;
-    document.getElementById("turfs-body").innerHTML = allTurfs.map(turf => `<tr><td>${esc(turf.name)}</td><td>${esc(turf.area)}</td><td>${esc(turf.surface)}</td><td>${turf.rating}</td><td>Rs ${turf.price_per_hour}</td><td>${turf.distance_km} km</td><td>${turf.map_link ? `<a href="${turf.map_link}" target="_blank" rel="noopener noreferrer" style="color:var(--brand)">Open</a>` : "—"}</td></tr>`).join("") || '<tr><td colspan="7" class="empty">No turfs yet</td></tr>';
-    document.getElementById("venue-owner-select").innerHTML = `<option value="">No owner</option>` + allOwners.map(owner => `<option value="${owner.id}">${esc(owner.name)}</option>`).join("");
-    document.getElementById("game-turf-select-admin").innerHTML = allTurfs.map(turf => `<option value="${turf.id}">${esc(turf.name)}</option>`).join("");
-  }
-
-  async function loadVenues() {
-    const data = await api("/api/admin/turfs");
-    if (!data) return;
-    document.getElementById("venues-count").textContent = data.turfs.length;
-    const ownerOptions = `<option value="">No owner</option>` + (data.owners || []).map(owner => `<option value="${owner.id}">${esc(owner.name)}</option>`).join("");
-    document.getElementById("venues-body").innerHTML = data.turfs.map(turf => `
-      <tr id="turf-row-${turf.id}">
-        <td><input class="search-bar" data-field="name" value="${esc(turf.name)}"></td>
-        <td><input class="search-bar" data-field="area" value="${esc(turf.area)}"></td>
-        <td><input class="search-bar" data-field="surface" value="${esc(turf.surface)}"></td>
-        <td><input class="search-bar" data-field="price_per_hour" type="number" value="${turf.price_per_hour}"></td>
-        <td><input class="search-bar" data-field="rating" type="number" step="0.1" min="1" max="5" value="${turf.rating}"></td>
-        <td>
-          <input class="search-bar" data-field="upi_id" value="${esc(turf.upi_id || "")}" placeholder="UPI">
-          <input class="search-bar" data-field="map_link" value="${esc(turf.map_link || "")}" style="margin-top:8px" placeholder="Map link">
-          <div class="form-grid" style="grid-template-columns:1fr 1fr;margin-top:8px">
-            <input class="search-bar" data-field="latitude" value="${esc(turf.latitude || "")}" placeholder="Latitude">
-            <input class="search-bar" data-field="longitude" value="${esc(turf.longitude || "")}" placeholder="Longitude">
-          </div>
-          <select class="search-bar" data-field="owner_id" style="margin-top:8px">${ownerOptions.replace(`value="${turf.owner_id || ""}"`, `value="${turf.owner_id || ""}" selected`)}</select>
-        </td>
-        <td><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="action-btn brand" onclick="saveTurf(${turf.id})">Save</button><button class="action-btn" onclick="deleteTurf(${turf.id})">Delete</button></div></td>
       </tr>
     `).join("") || '<tr><td colspan="7" class="empty">No turfs</td></tr>';
     document.getElementById("venue-owner-select").innerHTML = `<option value="">No owner</option>` + allOwners.map(owner => `<option value="${owner.id}">${owner.name}</option>`).join("");
     document.getElementById("game-turf-select-admin").innerHTML = allTurfs.map(turf => `<option value="${turf.id}">${turf.name}</option>`).join("");
     document.getElementById("game-player-select-admin").innerHTML = allPlayers.map(player => `<option value="${player.id}">${player.name}</option>`).join("");
-    `).join("") || '<tr><td colspan="7" class="empty">No venues yet</td></tr>';
-  }
-
-  async function saveTurf(id) {
-    const row = document.getElementById(`turf-row-${id}`);
-    const payload = {};
-    row.querySelectorAll("[data-field]").forEach(input => payload[input.dataset.field] = input.value);
-    await api(`/api/admin/turfs/${id}`, { method: "PUT", body: JSON.stringify(payload) });
-    showToast("Venue updated");
-    await loadVenues();
-    await loadTurfs();
-  }
-
-  async function deleteTurf(id) {
-    if (!confirm("Delete this venue?")) return;
-    await api(`/api/admin/turfs/${id}`, { method: "DELETE" });
-    showToast("Venue deleted");
-    await loadVenues();
-    await loadTurfs();
   }
 
   async function loadBookings() {
@@ -986,7 +628,6 @@
         <td>${b.booked_by_name || "—"}</td>
       </tr>
     `).join("") || '<tr><td colspan="4" class="empty">No bookings yet</td></tr>';
-    document.getElementById("bookings-body").innerHTML = data.bookings.map(item => `<tr><td>${esc(item.turf_name)}</td><td>${esc(item.slot_date)}</td><td>${esc(item.slot_time)}</td><td>${esc(item.booked_by_name || "—")}</td></tr>`).join("") || '<tr><td colspan="4" class="empty">No bookings yet</td></tr>';
   }
 
   async function loadMessages() {
@@ -1002,7 +643,6 @@
         <td style="color:var(--muted);font-size:.78rem">${m.created_at?.slice(0,16) || ""}</td>
       </tr>
     `).join("") || '<tr><td colspan="5" class="empty">No messages yet</td></tr>';
-    document.getElementById("messages-body").innerHTML = data.messages.map(item => `<tr><td>${esc(item.game_title)}</td><td>${esc(item.sender_name)}</td><td>${esc(item.message)}</td><td>${item.is_system ? "System" : "Chat"}</td><td>${esc((item.created_at || "").slice(0, 16))}</td></tr>`).join("") || '<tr><td colspan="5" class="empty">No messages yet</td></tr>';
   }
 
   async function loadVenues() {
@@ -1030,9 +670,6 @@
         </td>
       </tr>
     `).join('') || '<tr><td colspan="7" class="empty">No venues</td></tr>';
-  function triggerImageUpload(type, id = null) {
-    pendingImageTarget = { type, id };
-    document.getElementById("admin-image-input").click();
   }
 
   async function saveTurf(id) {
@@ -1043,26 +680,6 @@
     showToast('Venue updated');
     await loadVenues();
   }
-  document.getElementById("admin-image-input").addEventListener("change", async e => {
-    const file = e.target.files[0];
-    if (!file || !pendingImageTarget) return;
-    if (file.size > 2000000) { showToast("Image too large"); return; }
-    const base64 = await cropImageToSquare(file, 320);
-    if (pendingImageTarget.type === "new-team-logo") {
-      document.getElementById("new-team-logo-input").value = base64;
-      document.getElementById("new-team-logo-preview").innerHTML = `<img src="${base64}" class="logo-box">`;
-    } else if (pendingImageTarget.type === "user-avatar") {
-      await api(`/api/admin/users/${pendingImageTarget.id}/avatar`, { method: "POST", body: JSON.stringify({ avatar_base64: base64 }) });
-      showToast("Player photo updated");
-      await loadUsers();
-    } else if (pendingImageTarget.type === "team-logo") {
-      await api(`/api/admin/teams/${pendingImageTarget.id}/logo`, { method: "POST", body: JSON.stringify({ team_logo_base64: base64 }) });
-      showToast("Team logo updated");
-      await loadLeagues();
-    }
-    e.target.value = "";
-    pendingImageTarget = null;
-  });
 
   async function deleteTurf(id, name) {
     if (!confirm(`Delete venue "${name}"? This will remove all its slots and bookings.`)) return;
@@ -1070,88 +687,47 @@
     showToast('Venue deleted');
     await loadVenues();
   }
-  document.getElementById("team-logo-upload-btn").addEventListener("click", () => triggerImageUpload("new-team-logo"));
 
   document.getElementById('add-turf-form').addEventListener('submit', async e => {
-  document.getElementById("add-user-form").addEventListener("submit", async e => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(e.currentTarget).entries());
     const btn = e.currentTarget.querySelector('button[type=submit]');
     btn.textContent = 'Adding...'; btn.disabled = true;
     await api('/api/admin/turfs', { method: 'POST', body: JSON.stringify(data) });
     showToast('Venue added!');
-    const payload = Object.fromEntries(new FormData(e.currentTarget).entries());
-    payload.handle = (payload.handle || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-    await api("/api/admin/users", { method: "POST", body: JSON.stringify(payload) });
-    showToast("Player created");
     e.currentTarget.reset();
     btn.textContent = '+ Add venue'; btn.disabled = false;
     await loadVenues();
-    await loadUsers();
-    await loadOverview();
   });
 
   document.getElementById('add-user-form').addEventListener('submit', async e => {
-  document.getElementById("add-game-form").addEventListener("submit", async e => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(e.currentTarget).entries());
     data.handle = (data.handle || "").toLowerCase().replace(/[^a-z0-9]/g, "");
     await api('/api/admin/users', { method: 'POST', body: JSON.stringify(data) });
     showToast('Player created');
-    const payload = Object.fromEntries(new FormData(e.currentTarget).entries());
-    await api("/api/admin/games", { method: "POST", body: JSON.stringify(payload) });
-    showToast("Game created");
     e.currentTarget.reset();
     await loadUsers();
-    await loadGames();
     await loadOverview();
   });
 
   document.getElementById('add-game-form').addEventListener('submit', async e => {
-  document.getElementById("add-league-form").addEventListener("submit", async e => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(e.currentTarget).entries());
     await api('/api/admin/games', { method: 'POST', body: JSON.stringify(data) });
     showToast('Game created');
-    const payload = Object.fromEntries(new FormData(e.currentTarget).entries());
-    await api("/api/admin/leagues", { method: "POST", body: JSON.stringify(payload) });
-    showToast("League created");
     e.currentTarget.reset();
     await loadGames();
-    await loadLeagues();
     await loadOverview();
   });
 
   document.getElementById('venue-gps-btn').addEventListener('click', () => {
-  document.getElementById("add-team-form").addEventListener("submit", async e => {
-    e.preventDefault();
-    const payload = Object.fromEntries(new FormData(e.currentTarget).entries());
-    await api("/api/admin/teams", { method: "POST", body: JSON.stringify(payload) });
-    showToast("Team created");
-    e.currentTarget.reset();
-    document.getElementById("new-team-logo-preview").textContent = "No logo selected";
-    await loadLeagues();
-  });
-
-  document.getElementById("add-turf-form").addEventListener("submit", async e => {
-    e.preventDefault();
-    const payload = Object.fromEntries(new FormData(e.currentTarget).entries());
-    await api("/api/admin/turfs", { method: "POST", body: JSON.stringify(payload) });
-    showToast("Venue added");
-    e.currentTarget.reset();
-    await loadVenues();
-    await loadTurfs();
-  });
-
-  document.getElementById("venue-gps-btn").addEventListener("click", () => {
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(pos => {
       const form = document.getElementById('add-turf-form');
-      const form = document.getElementById("add-turf-form");
       form.elements.latitude.value = pos.coords.latitude.toFixed(6);
       form.elements.longitude.value = pos.coords.longitude.toFixed(6);
       document.getElementById('venue-gps-btn').textContent = 'GPS added';
-      document.getElementById("venue-gps-btn").textContent = "GPS added";
     });
   });
 
@@ -1162,45 +738,20 @@
     clearTimeout(t._t);
     t._t = setTimeout(()=>t.style.opacity='0', 2500);
   }
-  document.getElementById("user-search").addEventListener("input", e => {
-    const q = e.target.value.toLowerCase();
-    renderUsers(allUsers.filter(user =>
-      user.name.toLowerCase().includes(q) ||
-      user.handle.toLowerCase().includes(q) ||
-      user.email.toLowerCase().includes(q)
-    ));
-  });
 
   // Nav
   const pages = { overview: loadOverview, analytics: loadOverview, users: loadUsers, games: loadGames, turfs: loadTurfs, bookings: loadBookings, messages: loadMessages, venues: loadVenues };
   let loaded = new Set();
-  const pages = {
-    overview: loadOverview,
-    analytics: loadOverview,
-    users: loadUsers,
-    games: loadGames,
-    leagues: loadLeagues,
-    turfs: loadTurfs,
-    venues: loadVenues,
-    bookings: loadBookings,
-    messages: loadMessages,
-  };
 
   document.querySelectorAll(".nav-btn[data-page]").forEach(btn => {
     btn.addEventListener("click", () => {
       document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
       document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
-    btn.addEventListener("click", async () => {
-      document.querySelectorAll(".nav-btn").forEach(item => item.classList.remove("active"));
-      document.querySelectorAll(".page").forEach(item => item.classList.remove("active"));
       btn.classList.add("active");
       const page = btn.dataset.page;
       document.getElementById(`page-${page}`).classList.add("active");
       window.location.hash = page;
       if (!loaded.has(page)) { pages[page](); loaded.add(page); }
-      document.getElementById(`page-${btn.dataset.page}`).classList.add("active");
-      window.location.hash = btn.dataset.page;
-      await pages[btn.dataset.page]();
     });
   });
 
@@ -1228,14 +779,6 @@
   const initialPage = window.location.hash.replace("#", "") || "overview";
   const initialBtn = document.querySelector(`.nav-btn[data-page="${initialPage}"]`);
   if (initialBtn && initialPage !== "overview") initialBtn.click();
-  (async function init() {
-    await loadOverview();
-    await loadUsers();
-    await loadTurfs();
-    const initial = window.location.hash.replace("#", "") || "overview";
-    const button = document.querySelector(`.nav-btn[data-page="${initial}"]`);
-    if (button && initial !== "overview") button.click();
-  })();
 </script>
 </body>
 </html>
