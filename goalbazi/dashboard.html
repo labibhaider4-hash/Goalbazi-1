@@ -176,7 +176,7 @@
         <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#060d08;display:grid;place-items:center;font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;flex-shrink:0">${initials}</div>
         <div>
           <div style="font-weight:700">${p.name}</div>
-          <div style="color:var(--muted);font-size:.85rem">${p.handle}</div>
+          <div style="color:var(--muted);font-size:.85rem">${p.handle_display || `@${p.handle}`}</div>
         </div>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:6px">

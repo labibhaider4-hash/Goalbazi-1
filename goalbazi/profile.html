@@ -178,7 +178,7 @@
       </div>
       <div class="profile-info">
         <div class="profile-name">${p.name}</div>
-        <div class="profile-handle">${p.handle} · ${p.location}</div>
+        <div class="profile-handle">${p.handle_display || `@${p.handle}`} · ${p.location}</div>
         <div class="profile-tags">${[p.position,p.preferred_format,p.skill].filter(Boolean).map(t=>`<span class="pill pill-green">${t}</span>`).join("")}</div>
         ${p.bio ? `<div class="profile-bio">${p.bio}</div>` : ""}
         <div id="rating-display"><div class="no-rating">No ratings yet — play games to get rated</div></div>
@@ -298,6 +298,9 @@
   });
 
   loadProfile();
+  document.getElementById("f-handle").addEventListener("input", (e) => {
+    e.target.value = e.target.value.toLowerCase().replace(/[^a-z0-9]/g, "");
+  });
 </script>
 </body>
 </html>

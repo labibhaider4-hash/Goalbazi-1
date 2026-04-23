@@ -118,10 +118,11 @@
             <input name="name" placeholder="Arjun Rawat" required>
           </label>
           <label>
-            <span>Handle</span>
-            <input name="handle" placeholder="@arjun" required>
+            <span>Username</span>
+            <input name="handle" placeholder="arjun07" required>
           </label>
         </div>
+        <div style="color:rgba(255,255,255,0.55);font-size:.82rem;margin-top:-4px">Only lowercase letters and numbers are kept. Your profile will show it as <strong>@username</strong>.</div>
         <label>
           <span>Email</span>
           <input type="email" name="email" placeholder="you@example.com" required autocomplete="email">
@@ -136,11 +137,18 @@
         </label>
         <p class="error-msg" id="error-msg"></p>
         <button class="primary-btn" type="submit" id="submit-btn">Create account</button>
+        <button class="btn btn-ghost btn-full" type="button" style="margin-top:8px">Continue with Google (Soon)</button>
       </form>
       <p class="auth-switch">Already have an account? <a href="/login">Sign in</a></p>
+      <p class="auth-switch" style="margin-top:8px"><a href="/">Back to landing page</a></p>
     </div>
   </div>
   <script>
+    const handleInput = document.querySelector('input[name="handle"]');
+    handleInput.addEventListener("input", () => {
+      handleInput.value = handleInput.value.toLowerCase().replace(/[^a-z0-9]/g, "");
+    });
+
     document.getElementById("register-form").addEventListener("submit", async (e) => {
       e.preventDefault();
       const btn = document.getElementById("submit-btn");

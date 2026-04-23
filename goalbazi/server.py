@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import secrets
 import uuid
 from datetime import datetime, timedelta
@@ -85,6 +86,52 @@ def current_user_id():
     return session.get("user_id")
 
 
+def sanitize_handle(handle: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", (handle or "").strip().lower())
+
+
+def display_handle(handle: str) -> str:
+    clean = sanitize_handle(handle)
+    return f"@{clean}" if clean else "@player"
+
+
+def haversine_km(lat1, lon1, lat2, lon2):
+    from math import asin, cos, radians, sin, sqrt
+
+    d_lat = radians(lat2 - lat1)
+    d_lon = radians(lon2 - lon1)
+    lat1 = radians(lat1)
+    lat2 = radians(lat2)
+    a = sin(d_lat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(d_lon / 2) ** 2
+    return 6371 * 2 * asin(sqrt(a))
+
+
+def log_event(event_type: str, path_value: str, meta: dict | None = None) -> None:
+    try:
+        query(
+            """INSERT INTO analytics_events (event_type, path, user_id, owner_id, meta, created_at)
+               VALUES (%s,%s,%s,%s,%s,%s)""",
+            (
+                event_type,
+                path_value,
+                current_user_id(),
+                current_owner_id() if "owner_id" in session else None,
+                json.dumps(meta or {}),
+                datetime.now().isoformat(),
+            ),
+            commit=True,
+        )
+    except Exception:
+        pass
+
+
+def current_user_is_admin() -> bool:
+    if "user_id" not in session:
+        return False
+    user = query("SELECT is_admin FROM users WHERE id = %s", (current_user_id(),), one=True)
+    return bool(user and user.get("is_admin"))
+
+
 # ---------------------------------------------------------------------------
 # Database seeding
 # ---------------------------------------------------------------------------
@@ -164,7 +211,26 @@ def seed_db():
 
     # New columns for existing tables
     cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_base64 TEXT DEFAULT ''")
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE")
     cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS qr_base64 TEXT DEFAULT ''")
+    cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS map_link TEXT DEFAULT ''")
+    cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION")
+    cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION")
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS analytics_events (
+            id SERIAL PRIMARY KEY,
+            event_type TEXT NOT NULL,
+            path TEXT NOT NULL,
+            user_id INTEGER REFERENCES users(id),
+            owner_id INTEGER REFERENCES turf_owners(id),
+            meta TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL
+        )
+    """)
+
+    if ADMIN_EMAIL:
+        cur.execute("UPDATE users SET is_admin = TRUE WHERE LOWER(email) = %s", (ADMIN_EMAIL.lower(),))
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS player_ratings (
@@ -305,7 +371,10 @@ def seed_db():
 # ---------------------------------------------------------------------------
 
 def get_profile(user_id):
-    return dict(query("SELECT * FROM users WHERE id = %s", (user_id,), one=True))
+    profile = dict(query("SELECT * FROM users WHERE id = %s", (user_id,), one=True))
+    profile["handle"] = sanitize_handle(profile.get("handle", ""))
+    profile["handle_display"] = display_handle(profile["handle"])
+    return profile
 
 
 def get_stats():
@@ -317,15 +386,25 @@ def get_stats():
     ]
 
 
-def get_turfs(date_value, search=""):
+def get_turfs(date_value, search="", user_lat=None, user_lng=None):
     like = f"%{search.lower()}%"
     turfs = [dict(r) for r in query(
         "SELECT * FROM turfs WHERE LOWER(name) LIKE %s OR LOWER(area) LIKE %s ORDER BY distance_km ASC",
         (like, like),
     )]
+    if user_lat is not None and user_lng is not None:
+        for turf in turfs:
+            if turf.get("latitude") is not None and turf.get("longitude") is not None:
+                turf["nearby_distance_km"] = round(
+                    haversine_km(float(user_lat), float(user_lng), float(turf["latitude"]), float(turf["longitude"])),
+                    1,
+                )
+            else:
+                turf["nearby_distance_km"] = None
+        turfs.sort(key=lambda turf: turf["nearby_distance_km"] if turf["nearby_distance_km"] is not None else turf["distance_km"])
     for turf in turfs:
         slots = query(
-            "SELECT id, slot_time, is_booked FROM turf_slots WHERE turf_id = %s AND slot_date = %s ORDER BY slot_time",
+            "SELECT id, slot_time, is_booked, status FROM turf_slots WHERE turf_id = %s AND slot_date = %s ORDER BY slot_time",
             (turf["id"], date_value),
         )
         turf["slots"] = [dict(s) for s in slots]
@@ -381,13 +460,15 @@ def register_page():
 def api_register():
     data = request.get_json()
     name = data.get("name", "").strip()
-    handle = data.get("handle", "").strip()
+    handle = sanitize_handle(data.get("handle", ""))
     email = data.get("email", "").strip().lower()
     password = data.get("password", "")
     location = data.get("location", "Delhi NCR").strip()
 
     if not all([name, handle, email, password]):
         return jsonify({"error": "All fields are required"}), 400
+    if len(handle) < 3:
+        return jsonify({"error": "Username must have at least 3 lowercase letters or numbers"}), 400
     if len(password) < 8:
         return jsonify({"error": "Password must be at least 8 characters"}), 400
 
@@ -404,6 +485,7 @@ def api_register():
     user_id = cur.fetchone()["id"]
     conn.commit()
     session["user_id"] = user_id
+    log_event("auth_register", "/api/auth/register", {"user_id": user_id})
     return jsonify({"ok": True}), 201
 
 
@@ -416,6 +498,7 @@ def api_login():
     if not user or not verify_password(password, user["password_hash"]):
         return jsonify({"error": "Invalid email or password"}), 401
     session["user_id"] = user["id"]
+    log_event("auth_login", "/api/auth/login", {"user_id": user["id"]})
     return jsonify({"ok": True})
 
 
@@ -462,6 +545,8 @@ def serve_assets(filename):
 def api_dashboard():
     date_value = request.args.get("date", datetime.now().date().isoformat())
     search = request.args.get("search", "")
+    user_lat = request.args.get("user_lat", type=float)
+    user_lng = request.args.get("user_lng", type=float)
     leagues = [dict(r) for r in query("SELECT * FROM leagues ORDER BY id ASC")]
     standings = [dict(r) for r in query(
         "SELECT rank, team_name, played, won, points, form FROM standings ORDER BY rank ASC"
@@ -470,7 +555,7 @@ def api_dashboard():
         "profile": get_profile(current_user_id()),
         "stats": get_stats(),
         "games": get_games(),
-        "turfs": get_turfs(date_value, search),
+        "turfs": get_turfs(date_value, search, user_lat, user_lng),
         "leagues": leagues,
         "standings": standings,
     })
@@ -480,11 +565,22 @@ def api_dashboard():
 @login_required
 def api_profile_update():
     data = request.get_json()
+    handle = sanitize_handle(data.get("handle", ""))
+    if not handle:
+        return jsonify({"error": "Username can only contain lowercase letters and numbers"}), 400
+    existing = query(
+        "SELECT id FROM users WHERE handle = %s AND id != %s",
+        (handle, current_user_id()),
+        one=True,
+    )
+    if existing:
+        return jsonify({"error": "Username already taken"}), 409
     query(
         "UPDATE users SET name=%s, handle=%s, location=%s, preferred_format=%s, bio=%s WHERE id=%s",
-        (data.get("name"), data.get("handle"), data.get("location"), data.get("preferred_format"), data.get("bio"), current_user_id()),
+        (data.get("name"), handle, data.get("location"), data.get("preferred_format"), data.get("bio"), current_user_id()),
         commit=True,
     )
+    log_event("profile_update", "/api/profile")
     return jsonify(get_profile(current_user_id()))
 
 
@@ -510,6 +606,7 @@ def api_create_game():
         (game_id, f"{user['name']} created the game", datetime.now().isoformat()),
     )
     conn.commit()
+    log_event("game_create", "/api/games", {"game_id": game_id})
     return jsonify({"id": game_id}), 201
 
 
@@ -532,6 +629,7 @@ def api_post_message(game_id):
         (game_id, user["name"], data["message"], datetime.now().isoformat()),
         commit=True,
     )
+    log_event("game_message", f"/api/games/{game_id}/messages", {"game_id": game_id})
     return jsonify({"ok": True}), 201
 
 
@@ -560,6 +658,7 @@ def api_confirm_attendance(game_id):
         (game_id, f"{user['name']} confirmed attendance", datetime.now().isoformat()),
     )
     conn.commit()
+    log_event("game_attendance_confirm", f"/api/games/{game_id}/attendance", {"game_id": game_id})
     return jsonify({"ok": True}), 201
 
 
@@ -575,6 +674,7 @@ def api_leave_game(game_id):
         (game_id, f"{user['name']} left the game", datetime.now().isoformat()),
     )
     conn.commit()
+    log_event("game_attendance_leave", f"/api/games/{game_id}/attendance", {"game_id": game_id})
     return jsonify({"ok": True})
 
 
@@ -590,6 +690,8 @@ def api_book_slot(slot_id):
     slot = query("SELECT * FROM turf_slots WHERE id = %s", (slot_id,), one=True)
     if not slot:
         return jsonify({"error": "Slot not found"}), 404
+    if slot["is_booked"] or slot["status"] != "available":
+        return jsonify({"error": "This slot is no longer available"}), 409
     cur.execute(
         "UPDATE turf_slots SET is_booked = 1, status = 'pending', booked_by = %s WHERE id = %s",
         (current_user_id(), slot_id),
@@ -600,6 +702,7 @@ def api_book_slot(slot_id):
         (slot_id, current_user_id(), user["name"], user["email"], utr_number, amount),
     )
     conn.commit()
+    log_event("turf_booking", f"/api/bookings/{slot_id}", {"slot_id": slot_id, "amount": amount})
     return jsonify({"ok": True}), 201
 
 
@@ -618,8 +721,7 @@ def admin_required(f):
     def decorated(*args, **kwargs):
         if "user_id" not in session:
             return jsonify({"error": "Unauthorized"}), 401
-        user = query("SELECT email FROM users WHERE id = %s", (current_user_id(),), one=True)
-        if not user or user["email"] != ADMIN_EMAIL:
+        if not current_user_is_admin():
             return jsonify({"error": "Forbidden"}), 403
         return f(*args, **kwargs)
     return decorated
@@ -628,8 +730,7 @@ def admin_required(f):
 @app.route("/admin")
 @login_required
 def admin_page():
-    user = query("SELECT email FROM users WHERE id = %s", (current_user_id(),), one=True)
-    if not user or user["email"] != ADMIN_EMAIL:
+    if not current_user_is_admin():
         return redirect("/dashboard")
     return send_from_directory(".", "admin.html")
 
@@ -642,6 +743,8 @@ def api_admin_overview():
         {"value": query("SELECT COUNT(*) FROM games", one=True)["count"], "label": "Total games"},
         {"value": query("SELECT COUNT(*) FROM turf_slots WHERE is_booked = 1", one=True)["count"], "label": "Bookings"},
         {"value": query("SELECT COUNT(*) FROM game_messages WHERE is_system = 0", one=True)["count"], "label": "Chat messages"},
+        {"value": query("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'page_view'", one=True)["count"], "label": "Page views"},
+        {"value": query("SELECT COUNT(*) FROM analytics_events WHERE event_type != 'page_view'", one=True)["count"], "label": "Tracked actions"},
     ]
     recent_users = [dict(r) for r in query(
         "SELECT id, name, handle, email, location FROM users ORDER BY id DESC LIMIT 5"
@@ -652,16 +755,62 @@ def api_admin_overview():
            FROM games g LEFT JOIN game_players gp ON gp.game_id = g.id
            GROUP BY g.id ORDER BY g.id DESC LIMIT 5"""
     )]
-    return jsonify({"stats": stats, "recent_users": recent_users, "recent_games": recent_games})
+    analytics = {
+        "top_pages": [dict(r) for r in query(
+            """SELECT path, COUNT(*) AS visits
+               FROM analytics_events
+               WHERE event_type = 'page_view'
+               GROUP BY path
+               ORDER BY visits DESC
+               LIMIT 8"""
+        )],
+        "top_actions": [dict(r) for r in query(
+            """SELECT event_type, COUNT(*) AS total
+               FROM analytics_events
+               WHERE event_type != 'page_view'
+               GROUP BY event_type
+               ORDER BY total DESC
+               LIMIT 8"""
+        )],
+    }
+    return jsonify({"stats": stats, "recent_users": recent_users, "recent_games": recent_games, "analytics": analytics})
 
 
 @app.route("/api/admin/users")
 @admin_required
 def api_admin_users():
     users = [dict(r) for r in query(
-        "SELECT id, name, handle, email, location, skill, preferred_format FROM users ORDER BY id DESC"
+        "SELECT id, name, handle, email, location, skill, preferred_format, is_admin FROM users ORDER BY id DESC"
     )]
     return jsonify({"users": users})
+
+
+@app.route("/api/admin/users", methods=["POST"])
+@admin_required
+def api_admin_create_user():
+    data = request.get_json()
+    name = data.get("name", "").strip()
+    handle = sanitize_handle(data.get("handle", ""))
+    email = data.get("email", "").strip().lower()
+    password = data.get("password", "")
+    location = data.get("location", "Delhi NCR").strip()
+    if not all([name, handle, email, password]):
+        return jsonify({"error": "All player fields are required"}), 400
+    existing = query("SELECT id FROM users WHERE email = %s OR handle = %s", (email, handle), one=True)
+    if existing:
+        return jsonify({"error": "Email or username already taken"}), 409
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """INSERT INTO users
+           (name, handle, email, password_hash, location, position, preferred_format, skill, bio)
+           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+        (name, handle, email, hash_password(password), location, "Midfielder", "5v5", "Intermediate", ""),
+    )
+    user_id = cur.fetchone()["id"]
+    conn.commit()
+    log_event("admin_create_user", "/api/admin/users", {"user_id": user_id})
+    return jsonify({"ok": True, "id": user_id}), 201
 
 
 @app.route("/api/admin/users/<int:user_id>", methods=["DELETE"])
@@ -671,10 +820,13 @@ def api_admin_delete_user(user_id):
         return jsonify({"error": "Cannot delete yourself"}), 400
     conn = get_db()
     cur = conn.cursor()
+    cur.execute("DELETE FROM player_ratings WHERE rater_id = %s OR rated_id = %s", (user_id, user_id))
+    cur.execute("DELETE FROM bookings WHERE user_id = %s", (user_id,))
     cur.execute("DELETE FROM game_players WHERE user_id = %s", (user_id,))
     cur.execute("UPDATE turf_slots SET is_booked = 0, booked_by = NULL WHERE booked_by = %s", (user_id,))
     cur.execute("DELETE FROM users WHERE id = %s", (user_id,))
     conn.commit()
+    log_event("admin_delete_user", f"/api/admin/users/{user_id}", {"user_id": user_id})
     return jsonify({"ok": True})
 
 
@@ -682,7 +834,7 @@ def api_admin_delete_user(user_id):
 @admin_required
 def api_admin_games():
     games = [dict(r) for r in query(
-        """SELECT g.id, g.title, g.format, g.skill_level, g.game_date, g.game_time, g.status,
+        """SELECT g.id, g.title, g.format, g.skill_level, g.game_date, g.game_time, g.status, g.turf_id, g.created_by,
            COUNT(gp.id) as player_count
            FROM games g LEFT JOIN game_players gp ON gp.game_id = g.id
            GROUP BY g.id ORDER BY g.id DESC"""
@@ -690,15 +842,60 @@ def api_admin_games():
     return jsonify({"games": games})
 
 
+@app.route("/api/admin/games", methods=["POST"])
+@admin_required
+def api_admin_create_game():
+    data = request.get_json()
+    title = data.get("title", "").strip()
+    turf_id = int(data.get("turf_id", 0))
+    created_by = int(data.get("created_by") or current_user_id())
+    if not title or not turf_id:
+        return jsonify({"error": "Title and turf are required"}), 400
+    kickoff = datetime.fromisoformat(f"{data['date']}T{data['time']}:00").isoformat()
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """INSERT INTO games (title, format, skill_level, visibility, game_date, game_time, kickoff_at, turf_id, created_by)
+           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+        (
+            title,
+            data.get("format", "5v5"),
+            data.get("skill", "Intermediate"),
+            data.get("visibility", "Public"),
+            data["date"],
+            data["time"],
+            kickoff,
+            turf_id,
+            created_by,
+        ),
+    )
+    game_id = cur.fetchone()["id"]
+    creator = get_profile(created_by)
+    cur.execute(
+        """INSERT INTO game_players (game_id, user_id, player_name, player_role, team_name, is_captain, confirmed)
+           VALUES (%s,%s,%s,'Organizer','A',1,1)""",
+        (game_id, created_by, creator["name"]),
+    )
+    cur.execute(
+        "INSERT INTO game_messages (game_id, sender_name, message, is_system, created_at) VALUES (%s,'System',%s,1,%s)",
+        (game_id, f"{creator['name']} created the game", datetime.now().isoformat()),
+    )
+    conn.commit()
+    log_event("admin_create_game", "/api/admin/games", {"game_id": game_id})
+    return jsonify({"ok": True, "id": game_id}), 201
+
+
 @app.route("/api/admin/games/<int:game_id>", methods=["DELETE"])
 @admin_required
 def api_admin_delete_game(game_id):
     conn = get_db()
     cur = conn.cursor()
+    cur.execute("DELETE FROM player_ratings WHERE game_id = %s", (game_id,))
     cur.execute("DELETE FROM game_players WHERE game_id = %s", (game_id,))
     cur.execute("DELETE FROM game_messages WHERE game_id = %s", (game_id,))
     cur.execute("DELETE FROM games WHERE id = %s", (game_id,))
     conn.commit()
+    log_event("admin_delete_game", f"/api/admin/games/{game_id}", {"game_id": game_id})
     return jsonify({"ok": True})
 
 
@@ -706,7 +903,9 @@ def api_admin_delete_game(game_id):
 @admin_required
 def api_admin_turfs():
     turfs = [dict(r) for r in query("SELECT * FROM turfs ORDER BY id ASC")]
-    return jsonify({"turfs": turfs})
+    owners = [dict(r) for r in query("SELECT id, name FROM turf_owners ORDER BY name ASC")]
+    players = [dict(r) for r in query("SELECT id, name FROM users ORDER BY name ASC LIMIT 200")]
+    return jsonify({"turfs": turfs, "owners": owners, "players": players})
 
 
 @app.route("/api/admin/bookings")
@@ -748,6 +947,8 @@ def initialize():
     if not _db_ready:
         seed_db()
         _db_ready = True
+    if request.method == "GET" and not request.path.startswith("/api/") and "." not in request.path.rsplit("/", 1)[-1]:
+        log_event("page_view", request.path or "/")
 
 
 # ---------------------------------------------------------------------------
@@ -806,6 +1007,9 @@ def api_owner_register():
     surface = data.get("surface", "Astroturf")
     distance_km = float(data.get("distance_km", 0))
     upi_id = data.get("upi_id", "").strip()
+    map_link = data.get("map_link", "").strip()
+    latitude = float(data["latitude"]) if data.get("latitude") not in (None, "") else None
+    longitude = float(data["longitude"]) if data.get("longitude") not in (None, "") else None
     if not all([name, email, password, turf_name, area, upi_id]):
         return jsonify({"error": "All fields are required"}), 400
     if len(password) < 8:
@@ -821,8 +1025,10 @@ def api_owner_register():
     )
     owner_id = cur.fetchone()["id"]
     cur.execute(
-        "INSERT INTO turfs (name, area, distance_km, surface, rating, price_per_hour, owner_id, upi_id) VALUES (%s,%s,%s,%s,4.5,%s,%s,%s) RETURNING id",
-        (turf_name, area, distance_km, surface, price_per_hour, owner_id, upi_id),
+        """INSERT INTO turfs
+           (name, area, distance_km, surface, rating, price_per_hour, owner_id, upi_id, map_link, latitude, longitude)
+           VALUES (%s,%s,%s,%s,4.5,%s,%s,%s,%s,%s,%s) RETURNING id""",
+        (turf_name, area, distance_km, surface, price_per_hour, owner_id, upi_id, map_link, latitude, longitude),
     )
     turf_id = cur.fetchone()["id"]
     default_times = ["06:00", "07:00", "08:00", "09:00", "17:00", "18:00", "19:00", "20:00"]
@@ -835,6 +1041,7 @@ def api_owner_register():
             )
     conn.commit()
     session["owner_id"] = owner_id
+    log_event("owner_register", "/api/owner/register", {"owner_id": owner_id, "turf_id": turf_id})
     return jsonify({"ok": True}), 201
 
 
@@ -847,6 +1054,7 @@ def api_owner_login():
     if not owner or not verify_password(password, owner["password_hash"]):
         return jsonify({"error": "Invalid email or password"}), 401
     session["owner_id"] = owner["id"]
+    log_event("owner_login", "/api/owner/login", {"owner_id": owner["id"]})
     return jsonify({"ok": True})
 
 
@@ -890,22 +1098,46 @@ def api_owner_dashboard():
 @app.route("/api/owner/bookings/<int:booking_id>/approve", methods=["POST"])
 @owner_required
 def api_owner_approve(booking_id):
+    booking = query(
+        """SELECT b.id, b.slot_id
+           FROM bookings b
+           JOIN turf_slots ts ON ts.id = b.slot_id
+           JOIN turfs t ON t.id = ts.turf_id
+           WHERE b.id = %s AND t.owner_id = %s""",
+        (booking_id, current_owner_id()),
+        one=True,
+    )
+    if not booking:
+        return jsonify({"error": "Booking not found"}), 404
     conn = get_db()
     cur = conn.cursor()
     cur.execute("UPDATE bookings SET status = 'confirmed' WHERE id = %s", (booking_id,))
-    cur.execute("UPDATE turf_slots SET status = 'confirmed' WHERE id = (SELECT slot_id FROM bookings WHERE id = %s)", (booking_id,))
+    cur.execute("UPDATE turf_slots SET status = 'confirmed' WHERE id = %s", (booking["slot_id"],))
     conn.commit()
+    log_event("owner_approve_booking", f"/api/owner/bookings/{booking_id}/approve", {"booking_id": booking_id})
     return jsonify({"ok": True})
 
 
 @app.route("/api/owner/bookings/<int:booking_id>/reject", methods=["POST"])
 @owner_required
 def api_owner_reject(booking_id):
+    booking = query(
+        """SELECT b.id, b.slot_id
+           FROM bookings b
+           JOIN turf_slots ts ON ts.id = b.slot_id
+           JOIN turfs t ON t.id = ts.turf_id
+           WHERE b.id = %s AND t.owner_id = %s""",
+        (booking_id, current_owner_id()),
+        one=True,
+    )
+    if not booking:
+        return jsonify({"error": "Booking not found"}), 404
     conn = get_db()
     cur = conn.cursor()
     cur.execute("UPDATE bookings SET status = 'rejected' WHERE id = %s", (booking_id,))
-    cur.execute("UPDATE turf_slots SET is_booked = 0, status = 'available', booked_by = NULL WHERE id = (SELECT slot_id FROM bookings WHERE id = %s)", (booking_id,))
+    cur.execute("UPDATE turf_slots SET is_booked = 0, status = 'available', booked_by = NULL WHERE id = %s", (booking["slot_id"],))
     conn.commit()
+    log_event("owner_reject_booking", f"/api/owner/bookings/{booking_id}/reject", {"booking_id": booking_id})
     return jsonify({"ok": True})
 
 
@@ -930,10 +1162,22 @@ def api_owner_slots():
 def api_owner_settings():
     data = request.get_json()
     query(
-        "UPDATE turfs SET name=%s, area=%s, price_per_hour=%s, upi_id=%s WHERE owner_id=%s",
-        (data.get("turf_name"), data.get("area"), int(data.get("price_per_hour", 0)), data.get("upi_id"), current_owner_id()),
+        """UPDATE turfs
+           SET name=%s, area=%s, price_per_hour=%s, upi_id=%s, map_link=%s, latitude=%s, longitude=%s
+           WHERE owner_id=%s""",
+        (
+            data.get("turf_name"),
+            data.get("area"),
+            int(data.get("price_per_hour", 0)),
+            data.get("upi_id"),
+            data.get("map_link", ""),
+            float(data["latitude"]) if data.get("latitude") not in (None, "") else None,
+            float(data["longitude"]) if data.get("longitude") not in (None, "") else None,
+            current_owner_id(),
+        ),
         commit=True,
     )
+    log_event("owner_update_settings", "/api/owner/settings")
     return jsonify({"ok": True})
 
 
@@ -945,6 +1189,8 @@ def api_owner_settings():
 def root():
     if "user_id" in session:
         return redirect("/dashboard")
+    if "owner_id" in session:
+        return redirect("/owner/dashboard")
     return send_from_directory(".", "landing.html")
 
 @app.route("/dashboard")
@@ -1097,6 +1343,23 @@ def api_submit_rating():
         return jsonify({"error": "Rating must be 1-5"}), 400
     if rated_id == current_user_id():
         return jsonify({"error": "Cannot rate yourself"}), 400
+    game = query("SELECT id, game_date FROM games WHERE id = %s", (game_id,), one=True)
+    if not game:
+        return jsonify({"error": "Game not found"}), 404
+    if game["game_date"] > datetime.now().date().isoformat():
+        return jsonify({"error": "You can rate players only after the game"}), 400
+    rater_in_game = query(
+        "SELECT id FROM game_players WHERE game_id = %s AND user_id = %s AND confirmed = 1",
+        (game_id, current_user_id()),
+        one=True,
+    )
+    rated_in_game = query(
+        "SELECT id FROM game_players WHERE game_id = %s AND user_id = %s AND confirmed = 1",
+        (game_id, rated_id),
+        one=True,
+    )
+    if not rater_in_game or not rated_in_game:
+        return jsonify({"error": "Only confirmed players in this game can be rated"}), 403
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
@@ -1106,6 +1369,7 @@ def api_submit_rating():
         (game_id, current_user_id(), rated_id, rating, datetime.now().isoformat()),
     )
     conn.commit()
+    log_event("player_rating", "/api/ratings", {"game_id": game_id, "rated_id": rated_id})
     return jsonify({"ok": True})
 
 
@@ -1120,11 +1384,14 @@ def api_admin_add_turf():
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
-        """INSERT INTO turfs (name, area, distance_km, surface, rating, price_per_hour, upi_id)
-           VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+        """INSERT INTO turfs (name, area, distance_km, surface, rating, price_per_hour, upi_id, map_link, latitude, longitude, owner_id)
+           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
         (data["name"], data["area"], float(data.get("distance_km",0)),
          data.get("surface","Astroturf"), float(data.get("rating",4.5)),
-         int(data.get("price_per_hour",500)), data.get("upi_id","")),
+         int(data.get("price_per_hour",500)), data.get("upi_id",""), data.get("map_link", ""),
+         float(data["latitude"]) if data.get("latitude") not in (None, "") else None,
+         float(data["longitude"]) if data.get("longitude") not in (None, "") else None,
+         int(data["owner_id"]) if data.get("owner_id") not in (None, "") else None),
     )
     turf_id = cur.fetchone()["id"]
     # Seed slots for next 7 days
@@ -1137,6 +1404,7 @@ def api_admin_add_turf():
                 (turf_id, slot_date, t),
             )
     conn.commit()
+    log_event("admin_add_turf", "/api/admin/turfs", {"turf_id": turf_id})
     return jsonify({"ok": True, "id": turf_id}), 201
 
 
@@ -1146,12 +1414,16 @@ def api_admin_edit_turf(turf_id):
     data = request.get_json()
     query(
         """UPDATE turfs SET name=%s, area=%s, distance_km=%s, surface=%s,
-           rating=%s, price_per_hour=%s, upi_id=%s WHERE id=%s""",
+           rating=%s, price_per_hour=%s, upi_id=%s, map_link=%s, latitude=%s, longitude=%s, owner_id=%s WHERE id=%s""",
         (data["name"], data["area"], float(data.get("distance_km",0)),
          data.get("surface","Astroturf"), float(data.get("rating",4.5)),
-         int(data.get("price_per_hour",500)), data.get("upi_id",""), turf_id),
+         int(data.get("price_per_hour",500)), data.get("upi_id",""), data.get("map_link", ""),
+         float(data["latitude"]) if data.get("latitude") not in (None, "") else None,
+         float(data["longitude"]) if data.get("longitude") not in (None, "") else None,
+         int(data["owner_id"]) if data.get("owner_id") not in (None, "") else None, turf_id),
         commit=True,
     )
+    log_event("admin_edit_turf", f"/api/admin/turfs/{turf_id}", {"turf_id": turf_id})
     return jsonify({"ok": True})
 
 
@@ -1160,10 +1432,18 @@ def api_admin_edit_turf(turf_id):
 def api_admin_delete_turf(turf_id):
     conn = get_db()
     cur = conn.cursor()
+    cur.execute("SELECT id FROM games WHERE turf_id = %s", (turf_id,))
+    game_ids = [row["id"] for row in cur.fetchall()]
+    for game_id in game_ids:
+        cur.execute("DELETE FROM player_ratings WHERE game_id = %s", (game_id,))
+        cur.execute("DELETE FROM game_players WHERE game_id = %s", (game_id,))
+        cur.execute("DELETE FROM game_messages WHERE game_id = %s", (game_id,))
+    cur.execute("DELETE FROM games WHERE turf_id = %s", (turf_id,))
     cur.execute("DELETE FROM bookings WHERE slot_id IN (SELECT id FROM turf_slots WHERE turf_id=%s)", (turf_id,))
     cur.execute("DELETE FROM turf_slots WHERE turf_id=%s", (turf_id,))
     cur.execute("DELETE FROM turfs WHERE id=%s", (turf_id,))
     conn.commit()
+    log_event("admin_delete_turf", f"/api/admin/turfs/{turf_id}", {"turf_id": turf_id})
     return jsonify({"ok": True})
 
 
@@ -1179,13 +1459,14 @@ def api_owner_upload_qr():
     if len(qr_b64) > 2_000_000:
         return jsonify({"error": "Image too large"}), 400
     query("UPDATE turfs SET qr_base64=%s WHERE owner_id=%s", (qr_b64, current_owner_id()), commit=True)
+    log_event("owner_upload_qr", "/api/owner/qr")
     return jsonify({"ok": True})
 
 
 @app.route("/api/bookings/<int:slot_id>/info", methods=["GET"])
 def api_slot_info_updated(slot_id):
     info = query(
-        """SELECT t.upi_id, t.price_per_hour, t.name as turf_name, t.qr_base64
+        """SELECT t.upi_id, t.price_per_hour, t.name as turf_name, t.qr_base64, t.map_link
            FROM turf_slots ts JOIN turfs t ON t.id = ts.turf_id
            WHERE ts.id = %s""",
         (slot_id,), one=True,

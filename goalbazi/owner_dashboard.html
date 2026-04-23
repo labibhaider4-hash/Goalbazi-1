@@ -101,6 +101,7 @@
   </div>
   <div class="header-right">
     <span style="color:var(--muted);font-size:.85rem" id="owner-name-display"></span>
+    <button class="btn btn-ghost btn-sm" onclick="window.location.href='/'">Landing page</button>
     <button class="btn btn-ghost btn-sm" id="logout-btn">Log out</button>
   </div>
 </div>
@@ -140,6 +141,13 @@
       <div style="color:var(--muted);font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em">Your UPI ID</div>
       <div class="upi-id" id="upi-display">Loading...</div>
       <div class="upi-note">Players will see this UPI ID when booking a slot. They pay directly to this UPI and enter their UTR number to confirm payment. You then verify and approve the booking.</div>
+      <div style="margin-top:18px;display:grid;gap:10px">
+        <div id="qr-preview" style="width:160px;height:160px;border:1px dashed var(--line);border-radius:16px;display:grid;place-items:center;color:var(--muted)">No QR uploaded</div>
+        <label class="btn btn-ghost" style="width:max-content">
+          Upload QR code
+          <input type="file" id="qr-file-input" accept="image/*" style="display:none">
+        </label>
+      </div>
     </div>
     <div class="table-card">
       <div class="card-head"><h3>Recent payments received</h3></div>
@@ -176,6 +184,18 @@
               <input name="upi_id" id="settings-upi" style="padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--panel-soft);color:var(--text);font-family:inherit">
             </label>
           </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <label style="display:grid;gap:8px">
+              <span style="font-size:.85rem;color:var(--muted);font-weight:700">Map link</span>
+              <input name="map_link" id="settings-map-link" style="padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--panel-soft);color:var(--text);font-family:inherit">
+            </label>
+            <label style="display:grid;gap:8px">
+              <span style="font-size:.85rem;color:var(--muted);font-weight:700">GPS location</span>
+              <button class="btn btn-ghost" type="button" id="owner-location-btn">Use current location</button>
+            </label>
+          </div>
+          <input type="hidden" name="latitude" id="settings-latitude">
+          <input type="hidden" name="longitude" id="settings-longitude">
           <button class="btn btn-primary" type="submit" style="justify-self:start">Save changes</button>
         </form>
       </div>
@@ -297,6 +317,13 @@
     document.getElementById("settings-area").value = turf.area;
     document.getElementById("settings-price").value = turf.price_per_hour;
     document.getElementById("settings-upi").value = turf.upi_id || "";
+    document.getElementById("settings-map-link").value = turf.map_link || "";
+    document.getElementById("settings-latitude").value = turf.latitude || "";
+    document.getElementById("settings-longitude").value = turf.longitude || "";
+    const preview = document.getElementById("qr-preview");
+    preview.innerHTML = turf.qr_base64
+      ? `<img src="${turf.qr_base64}" style="width:100%;height:100%;object-fit:contain;border-radius:12px">`
+      : "No QR uploaded";
   }
 
   async function approveBooking(id) {
@@ -335,14 +362,28 @@
       document.querySelectorAll(".tab-content").forEach(c => c.style.display = "none");
       tab.classList.add("active");
       document.getElementById(`tab-${tab.dataset.tab}`).style.display = "block";
+      window.location.hash = tab.dataset.tab;
       if (tab.dataset.tab === "slots") loadSlots();
     });
   });
+
+  function openOwnerTab(name) {
+    const btn = document.querySelector(`.tab[data-tab="${name}"]`) || document.querySelector(".tab");
+    if (btn) btn.click();
+  }
 
   // Slot date filter
   const today = new Date().toISOString().slice(0, 10);
   document.getElementById("slot-date-filter").value = today;
   document.getElementById("slot-date-filter").addEventListener("change", loadSlots);
+  document.getElementById("owner-location-btn").addEventListener("click", () => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition((pos) => {
+      document.getElementById("settings-latitude").value = pos.coords.latitude.toFixed(6);
+      document.getElementById("settings-longitude").value = pos.coords.longitude.toFixed(6);
+      document.getElementById("owner-location-btn").textContent = "GPS added";
+    });
+  });
 
   // Settings form
   document.getElementById("settings-form").addEventListener("submit", async (e) => {
@@ -373,10 +414,11 @@
   // Logout
   document.getElementById("logout-btn").addEventListener("click", async () => {
     await fetch("/api/owner/logout", { method: "POST" });
-    window.location.href = "/owner/login";
+    window.location.href = "/";
   });
 
   loadDashboard();
+  openOwnerTab(window.location.hash.replace("#", "") || "bookings");
 </script>
 </body>
 </html>

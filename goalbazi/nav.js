@@ -68,7 +68,7 @@ function initNav(activePage) {
   // Logout
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
-    window.location.href = "/login";
+    window.location.href = "/";
   }
 
   const logoutBtn = document.getElementById("nav-logout");

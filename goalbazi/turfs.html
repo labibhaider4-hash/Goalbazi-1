@@ -141,6 +141,7 @@
     <div class="filter-bar">
       <input class="form-input" id="search-input" placeholder="Search by name or area...">
       <input type="date" class="form-input" id="date-input" style="max-width:180px">
+      <button class="btn btn-ghost" id="nearby-btn" type="button">Use my location</button>
     </div>
 
     <div id="turfs-list">
@@ -156,6 +157,7 @@
 
   let pendingSlotId = null;
   let pendingAmount = 0;
+  let userCoords = null;
 
   const today = new Date().toISOString().slice(0,10);
   document.getElementById("date-input").value = today;
@@ -163,7 +165,12 @@
   async function loadTurfs() {
     const search = document.getElementById("search-input").value.trim();
     const date = document.getElementById("date-input").value;
-    const data = await apiFetch(`/api/dashboard?date=${date}&search=${encodeURIComponent(search)}`);
+    const query = new URLSearchParams({ date, search });
+    if (userCoords) {
+      query.set("user_lat", userCoords.latitude);
+      query.set("user_lng", userCoords.longitude);
+    }
+    const data = await apiFetch(`/api/dashboard?${query.toString()}`);
     if (!data) return;
 
     const turfs = data.turfs;
@@ -188,10 +195,11 @@
           <div class="turf-top">
             <div>
               <div class="turf-name">${t.name}</div>
-              <div class="turf-meta">📍 ${t.area} · ${t.distance_km}km · ${t.surface}<br>⭐ ${t.rating}</div>
+              <div class="turf-meta">📍 ${t.area} · ${(t.nearby_distance_km ?? t.distance_km)}km · ${t.surface}<br>⭐ ${t.rating}</div>
             </div>
             <div class="turf-price">₹${t.price_per_hour}<span>/hr</span></div>
           </div>
+          ${t.map_link ? `<div style="margin:0 0 12px"><a class="btn btn-ghost btn-sm" href="${t.map_link}" target="_blank" rel="noopener noreferrer">Open map</a></div>` : ``}
           <div class="slots-label">Available slots — ${date}</div>
           ${slotsHtml}
         </div>
@@ -218,6 +226,9 @@
       qrEl.innerHTML = `<div style="margin-top:12px;text-align:center"><div style="color:#7a9e8a;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px">Scan to pay</div><img src="${info.qr_base64}" style="width:140px;height:140px;object-fit:contain;border-radius:12px;border:1px solid rgba(255,255,255,.08);display:block;margin:0 auto"></div>`;
     } else {
       qrEl.innerHTML = '';
+    }
+    if (info.map_link) {
+      qrEl.innerHTML += `<div style="margin-top:12px;text-align:center"><a class="btn btn-ghost btn-sm" href="${info.map_link}" target="_blank" rel="noopener noreferrer">Open location in Maps</a></div>`;
     }
     document.getElementById("utr-input").value = "";
     document.getElementById("upi-modal").classList.add("open");
@@ -252,6 +263,17 @@
 
   document.getElementById("search-input").addEventListener("input", loadTurfs);
   document.getElementById("date-input").addEventListener("change", loadTurfs);
+  document.getElementById("nearby-btn").addEventListener("click", () => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition((pos) => {
+      userCoords = {
+        latitude: pos.coords.latitude.toFixed(6),
+        longitude: pos.coords.longitude.toFixed(6),
+      };
+      document.getElementById("nearby-btn").textContent = "Nearby turfs";
+      loadTurfs();
+    });
+  });
 
   loadTurfs();
 </script>
