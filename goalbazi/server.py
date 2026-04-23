@@ -162,6 +162,22 @@ def seed_db():
         )
     """)
 
+    # New columns for existing tables
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_base64 TEXT DEFAULT ''")
+    cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS qr_base64 TEXT DEFAULT ''")
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS player_ratings (
+            id SERIAL PRIMARY KEY,
+            game_id INTEGER NOT NULL REFERENCES games(id),
+            rater_id INTEGER NOT NULL REFERENCES users(id),
+            rated_id INTEGER NOT NULL REFERENCES users(id),
+            rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+            created_at TEXT NOT NULL,
+            UNIQUE(game_id, rater_id, rated_id)
+        )
+    """)
+
     cur.execute("""
         CREATE TABLE IF NOT EXISTS games (
             id SERIAL PRIMARY KEY,
@@ -587,18 +603,7 @@ def api_book_slot(slot_id):
     return jsonify({"ok": True}), 201
 
 
-@app.route("/api/bookings/<int:slot_id>/info")
-@login_required
-def api_slot_info(slot_id):
-    info = query(
-        """SELECT t.upi_id, t.price_per_hour, t.name as turf_name
-           FROM turf_slots ts JOIN turfs t ON t.id = ts.turf_id
-           WHERE ts.id = %s""",
-        (slot_id,), one=True,
-    )
-    if not info:
-        return jsonify({"error": "Not found"}), 404
-    return jsonify(dict(info))
+
 
 
 
@@ -984,3 +989,207 @@ def api_public_stats():
         "turfs": query("SELECT COUNT(*) FROM turfs", one=True)["count"],
         "leagues": query("SELECT COUNT(*) FROM leagues", one=True)["count"],
     })
+
+
+# ---------------------------------------------------------------------------
+# Player profile — avatar + stats + ratings
+# ---------------------------------------------------------------------------
+
+@app.route("/api/profile/avatar", methods=["POST"])
+@login_required
+def api_upload_avatar():
+    data = request.get_json()
+    b64 = data.get("avatar_base64", "")
+    if len(b64) > 2_000_000:
+        return jsonify({"error": "Image too large (max 1.5MB)"}), 400
+    query("UPDATE users SET avatar_base64 = %s WHERE id = %s", (b64, current_user_id()), commit=True)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/profile/stats")
+@login_required
+def api_profile_stats():
+    uid = current_user_id()
+    games_played = query("SELECT COUNT(*) FROM game_players WHERE user_id = %s AND confirmed = 1", (uid,), one=True)["count"]
+    games_created = query("SELECT COUNT(*) FROM games WHERE created_by = %s", (uid,), one=True)["count"]
+    turfs_booked = query("SELECT COUNT(*) FROM bookings WHERE user_id = %s AND status = 'confirmed'", (uid,), one=True)["count"]
+    avg_rating = query("SELECT ROUND(AVG(rating)::numeric, 1) as avg FROM player_ratings WHERE rated_id = %s", (uid,), one=True)["avg"]
+    total_ratings = query("SELECT COUNT(*) FROM player_ratings WHERE rated_id = %s", (uid,), one=True)["count"]
+
+    # Games played with — players who shared a game
+    teammates = [dict(r) for r in query(
+        """SELECT u.id, u.name, u.handle, u.avatar_base64,
+           ROUND(AVG(pr.rating)::numeric,1) as avg_rating,
+           COUNT(pr.id) as rating_count
+           FROM game_players gp1
+           JOIN game_players gp2 ON gp2.game_id = gp1.game_id AND gp2.user_id != %s
+           JOIN users u ON u.id = gp2.user_id
+           LEFT JOIN player_ratings pr ON pr.rated_id = u.id
+           WHERE gp1.user_id = %s AND gp1.confirmed = 1 AND gp2.confirmed = 1
+           GROUP BY u.id, u.name, u.handle, u.avatar_base64
+           LIMIT 20""",
+        (uid, uid),
+    )]
+
+    # Games I can rate players in (games I was in, that have other confirmed players)
+    rateable_games = [dict(r) for r in query(
+        """SELECT DISTINCT g.id, g.title, g.game_date
+           FROM games g
+           JOIN game_players gp ON gp.game_id = g.id AND gp.user_id = %s AND gp.confirmed = 1
+           WHERE g.game_date <= %s
+           ORDER BY g.game_date DESC LIMIT 10""",
+        (uid, datetime.now().date().isoformat()),
+    )]
+
+    for game in rateable_games:
+        players = [dict(r) for r in query(
+            """SELECT gp.user_id, u.name, u.avatar_base64,
+               pr.rating as my_rating
+               FROM game_players gp
+               JOIN users u ON u.id = gp.user_id
+               LEFT JOIN player_ratings pr ON pr.game_id = gp.game_id AND pr.rater_id = %s AND pr.rated_id = gp.user_id
+               WHERE gp.game_id = %s AND gp.user_id != %s AND gp.confirmed = 1""",
+            (uid, game["id"], uid),
+        )]
+        game["players"] = players
+
+    return jsonify({
+        "stats": {
+            "games_played": games_played,
+            "games_created": games_created,
+            "turfs_booked": turfs_booked,
+            "avg_rating": float(avg_rating) if avg_rating else None,
+            "total_ratings": total_ratings,
+        },
+        "teammates": teammates,
+        "rateable_games": rateable_games,
+    })
+
+
+@app.route("/api/players/<int:player_id>")
+@login_required
+def api_player_profile(player_id):
+    user = query(
+        "SELECT id, name, handle, location, position, preferred_format, skill, bio, avatar_base64 FROM users WHERE id = %s",
+        (player_id,), one=True,
+    )
+    if not user:
+        return jsonify({"error": "Not found"}), 404
+    avg_rating = query("SELECT ROUND(AVG(rating)::numeric,1) as avg FROM player_ratings WHERE rated_id = %s", (player_id,), one=True)["avg"]
+    total_ratings = query("SELECT COUNT(*) FROM player_ratings WHERE rated_id = %s", (player_id,), one=True)["count"]
+    games_played = query("SELECT COUNT(*) FROM game_players WHERE user_id = %s AND confirmed = 1", (player_id,), one=True)["count"]
+    return jsonify({
+        **dict(user),
+        "avg_rating": float(avg_rating) if avg_rating else None,
+        "total_ratings": total_ratings,
+        "games_played": games_played,
+    })
+
+
+@app.route("/api/ratings", methods=["POST"])
+@login_required
+def api_submit_rating():
+    data = request.get_json()
+    game_id = int(data.get("game_id"))
+    rated_id = int(data.get("rated_id"))
+    rating = int(data.get("rating"))
+    if not 1 <= rating <= 5:
+        return jsonify({"error": "Rating must be 1-5"}), 400
+    if rated_id == current_user_id():
+        return jsonify({"error": "Cannot rate yourself"}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """INSERT INTO player_ratings (game_id, rater_id, rated_id, rating, created_at)
+           VALUES (%s,%s,%s,%s,%s)
+           ON CONFLICT (game_id, rater_id, rated_id) DO UPDATE SET rating = EXCLUDED.rating""",
+        (game_id, current_user_id(), rated_id, rating, datetime.now().isoformat()),
+    )
+    conn.commit()
+    return jsonify({"ok": True})
+
+
+# ---------------------------------------------------------------------------
+# Admin — turf management
+# ---------------------------------------------------------------------------
+
+@app.route("/api/admin/turfs", methods=["POST"])
+@admin_required
+def api_admin_add_turf():
+    data = request.get_json()
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """INSERT INTO turfs (name, area, distance_km, surface, rating, price_per_hour, upi_id)
+           VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+        (data["name"], data["area"], float(data.get("distance_km",0)),
+         data.get("surface","Astroturf"), float(data.get("rating",4.5)),
+         int(data.get("price_per_hour",500)), data.get("upi_id","")),
+    )
+    turf_id = cur.fetchone()["id"]
+    # Seed slots for next 7 days
+    times = ["06:00","07:00","08:00","09:00","17:00","18:00","19:00","20:00"]
+    for day in range(7):
+        slot_date = (datetime.now() + timedelta(days=day)).date().isoformat()
+        for t in times:
+            cur.execute(
+                "INSERT INTO turf_slots (turf_id,slot_date,slot_time,is_booked,status) VALUES (%s,%s,%s,0,'available')",
+                (turf_id, slot_date, t),
+            )
+    conn.commit()
+    return jsonify({"ok": True, "id": turf_id}), 201
+
+
+@app.route("/api/admin/turfs/<int:turf_id>", methods=["PUT"])
+@admin_required
+def api_admin_edit_turf(turf_id):
+    data = request.get_json()
+    query(
+        """UPDATE turfs SET name=%s, area=%s, distance_km=%s, surface=%s,
+           rating=%s, price_per_hour=%s, upi_id=%s WHERE id=%s""",
+        (data["name"], data["area"], float(data.get("distance_km",0)),
+         data.get("surface","Astroturf"), float(data.get("rating",4.5)),
+         int(data.get("price_per_hour",500)), data.get("upi_id",""), turf_id),
+        commit=True,
+    )
+    return jsonify({"ok": True})
+
+
+@app.route("/api/admin/turfs/<int:turf_id>", methods=["DELETE"])
+@admin_required
+def api_admin_delete_turf(turf_id):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM bookings WHERE slot_id IN (SELECT id FROM turf_slots WHERE turf_id=%s)", (turf_id,))
+    cur.execute("DELETE FROM turf_slots WHERE turf_id=%s", (turf_id,))
+    cur.execute("DELETE FROM turfs WHERE id=%s", (turf_id,))
+    conn.commit()
+    return jsonify({"ok": True})
+
+
+# ---------------------------------------------------------------------------
+# Turf owner — QR code upload
+# ---------------------------------------------------------------------------
+
+@app.route("/api/owner/qr", methods=["POST"])
+@owner_required
+def api_owner_upload_qr():
+    data = request.get_json()
+    qr_b64 = data.get("qr_base64", "")
+    if len(qr_b64) > 2_000_000:
+        return jsonify({"error": "Image too large"}), 400
+    query("UPDATE turfs SET qr_base64=%s WHERE owner_id=%s", (qr_b64, current_owner_id()), commit=True)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/bookings/<int:slot_id>/info", methods=["GET"])
+def api_slot_info_updated(slot_id):
+    info = query(
+        """SELECT t.upi_id, t.price_per_hour, t.name as turf_name, t.qr_base64
+           FROM turf_slots ts JOIN turfs t ON t.id = ts.turf_id
+           WHERE ts.id = %s""",
+        (slot_id,), one=True,
+    )
+    if not info:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify(dict(info))

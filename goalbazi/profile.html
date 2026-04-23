@@ -3,50 +3,91 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Goalbazi — Profile</title>
+  <title>Goalbazi — My Profile</title>
   <link rel="icon" type="image/svg+xml" href="/assets/goalbazi-logo.svg">
   <link rel="stylesheet" href="/styles.css">
   <style>
-    .profile-shell { padding: 28px 20px 80px; max-width: 680px; }
-    .page-header { margin-bottom: 24px; }
-    .page-header h1 { font-size: clamp(1.6rem,5vw,2.4rem); font-weight:800; letter-spacing:-.04em; }
+    .profile-shell { padding: 28px 20px 80px; }
 
     .profile-hero {
       background: var(--panel);
       border: 1px solid var(--line);
       border-radius: var(--radius);
       padding: 24px;
-      display: flex;
-      align-items: center;
-      gap: 18px;
       margin-bottom: 20px;
+      display: flex;
+      align-items: flex-start;
+      gap: 20px;
       flex-wrap: wrap;
     }
-    .profile-avatar {
-      width: 72px; height: 72px;
-      border-radius: 50%;
+
+    .avatar-wrap { position: relative; flex-shrink: 0; cursor: pointer; }
+    .avatar-img { width: 88px; height: 88px; border-radius: 50%; object-fit: cover; border: 3px solid var(--brand); display: block; }
+    .avatar-initials {
+      width: 88px; height: 88px; border-radius: 50%;
       background: linear-gradient(135deg, var(--brand), var(--brand-2));
-      color: #060d08;
-      display: grid;
-      place-items: center;
-      font-family: 'Syne', sans-serif;
-      font-weight: 800;
-      font-size: 1.5rem;
-      flex-shrink: 0;
+      color: #060d08; display: grid; place-items: center;
+      font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.8rem;
+      border: 3px solid var(--brand);
     }
-    .profile-info-name { font-family:'Syne',sans-serif; font-weight:800; font-size:1.3rem; }
-    .profile-info-meta { color:var(--muted); font-size:.88rem; margin-top:3px; }
-    .profile-tags { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
-
-    .edit-card {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      padding: 24px;
+    .avatar-upload-btn {
+      position: absolute; bottom: 2px; right: 2px;
+      width: 26px; height: 26px; border-radius: 50%;
+      background: var(--brand); border: 2px solid var(--bg);
+      color: #060d08; font-size: .75rem;
+      display: grid; place-items: center; cursor: pointer; font-weight: 800;
     }
-    .edit-card h2 { font-family:'Syne',sans-serif; font-weight:700; font-size:1rem; margin-bottom:18px; }
 
-    @media (min-width:768px) { .profile-shell { padding:36px 28px 80px; } }
+    .profile-info { flex: 1; min-width: 0; }
+    .profile-name { font-family: 'Syne', sans-serif; font-size: 1.5rem; font-weight: 800; letter-spacing: -.04em; }
+    .profile-handle { color: var(--muted); font-size: .9rem; margin-top: 3px; }
+    .profile-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .profile-bio { color: var(--muted); font-size: .88rem; line-height: 1.6; margin-top: 10px; }
+
+    .rating-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 14px; margin-top: 12px;
+      background: rgba(127,255,69,.08); border: 1px solid rgba(127,255,69,.2);
+      border-radius: 999px;
+    }
+    .rating-num { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.1rem; color: var(--brand); }
+    .rating-count { color: var(--muted); font-size: .8rem; }
+    .no-rating { color: var(--muted); font-size: .85rem; margin-top: 10px; font-style: italic; }
+
+    .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+
+    .tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--line); }
+    .tab-btn { padding: 10px 16px; background: none; border: none; color: var(--muted); font-weight: 600; font-size: .88rem; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; font-family: inherit; }
+    .tab-btn.active { color: var(--brand); border-bottom-color: var(--brand); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    .edit-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; }
+    .edit-card h3 { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1rem; margin-bottom: 18px; }
+
+    .game-rate-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; margin-bottom: 14px; }
+    .game-rate-title { font-weight: 700; margin-bottom: 4px; }
+    .game-rate-date { color: var(--muted); font-size: .82rem; margin-bottom: 14px; }
+    .rate-player-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+    .rate-player-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .rate-player-name { font-weight: 600; font-size: .92rem; }
+    .stars-input { display: flex; gap: 3px; }
+    .star-btn { background: none; border: none; font-size: 1.4rem; cursor: pointer; color: var(--muted); transition: color .1s, transform .1s; padding: 2px; line-height: 1; }
+    .star-btn.active { color: var(--warn); }
+    .star-btn:hover { transform: scale(1.2); }
+    .rated-badge { color: var(--accent); font-size: .82rem; font-weight: 700; }
+
+    .teammates-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
+    .teammate-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 14px; text-align: center; text-decoration: none; color: var(--text); transition: border-color .2s; display: block; }
+    .teammate-card:hover { border-color: rgba(127,255,69,.25); }
+    .teammate-avatar-wrap { width: 48px; height: 48px; border-radius: 50%; margin: 0 auto 8px; overflow: hidden; }
+    .teammate-avatar { width: 100%; height: 100%; object-fit: cover; }
+    .teammate-initials { width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg,var(--brand),var(--brand-2)); color:#060d08; display:grid; place-items:center; font-family:'Syne',sans-serif; font-weight:800; font-size:1rem; margin:0 auto 8px; }
+    .teammate-name { font-weight: 700; font-size: .85rem; }
+    .teammate-rating { color: var(--warn); font-size: .78rem; margin-top: 3px; }
+
+    @media (min-width: 768px) { .profile-shell { padding: 36px 28px 80px; } }
+    @media (max-width: 400px) { .stats-row { grid-template-columns: 1fr 1fr; } }
   </style>
 </head>
 <body>
@@ -54,49 +95,53 @@
 <div class="nav-drawer" id="nav-drawer"></div>
 <div class="ambient ambient-a"></div>
 <div class="ambient ambient-b"></div>
+<input type="file" id="avatar-file-input" accept="image/*" style="display:none">
 
 <div class="page-wrap">
   <div class="container profile-shell">
-    <div class="page-header">
-      <h1>My profile</h1>
-    </div>
 
-    <!-- Hero card -->
     <div class="profile-hero" id="profile-hero">
       <div class="page-loader"><div class="spinner"></div></div>
     </div>
 
-    <!-- Edit form -->
-    <div class="edit-card">
-      <h2>Edit details</h2>
-      <form id="profile-form" class="form-grid" style="gap:14px">
-        <div class="form-grid form-grid-2">
-          <div class="form-group">
-            <label class="form-label">Full name</label>
-            <input name="name" id="f-name" class="form-input" required>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Handle</label>
-            <input name="handle" id="f-handle" class="form-input" required>
-          </div>
-        </div>
-        <div class="form-grid form-grid-2">
-          <div class="form-group">
-            <label class="form-label">Location</label>
-            <input name="location" id="f-location" class="form-input" required>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Preferred format</label>
-            <input name="preferred_format" id="f-format" class="form-input" required>
-          </div>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Bio</label>
-          <textarea name="bio" id="f-bio" class="form-input" rows="3" style="resize:vertical"></textarea>
-        </div>
-        <button class="btn btn-primary" type="submit" id="save-btn">Save changes</button>
-      </form>
+    <div class="stats-row" id="stats-row">
+      <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Games played</div></div>
+      <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Games created</div></div>
+      <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Turfs booked</div></div>
     </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="edit">Edit profile</button>
+      <button class="tab-btn" data-tab="rate">Rate players</button>
+      <button class="tab-btn" data-tab="teammates">Teammates</button>
+    </div>
+
+    <div class="tab-panel active" id="tab-edit">
+      <div class="edit-card">
+        <h3>Your details</h3>
+        <form id="profile-form" style="display:grid;gap:14px">
+          <div class="form-grid form-grid-2">
+            <div class="form-group"><label class="form-label">Full name</label><input name="name" id="f-name" class="form-input" required></div>
+            <div class="form-group"><label class="form-label">Handle</label><input name="handle" id="f-handle" class="form-input" required></div>
+          </div>
+          <div class="form-grid form-grid-2">
+            <div class="form-group"><label class="form-label">Location</label><input name="location" id="f-location" class="form-input" required></div>
+            <div class="form-group"><label class="form-label">Preferred format</label><input name="preferred_format" id="f-format" class="form-input" required></div>
+          </div>
+          <div class="form-group"><label class="form-label">Bio</label><textarea name="bio" id="f-bio" class="form-input" rows="3" style="resize:vertical"></textarea></div>
+          <button class="btn btn-primary" type="submit" id="save-btn">Save changes</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tab-rate">
+      <div id="rate-content"><div class="page-loader"><div class="spinner"></div></div></div>
+    </div>
+
+    <div class="tab-panel" id="tab-teammates">
+      <div id="teammates-content"><div class="page-loader"><div class="spinner"></div></div></div>
+    </div>
+
   </div>
 </div>
 
@@ -104,51 +149,155 @@
 <script src="/nav.js"></script>
 <script>
   initNav("profile");
+  let statsLoaded = false;
 
-  async function load() {
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById(`tab-${btn.dataset.tab}`).classList.add("active");
+      if (!statsLoaded && (btn.dataset.tab === "rate" || btn.dataset.tab === "teammates")) loadStats();
+    });
+  });
+
+  function makeAvatar(user, size=88) {
+    if (user.avatar_base64) return `<img src="${user.avatar_base64}" class="avatar-img" style="width:${size}px;height:${size}px">`;
+    const i = user.name.split(" ").map(x=>x[0]).slice(0,2).join("").toUpperCase();
+    return `<div class="avatar-initials" style="width:${size}px;height:${size}px;font-size:${Math.round(size/2.5)}rem">${i}</div>`;
+  }
+
+  async function loadProfile() {
     const data = await apiFetch("/api/dashboard");
     if (!data) return;
     const p = data.profile;
-    const initials = p.name.split(" ").map(x => x[0]).slice(0,2).join("").toUpperCase();
-
     document.getElementById("profile-hero").innerHTML = `
-      <div class="profile-avatar">${initials}</div>
-      <div>
-        <div class="profile-info-name">${p.name}</div>
-        <div class="profile-info-meta">${p.handle} · ${p.location}</div>
-        <div class="profile-tags">
-          ${[p.position, p.preferred_format, p.skill].filter(Boolean).map(t => `<span class="pill pill-green">${t}</span>`).join("")}
-        </div>
-        ${p.bio ? `<div style="color:var(--muted);font-size:.85rem;margin-top:10px;line-height:1.6">${p.bio}</div>` : ""}
+      <div class="avatar-wrap" id="avatar-wrap">
+        ${makeAvatar(p)}
+        <div class="avatar-upload-btn" title="Change photo">📷</div>
+      </div>
+      <div class="profile-info">
+        <div class="profile-name">${p.name}</div>
+        <div class="profile-handle">${p.handle} · ${p.location}</div>
+        <div class="profile-tags">${[p.position,p.preferred_format,p.skill].filter(Boolean).map(t=>`<span class="pill pill-green">${t}</span>`).join("")}</div>
+        ${p.bio ? `<div class="profile-bio">${p.bio}</div>` : ""}
+        <div id="rating-display"><div class="no-rating">No ratings yet — play games to get rated</div></div>
       </div>
     `;
-
+    document.getElementById("avatar-wrap").addEventListener("click", () => document.getElementById("avatar-file-input").click());
     document.getElementById("f-name").value = p.name;
     document.getElementById("f-handle").value = p.handle;
     document.getElementById("f-location").value = p.location;
     document.getElementById("f-format").value = p.preferred_format;
     document.getElementById("f-bio").value = p.bio || "";
+    // Load stats for rating display
+    loadStats();
   }
 
+  async function loadStats() {
+    statsLoaded = true;
+    const data = await apiFetch("/api/profile/stats");
+    if (!data) return;
+    const s = data.stats;
+
+    document.getElementById("stats-row").innerHTML = [
+      { value: s.games_played, label: "Games played" },
+      { value: s.games_created, label: "Games created" },
+      { value: s.turfs_booked, label: "Turfs booked" },
+    ].map(x=>`<div class="stat-card"><div class="stat-value">${x.value}</div><div class="stat-label">${x.label}</div></div>`).join("");
+
+    const rEl = document.getElementById("rating-display");
+    if (rEl) {
+      if (s.avg_rating) {
+        const filled = Math.round(s.avg_rating);
+        const stars = "★".repeat(filled) + "☆".repeat(5-filled);
+        rEl.innerHTML = `<div class="rating-badge"><span style="color:var(--warn);font-size:1rem">${stars}</span><span class="rating-num">${s.avg_rating}</span><span class="rating-count">(${s.total_ratings} ratings)</span></div>`;
+      } else {
+        rEl.innerHTML = `<div class="no-rating">No ratings yet — play games to get rated</div>`;
+      }
+    }
+
+    // Rate tab
+    const rateEl = document.getElementById("rate-content");
+    if (data.rateable_games.length === 0) {
+      rateEl.innerHTML = `<div class="empty-state"><div class="empty-icon">⭐</div><div class="empty-title">No games to rate yet</div><p>Join and confirm attendance in games to rate teammates afterward.</p></div>`;
+    } else {
+      rateEl.innerHTML = data.rateable_games.map(g => `
+        <div class="game-rate-card">
+          <div class="game-rate-title">${g.title}</div>
+          <div class="game-rate-date">📅 ${g.game_date}</div>
+          ${g.players.length === 0
+            ? `<div style="color:var(--muted);font-size:.85rem">No other confirmed players to rate</div>`
+            : g.players.map(p => `
+              <div class="rate-player-row">
+                <div class="rate-player-name">${p.name}</div>
+                ${p.my_rating
+                  ? `<div class="rated-badge">✓ You rated ${p.my_rating}★</div>`
+                  : `<div class="stars-input" data-game="${g.id}" data-player="${p.user_id}">
+                      ${[1,2,3,4,5].map(n=>`<button class="star-btn" data-val="${n}" type="button">★</button>`).join("")}
+                    </div>`
+                }
+              </div>`).join("")}
+        </div>`).join("");
+
+      document.querySelectorAll(".stars-input").forEach(row => {
+        const btns = row.querySelectorAll(".star-btn");
+        btns.forEach((btn, i) => {
+          btn.addEventListener("mouseenter", () => btns.forEach((b,j)=>b.classList.toggle("active",j<=i)));
+          btn.addEventListener("mouseleave", () => btns.forEach(b=>b.classList.remove("active")));
+          btn.addEventListener("click", async () => {
+            await apiFetch("/api/ratings", { method:"POST", body: JSON.stringify({ game_id: row.dataset.game, rated_id: row.dataset.player, rating: btn.dataset.val }) });
+            showToast(`Rated ${btn.dataset.val}★`);
+            statsLoaded = false;
+            loadStats();
+          });
+        });
+      });
+    }
+
+    // Teammates tab
+    const teamEl = document.getElementById("teammates-content");
+    if (data.teammates.length === 0) {
+      teamEl.innerHTML = `<div class="empty-state"><div class="empty-icon">👥</div><div class="empty-title">No teammates yet</div><p>Join games and confirm attendance to see players you've played with.</p></div>`;
+    } else {
+      teamEl.innerHTML = `<div class="teammates-grid">${data.teammates.map(t => {
+        const initials = t.name.split(" ").map(x=>x[0]).slice(0,2).join("").toUpperCase();
+        const av = t.avatar_base64 ? `<img src="${t.avatar_base64}" class="teammate-avatar">` : `<div class="teammate-initials">${initials}</div>`;
+        return `<div class="teammate-card">${av}<div class="teammate-name">${t.name}</div><div class="teammate-rating">${t.avg_rating ? `★ ${t.avg_rating}` : "No ratings yet"}</div></div>`;
+      }).join("")}</div>`;
+    }
+  }
+
+  // Avatar file upload
+  document.getElementById("avatar-file-input").addEventListener("change", async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 1_500_000) { showToast("Image too large — max 1.5MB"); return; }
+    const reader = new FileReader();
+    reader.onload = async ev => {
+      try {
+        await apiFetch("/api/profile/avatar", { method:"POST", body: JSON.stringify({ avatar_base64: ev.target.result }) });
+        showToast("Photo updated ✓");
+        loadProfile();
+      } catch { showToast("Upload failed"); }
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // Save profile
   document.getElementById("profile-form").addEventListener("submit", async e => {
     e.preventDefault();
     const btn = document.getElementById("save-btn");
-    btn.textContent = "Saving...";
-    btn.disabled = true;
+    btn.textContent = "Saving..."; btn.disabled = true;
     try {
-      const data = Object.fromEntries(new FormData(e.currentTarget).entries());
-      await apiFetch("/api/profile", { method: "PUT", body: JSON.stringify(data) });
+      await apiFetch("/api/profile", { method:"PUT", body: JSON.stringify(Object.fromEntries(new FormData(e.currentTarget).entries())) });
       showToast("Profile saved ✓");
-      load();
-    } catch (err) {
-      showToast("Error: " + err.message);
-    } finally {
-      btn.textContent = "Save changes";
-      btn.disabled = false;
-    }
+      loadProfile();
+    } catch (err) { showToast("Error: " + err.message); }
+    finally { btn.textContent = "Save changes"; btn.disabled = false; }
   });
 
-  load();
+  loadProfile();
 </script>
 </body>
 </html>

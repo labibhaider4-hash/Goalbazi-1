@@ -353,6 +353,21 @@
     await loadDashboard();
   });
 
+  // QR upload
+  document.getElementById("qr-file-input").addEventListener("change", async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 1500000) { showToast("Image too large — max 1.5MB"); return; }
+    const reader = new FileReader();
+    reader.onload = async ev => {
+      const b64 = ev.target.result;
+      await api("/api/owner/qr", { method: "POST", body: JSON.stringify({ qr_base64: b64 }) });
+      showToast("QR code uploaded ✓");
+      document.getElementById("qr-preview").innerHTML = `<img src="${b64}" style="width:100%;height:100%;object-fit:contain;border-radius:12px">`;
+    };
+    reader.readAsDataURL(file);
+  });
+
   // Logout
   document.getElementById("logout-btn").addEventListener("click", async () => {
     await fetch("/api/owner/logout", { method: "POST" });

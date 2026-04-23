@@ -235,6 +235,10 @@
       <span class="nav-icon">📅</span>
       <span>Bookings</span>
     </button>
+    <button class="nav-btn" data-page="venues">
+      <span class="nav-icon">🏟️</span>
+      <span>Venues</span>
+    </button>
     <button class="nav-btn" data-page="messages">
       <span class="nav-icon">💬</span>
       <span>Messages</span>
@@ -354,6 +358,46 @@
         <table>
           <thead><tr><th>Game</th><th>Sender</th><th>Message</th><th>Type</th><th>Time</th></tr></thead>
           <tbody id="messages-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Venues -->
+    <div class="page" id="page-venues">
+      <div class="page-title">Venues</div>
+      <div class="page-sub">Add, edit, or remove turf venues</div>
+
+      <!-- Add new turf form -->
+      <div class="table-card" style="margin-bottom:24px">
+        <div class="card-head"><h3>Add new venue</h3></div>
+        <div style="padding:22px">
+          <form id="add-turf-form" style="display:grid;gap:14px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+              <label style="display:grid;gap:8px"><span style="font-size:.85rem;color:var(--muted);font-weight:700">Turf name</span><input name="name" class="search-bar" style="margin:0" placeholder="Siri Fort Complex" required></label>
+              <label style="display:grid;gap:8px"><span style="font-size:.85rem;color:var(--muted);font-weight:700">Area</span><input name="area" class="search-bar" style="margin:0" placeholder="South Delhi" required></label>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
+              <label style="display:grid;gap:8px"><span style="font-size:.85rem;color:var(--muted);font-weight:700">Surface</span>
+                <select name="surface" class="search-bar" style="margin:0"><option>Astroturf</option><option>Natural grass</option><option>Concrete</option><option>Hybrid</option></select>
+              </label>
+              <label style="display:grid;gap:8px"><span style="font-size:.85rem;color:var(--muted);font-weight:700">Price/hr (₹)</span><input type="number" name="price_per_hour" class="search-bar" style="margin:0" placeholder="600" required></label>
+              <label style="display:grid;gap:8px"><span style="font-size:.85rem;color:var(--muted);font-weight:700">Distance (km)</span><input type="number" name="distance_km" class="search-bar" style="margin:0" placeholder="2.5" step="0.1"></label>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+              <label style="display:grid;gap:8px"><span style="font-size:.85rem;color:var(--muted);font-weight:700">Rating (1-5)</span><input type="number" name="rating" class="search-bar" style="margin:0" placeholder="4.5" step="0.1" min="1" max="5"></label>
+              <label style="display:grid;gap:8px"><span style="font-size:.85rem;color:var(--muted);font-weight:700">UPI ID</span><input name="upi_id" class="search-bar" style="margin:0" placeholder="turf@upi"></label>
+            </div>
+            <button class="btn-primary" type="submit" style="padding:11px 20px;border-radius:12px;border:none;font-weight:800;cursor:pointer;font-family:inherit;justify-self:start">+ Add venue</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Existing turfs table -->
+      <div class="table-card">
+        <div class="card-head"><h3>All venues</h3><span class="count-chip" id="venues-count">—</span></div>
+        <table>
+          <thead><tr><th>Name</th><th>Area</th><th>Surface</th><th>Price/hr</th><th>Rating</th><th>UPI</th><th>Actions</th></tr></thead>
+          <tbody id="venues-body"></tbody>
         </table>
       </div>
     </div>
@@ -501,8 +545,68 @@
     `).join("") || '<tr><td colspan="5" class="empty">No messages yet</td></tr>';
   }
 
+  async function loadVenues() {
+    const data = await api('/api/admin/turfs');
+    if (!data) return;
+    document.getElementById('venues-count').textContent = data.turfs.length;
+    document.getElementById('venues-body').innerHTML = data.turfs.map(t => `
+      <tr id="turf-row-${t.id}">
+        <td><input value="${t.name}" style="background:transparent;border:none;color:var(--text);font-family:inherit;width:140px" onchange="editTurf(${t.id}, 'name', this.value)"></td>
+        <td><input value="${t.area}" style="background:transparent;border:none;color:var(--text);font-family:inherit;width:110px" onchange="editTurf(${t.id}, 'area', this.value)"></td>
+        <td><span class="pill pill-muted">${t.surface}</span></td>
+        <td>₹<input type="number" value="${t.price_per_hour}" style="background:transparent;border:none;color:var(--text);font-family:inherit;width:60px" onchange="editTurf(${t.id}, 'price_per_hour', this.value)"></td>
+        <td style="color:var(--brand)">★ ${t.rating}</td>
+        <td style="color:var(--muted);font-size:.82rem">${t.upi_id || '—'}</td>
+        <td style="display:flex;gap:8px">
+          <button class="action-btn" style="color:var(--brand);border-color:rgba(127,255,69,.2)" onclick="saveTurf(${t.id})">Save</button>
+          <button class="action-btn" onclick="deleteTurf(${t.id}, '${t.name}')">Delete</button>
+        </td>
+      </tr>
+    `).join('') || '<tr><td colspan="7" class="empty">No venues</td></tr>';
+  }
+
+  const turfEdits = {};
+  function editTurf(id, field, value) {
+    if (!turfEdits[id]) turfEdits[id] = {};
+    turfEdits[id][field] = value;
+  }
+
+  async function saveTurf(id) {
+    const data = turfEdits[id] || {};
+    await api(`/api/admin/turfs/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+    showToast('Venue updated');
+    await loadVenues();
+  }
+
+  async function deleteTurf(id, name) {
+    if (!confirm(`Delete venue "${name}"? This will remove all its slots and bookings.`)) return;
+    await api(`/api/admin/turfs/${id}`, { method: 'DELETE' });
+    showToast('Venue deleted');
+    await loadVenues();
+  }
+
+  document.getElementById('add-turf-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.currentTarget).entries());
+    const btn = e.currentTarget.querySelector('button[type=submit]');
+    btn.textContent = 'Adding...'; btn.disabled = true;
+    await api('/api/admin/turfs', { method: 'POST', body: JSON.stringify(data) });
+    showToast('Venue added!');
+    e.currentTarget.reset();
+    btn.textContent = '+ Add venue'; btn.disabled = false;
+    await loadVenues();
+  });
+
+  function showToast(msg) {
+    let t = document.getElementById('admintoast');
+    if (!t) { t = document.createElement('div'); t.id='admintoast'; t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#13211b;border:1px solid rgba(255,255,255,.1);color:#eff7f3;padding:12px 18px;border-radius:12px;font-family:Manrope,sans-serif;font-weight:700;z-index:999;transition:.2s;opacity:0'; document.body.appendChild(t); }
+    t.textContent = msg; t.style.opacity='1';
+    clearTimeout(t._t);
+    t._t = setTimeout(()=>t.style.opacity='0', 2500);
+  }
+
   // Nav
-  const pages = { overview: loadOverview, users: loadUsers, games: loadGames, turfs: loadTurfs, bookings: loadBookings, messages: loadMessages };
+  const pages = { overview: loadOverview, users: loadUsers, games: loadGames, turfs: loadTurfs, bookings: loadBookings, messages: loadMessages, venues: loadVenues };
   let loaded = new Set();
 
   document.querySelectorAll(".nav-btn[data-page]").forEach(btn => {
