@@ -536,6 +536,41 @@ def normalize_friend_pair(user_a, user_b):
     return (min(int(user_a), int(user_b)), max(int(user_a), int(user_b)))
 
 
+def have_shared_game(user_a, user_b):
+    row = query(
+        """SELECT COUNT(*) AS count
+           FROM game_players gp1
+           JOIN game_players gp2 ON gp2.game_id = gp1.game_id
+           WHERE gp1.user_id = %s AND gp2.user_id = %s
+             AND gp1.confirmed = 1 AND gp2.confirmed = 1""",
+        (user_a, user_b),
+        one=True,
+    )
+    return bool(row and row["count"] > 0)
+
+
+def are_friends(user_a, user_b):
+    one_id, two_id = normalize_friend_pair(user_a, user_b)
+    row = query(
+        """SELECT id
+           FROM friendships
+           WHERE user_one_id = %s AND user_two_id = %s AND status = 'accepted'""",
+        (one_id, two_id),
+        one=True,
+    )
+    return bool(row)
+
+
+def can_rate_athlete(rater_id, rated_id):
+    if rater_id == rated_id:
+        return False, "You cannot rate yourself."
+    if are_friends(rater_id, rated_id):
+        return True, "You are connected as friends."
+    if have_shared_game(rater_id, rated_id):
+        return True, "You have played together."
+    return False, "Ratings are only available for friends or athletes you have played with."
+
+
 def get_rating_summary(user_id):
     row = query(
         """SELECT
@@ -2261,6 +2296,9 @@ def api_submit_open_rating():
         return jsonify({"error": "Cannot rate yourself"}), 400
     if not query("SELECT id FROM users WHERE id = %s", (rated_id,), one=True):
         return jsonify({"error": "Player not found"}), 404
+    can_rate, reason = can_rate_athlete(current_user_id(), rated_id)
+    if not can_rate:
+        return jsonify({"error": reason}), 403
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
@@ -2279,6 +2317,7 @@ def api_submit_open_rating():
 def api_community_users():
     search = request.args.get("q", "").strip().lower()
     like = f"%{search}%"
+    my_profile = get_profile(current_user_id()) or {}
     rows = [dict(r) for r in query(
         """SELECT u.id, u.name, u.handle, u.location, u.position, u.preferred_format, u.skill, u.avatar_base64,
                   t.name AS team_name
@@ -2303,7 +2342,19 @@ def api_community_users():
         )
         row["friendship_status"] = friendship["status"] if friendship else "none"
         row["can_accept"] = bool(friendship and friendship["status"] == "pending" and friendship["requested_by"] != current_user_id())
-    return jsonify({"users": rows})
+        can_rate, reason = can_rate_athlete(current_user_id(), row["id"])
+        row["can_rate"] = can_rate
+        row["rating_rule"] = reason
+        row["is_suggested"] = bool(
+            row["friendship_status"] == "none" and (
+                (row.get("location") and row.get("location") == my_profile.get("location")) or
+                (row.get("preferred_format") and row.get("preferred_format") == my_profile.get("preferred_format")) or
+                (row.get("skill") and row.get("skill") == my_profile.get("skill")) or
+                (row.get("team_name") and row.get("team_name") == (my_profile.get("team") or {}).get("name"))
+            )
+        )
+    suggested = [row for row in rows if row["is_suggested"]][:6]
+    return jsonify({"users": rows, "suggested": suggested})
 
 
 @app.route("/api/friends")
@@ -2328,8 +2379,15 @@ def api_friends():
            ORDER BY f.id DESC""",
         (current_user_id(), current_user_id(), current_user_id()),
     )]
+    for row in accepted:
+        can_rate, reason = can_rate_athlete(current_user_id(), row["user_id"])
+        row["can_rate"] = can_rate
+        row["rating_rule"] = reason
     for row in pending:
         row["is_outgoing"] = row["requested_by"] == current_user_id()
+        can_rate, reason = can_rate_athlete(current_user_id(), row["user_id"])
+        row["can_rate"] = can_rate
+        row["rating_rule"] = reason
     return jsonify({"friends": accepted, "pending": pending})
 
 

@@ -52,6 +52,23 @@
     .meta-line { color: var(--muted); font-size: .82rem; }
     .tag-line { display: flex; flex-wrap: wrap; gap: 6px; }
     .community-card, .arena-card, .notify-card { padding: 16px; }
+    .athlete-shell { display: grid; gap: 14px; }
+    .athlete-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+    .athlete-tab {
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: .8rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .athlete-tab.active { color: var(--brand); border-color: rgba(127,255,69,.25); background: rgba(127,255,69,.08); }
+    .athlete-pane { display: none; }
+    .athlete-pane.active { display: block; }
+    .suggestion-strip { display: grid; gap: 10px; margin-bottom: 12px; }
+    .helper-note { color: var(--muted); font-size: .78rem; line-height: 1.5; margin-top: 8px; }
     .assistant-card { padding: 16px; margin-bottom: 16px; background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
     .assistant-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
     .assistant-badge { display: inline-flex; align-items: center; gap: 8px; font-family: 'Syne', sans-serif; font-weight: 700; }
@@ -90,6 +107,7 @@
     .mini-btn { cursor: pointer; font-weight: 700; }
     .mini-btn.primary { border-color: rgba(127,255,69,.25); color: var(--brand); }
     .mini-btn.danger { color: var(--danger); }
+    .mini-btn[disabled], .mini-select[disabled] { opacity: .55; cursor: not-allowed; }
     .chat-feed {
       display: grid;
       gap: 8px;
@@ -204,19 +222,39 @@
     <div class="stack-grid" style="margin-top:16px">
       <div class="community-card">
         <div class="section-head">
-          <h2>Community</h2>
+          <h2>Athletes</h2>
           <span class="meta-line" id="community-meta"></span>
         </div>
-        <div class="community-tools">
-          <input id="user-search" class="form-input" placeholder="Search athletes, handles, cities, or teams">
+        <div class="athlete-shell">
+          <div class="athlete-tabs">
+            <button class="athlete-tab active" type="button" data-athlete-tab="suggested">Suggested</button>
+            <button class="athlete-tab" type="button" data-athlete-tab="discover">Discover</button>
+            <button class="athlete-tab" type="button" data-athlete-tab="friends">Friends</button>
+          </div>
+
+          <div class="athlete-pane active" id="athlete-pane-suggested">
+            <div class="section-head">
+              <h2>Suggested athletes</h2>
+              <span class="meta-line">Recommended from your network and profile</span>
+            </div>
+            <div class="suggestion-strip" id="suggested-results"></div>
+          </div>
+
+          <div class="athlete-pane" id="athlete-pane-discover">
+            <div class="community-tools">
+              <input id="user-search" class="form-input" placeholder="Search athletes, handles, cities, or teams">
+            </div>
+            <div class="community-results" id="community-results"></div>
+          </div>
+
+          <div class="athlete-pane" id="athlete-pane-friends">
+            <div class="section-head">
+              <h2>Friends</h2>
+              <span class="meta-line">Requests and active connections</span>
+            </div>
+            <div class="friends-results" id="friends-results"></div>
+          </div>
         </div>
-        <div class="community-results" id="community-results"></div>
-        <div style="height:12px"></div>
-        <div class="section-head">
-          <h2>Friends</h2>
-          <span class="meta-line">Requests and active connections</span>
-        </div>
-        <div class="friends-results" id="friends-results"></div>
       </div>
 
       <div class="community-card">
@@ -261,14 +299,25 @@
     dashboard: null,
     friends: [],
     pending: [],
+    suggestedAthletes: [],
     conversations: [],
     activeChatUserId: null,
     assistantMessages: [],
     assistantSuggestions: [],
+    activeAthleteTab: "suggested",
   };
 
   function esc(value = "") {
     return String(value).replace(/[&<>"']/g, ch => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[ch]));
+  }
+
+  function errorMessage(err, fallback = "Something went wrong") {
+    try {
+      const parsed = JSON.parse(err.message);
+      return parsed.error || fallback;
+    } catch {
+      return err.message || fallback;
+    }
   }
 
   function avatarHtml(user, size = 40) {
@@ -289,6 +338,16 @@
     document.getElementById("assistant-suggestions").innerHTML = (state.assistantSuggestions || []).map((item, index) => `
       <button class="assistant-chip" type="button" data-ai-suggestion="${index}">${esc(item.label || item.message || "")}</button>
     `).join("");
+  }
+
+  function setAthleteTab(tab) {
+    state.activeAthleteTab = tab;
+    document.querySelectorAll("[data-athlete-tab]").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.athleteTab === tab);
+    });
+    document.querySelectorAll(".athlete-pane").forEach(pane => {
+      pane.classList.toggle("active", pane.id === `athlete-pane-${tab}`);
+    });
   }
 
   async function loadAssistant() {
@@ -416,6 +475,13 @@
     `;
   }
 
+  function ratingControlsForUser(user) {
+    if (user.can_rate) {
+      return rateControls(user.id || user.user_id, user.my_rating || "");
+    }
+    return `<div class="helper-note">${esc(user.rating_rule || "You can rate only athletes who are friends or have played with you.")}</div>`;
+  }
+
   function renderCommunity(users) {
     document.getElementById("community-results").innerHTML = users.length ? users.map(user => `
       <div class="user-card">
@@ -440,9 +506,38 @@
           }
           <button class="mini-btn" type="button" onclick="openChat(${user.id})">Private chat</button>
         </div>
-        ${rateControls(user.id)}
+        ${ratingControlsForUser(user)}
       </div>
     `).join("") : `<div class="empty-note">No athletes matched that search.</div>`;
+  }
+
+  function renderSuggestedAthletes() {
+    const users = state.suggestedAthletes || [];
+    document.getElementById("suggested-results").innerHTML = users.length ? users.map(user => `
+      <div class="user-card">
+        <div class="user-top">
+          <div class="user-main">
+            ${avatarHtml(user)}
+            <div class="user-main-body">
+              <div class="user-name">${esc(user.name)}</div>
+              <div class="user-sub">${esc(`@${user.handle}`)} · ${esc(user.location)}</div>
+              <div class="user-sub">${esc([user.position, user.skill, user.team_name].filter(Boolean).join(" · "))}</div>
+            </div>
+          </div>
+        </div>
+        <div class="user-actions">
+          ${user.friendship_status === "accepted"
+            ? `<button class="mini-btn primary" type="button" onclick="openChat(${user.id})">Message</button>`
+            : user.can_accept
+              ? `<button class="mini-btn primary" type="button" onclick="acceptFriend(${user.id})">Accept request</button>`
+              : user.friendship_status === "pending"
+                ? `<button class="mini-btn" type="button" disabled>Waiting</button>`
+                : `<button class="mini-btn primary" type="button" onclick="sendFriendRequest(${user.id})">Add friend</button>`
+          }
+        </div>
+        ${ratingControlsForUser(user)}
+      </div>
+    `).join("") : `<div class="empty-note">We’ll suggest athletes here based on your location, level, format, and team links.</div>`;
   }
 
   function renderFriends() {
@@ -477,7 +572,7 @@
           <div class="user-actions">
             <button class="mini-btn primary" type="button" onclick="openChat(${friend.user_id})">Message</button>
           </div>
-          ${rateControls(friend.user_id)}
+          ${ratingControlsForUser(friend)}
         </div>
       `));
     }
@@ -538,6 +633,8 @@
     const q = document.getElementById("user-search").value.trim();
     const data = await apiFetch(`/api/community/users?q=${encodeURIComponent(q)}`);
     if (!data) return;
+    state.suggestedAthletes = data.suggested || [];
+    renderSuggestedAthletes();
     renderCommunity(data.users || []);
   }
 
@@ -562,8 +659,12 @@
   async function submitOpenRating(button, userId) {
     const select = button.closest(".rate-row")?.querySelector("[data-rate-select]");
     if (!select || !select.value) return showToast("Choose a rating first");
-    await apiFetch("/api/open-ratings", { method: "POST", body: JSON.stringify({ rated_id: userId, rating: select.value }) });
-    showToast("Rating saved");
+    try {
+      await apiFetch("/api/open-ratings", { method: "POST", body: JSON.stringify({ rated_id: userId, rating: select.value }) });
+      showToast("Rating saved");
+    } catch (err) {
+      showToast(errorMessage(err, "Rating could not be saved"));
+    }
   }
 
   async function openChat(userId) {
@@ -602,7 +703,13 @@
     }, () => showToast("Location permission was denied"));
   }
 
-  document.getElementById("user-search").addEventListener("input", searchUsers);
+  document.querySelectorAll("[data-athlete-tab]").forEach(btn => {
+    btn.addEventListener("click", () => setAthleteTab(btn.dataset.athleteTab));
+  });
+  document.getElementById("user-search").addEventListener("input", () => {
+    setAthleteTab("discover");
+    searchUsers();
+  });
   document.getElementById("assistant-send").addEventListener("click", () => sendAssistantMessage());
   document.getElementById("assistant-input").addEventListener("keydown", e => {
     if (e.key === "Enter") sendAssistantMessage();
@@ -619,6 +726,7 @@
   document.getElementById("arena-search-btn").addEventListener("click", searchArenasWithQuery);
   document.getElementById("nearby-btn").addEventListener("click", searchNearbyArenas);
 
+  setAthleteTab("suggested");
   loadDashboard();
   loadAssistant();
   loadFriends();
