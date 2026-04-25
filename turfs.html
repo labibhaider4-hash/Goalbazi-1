@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Goalbazi — Book a Turf</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/goalbazi-logo.svg">
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    .turfs-shell { padding: 28px 20px 80px; }
+    .page-header { margin-bottom: 20px; }
+    .page-header h1 { font-size: clamp(1.6rem,5vw,2.4rem); font-weight: 800; letter-spacing:-.04em; }
+    .page-header p { color: var(--muted); margin-top: 4px; }
+
+    .filter-bar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+    .filter-bar input { flex: 1; min-width: 160px; }
+
+    .turfs-list { display: grid; gap: 16px; }
+
+    .turf-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 20px;
+      transition: border-color .2s;
+    }
+    .turf-card:hover { border-color: rgba(127,255,69,.2); }
+
+    .turf-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+    .turf-name { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.05rem; }
+    .turf-meta { color: var(--muted); font-size: .85rem; margin-top: 4px; line-height: 1.6; }
+    .turf-price { font-family: 'Syne', sans-serif; font-weight: 800; color: var(--brand); font-size: 1.1rem; white-space: nowrap; }
+    .turf-price span { color: var(--muted); font-size: .78rem; font-weight: 400; }
+
+    .slots-label { font-size: .78rem; font-weight: 700; color: var(--muted-2); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 10px; }
+    .slots-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .slot-btn {
+      padding: 8px 12px;
+      border-radius: var(--radius-xs);
+      border: 1px solid var(--line-2);
+      background: var(--panel-2);
+      color: var(--text);
+      font-size: .85rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: .15s;
+    }
+    .slot-btn.available { border-color: rgba(127,255,69,.25); color: var(--brand); }
+    .slot-btn.available:hover { background: rgba(127,255,69,.1); }
+    .slot-btn.pending { border-color: rgba(245,200,66,.25); color: var(--warn); cursor: default; opacity: .6; }
+    .slot-btn.booked { opacity: .35; cursor: default; }
+
+    .no-slots { color: var(--muted); font-size: .85rem; font-style: italic; }
+
+    /* UPI Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.75);
+      z-index: 300;
+      place-items: center;
+      padding: 20px;
+    }
+    .modal-overlay.open { display: grid; }
+    .modal-box {
+      background: var(--panel);
+      border: 1px solid var(--line-2);
+      border-radius: 24px;
+      padding: 28px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: var(--shadow-lg);
+    }
+    .modal-title { font-family: 'Syne', sans-serif; font-size: 1.2rem; font-weight: 800; margin-bottom: 6px; }
+    .modal-sub { color: var(--muted); font-size: .88rem; margin-bottom: 20px; }
+
+    .upi-display {
+      background: var(--panel-2);
+      border: 1px solid var(--line-2);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      text-align: center;
+      margin-bottom: 18px;
+    }
+    .upi-label { color: var(--muted); font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; margin-bottom: 6px; }
+    .upi-id { font-family: 'Syne', sans-serif; font-size: 1.3rem; font-weight: 800; color: var(--brand-2); margin-bottom: 6px; }
+    .upi-amount { color: var(--muted); font-size: .85rem; }
+
+    .modal-actions { display: flex; gap: 10px; margin-top: 18px; }
+
+    @media (min-width: 768px) {
+      .turfs-shell { padding: 36px 28px 80px; }
+      .turfs-list { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (min-width: 1024px) {
+      .turfs-list { grid-template-columns: repeat(3, 1fr); }
+    }
+  </style>
+</head>
+<body>
+<nav class="navbar" id="navbar"></nav>
+<div class="nav-drawer" id="nav-drawer"></div>
+<div class="ambient ambient-a"></div>
+<div class="ambient ambient-b"></div>
+
+<!-- UPI Modal -->
+<div class="modal-overlay" id="upi-modal">
+  <div class="modal-box">
+    <div class="modal-title">Complete booking</div>
+    <div class="modal-sub" id="modal-slot-info">Loading...</div>
+
+    <div class="upi-display">
+      <div class="upi-label">Pay via UPI to</div>
+      <div class="upi-id" id="modal-upi-id">—</div>
+      <div class="upi-amount" id="modal-amount">—</div>
+    </div>
+
+    <div id="modal-qr"></div>
+    <div class="form-group">
+      <label class="form-label">UTR / Transaction ID <span style="color:var(--muted);font-weight:400">(after paying)</span></label>
+      <input class="form-input" id="utr-input" placeholder="e.g. 123456789012">
+    </div>
+    <div style="color:var(--muted);font-size:.8rem;margin-top:8px">Pay first, then enter the 12-digit UTR from your UPI app. The turf owner will confirm after verifying.</div>
+
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="modal-confirm-btn" style="flex:1">Confirm booking</button>
+      <button class="btn btn-ghost" id="modal-cancel-btn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="page-wrap">
+  <div class="container turfs-shell">
+    <div class="page-header">
+      <h1>Book an arena</h1>
+      <p id="turfs-count">Loading arenas...</p>
+    </div>
+
+    <div class="filter-bar">
+      <input class="form-input" id="search-input" placeholder="Search by name or area...">
+      <input type="date" class="form-input" id="date-input" style="max-width:180px">
+      <button class="btn btn-ghost" id="nearby-btn" type="button">Use my location</button>
+    </div>
+
+    <div id="turfs-list">
+      <div class="page-loader"><div class="spinner"></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/nav.js"></script>
+<script>
+  initNav("turfs");
+
+  let pendingSlotId = null;
+  let pendingAmount = 0;
+  let userCoords = null;
+
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById("date-input").value = today;
+
+  async function loadTurfs() {
+    const search = document.getElementById("search-input").value.trim();
+    const date = document.getElementById("date-input").value;
+    const query = new URLSearchParams({ date, search });
+    if (userCoords) {
+      query.set("user_lat", userCoords.latitude);
+      query.set("user_lng", userCoords.longitude);
+    }
+    const data = await apiFetch(`/api/dashboard?${query.toString()}`);
+    if (!data) return;
+
+    const turfs = data.turfs;
+    document.getElementById("turfs-count").textContent = `${turfs.length} arenas available`;
+
+    if (turfs.length === 0) {
+      document.getElementById("turfs-list").innerHTML = `<div class="empty-state"><div class="empty-icon">🏟️</div><div class="empty-title">No arenas found</div><p>Try a different search or date.</p></div>`;
+      return;
+    }
+
+    document.getElementById("turfs-list").innerHTML = `<div class="turfs-list">${turfs.map(t => {
+      const slotsHtml = t.slots.length === 0
+        ? `<div class="no-slots">No slots for this date</div>`
+        : `<div class="slots-row">${t.slots.map(s => {
+            const cls = s.status === "pending" ? "pending" : s.is_booked ? "booked" : "available";
+            const disabled = cls !== "available" ? "disabled" : "";
+            return `<button class="slot-btn ${cls}" data-slot-id="${s.id}" data-turf-price="${t.price_per_hour}" ${disabled}>${s.slot_time}</button>`;
+          }).join("")}</div>`;
+
+      return `
+        <div class="turf-card">
+          <div class="turf-top">
+            <div>
+              <div class="turf-name">${t.name}</div>
+              <div class="turf-meta">📍 ${t.area} · ${(t.nearby_distance_km ?? t.distance_km)}km · ${t.surface}<br>⭐ ${t.rating}</div>
+            </div>
+            <div class="turf-price">₹${t.price_per_hour}<span>/hr</span></div>
+          </div>
+          ${t.map_link ? `<div style="margin:0 0 12px"><a class="btn btn-ghost btn-sm" href="${t.map_link}" target="_blank" rel="noopener noreferrer">Open map</a></div>` : ``}
+          <div class="slots-label">Available slots — ${date}</div>
+          ${slotsHtml}
+        </div>
+      `;
+    }).join("")}</div>`;
+
+    // Slot click listeners
+    document.querySelectorAll(".slot-btn.available").forEach(btn => {
+      btn.addEventListener("click", () => openModal(btn.dataset.slotId, btn.dataset.turfPrice));
+    });
+  }
+
+  async function openModal(slotId, price) {
+    pendingSlotId = slotId;
+    pendingAmount = parseInt(price);
+    const info = await apiFetch(`/api/bookings/${slotId}/info`);
+    if (!info) return;
+    document.getElementById("modal-slot-info").textContent = info.turf_name;
+    document.getElementById("modal-upi-id").textContent = info.upi_id || "Not set by owner";
+    document.getElementById("modal-amount").textContent = `₹${info.price_per_hour} per hour`;
+    // Show QR if available
+    const qrEl = document.getElementById("modal-qr");
+    if (info.qr_base64) {
+      qrEl.innerHTML = `<div style="margin-top:12px;text-align:center"><div style="color:#7a9e8a;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px">Scan to pay</div><img src="${info.qr_base64}" style="width:140px;height:140px;object-fit:contain;border-radius:12px;border:1px solid rgba(255,255,255,.08);display:block;margin:0 auto"></div>`;
+    } else {
+      qrEl.innerHTML = '';
+    }
+    if (info.map_link) {
+      qrEl.innerHTML += `<div style="margin-top:12px;text-align:center"><a class="btn btn-ghost btn-sm" href="${info.map_link}" target="_blank" rel="noopener noreferrer">Open location in Maps</a></div>`;
+    }
+    document.getElementById("utr-input").value = "";
+    document.getElementById("upi-modal").classList.add("open");
+  }
+
+  document.getElementById("modal-cancel-btn").addEventListener("click", () => {
+    document.getElementById("upi-modal").classList.remove("open");
+    pendingSlotId = null;
+  });
+
+  document.getElementById("modal-confirm-btn").addEventListener("click", async () => {
+    const utr = document.getElementById("utr-input").value.trim();
+    if (!utr) { showToast("Please enter your UTR / transaction ID"); return; }
+    const btn = document.getElementById("modal-confirm-btn");
+    btn.textContent = "Submitting...";
+    btn.disabled = true;
+    try {
+      await apiFetch(`/api/bookings/${pendingSlotId}`, {
+        method: "POST",
+        body: JSON.stringify({ utr_number: utr, amount: pendingAmount }),
+      });
+      document.getElementById("upi-modal").classList.remove("open");
+      showToast("Booking submitted! Waiting for owner confirmation.");
+      loadTurfs();
+    } catch (e) {
+      showToast("Error: " + e.message);
+    } finally {
+      btn.textContent = "Confirm booking";
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById("search-input").addEventListener("input", loadTurfs);
+  document.getElementById("date-input").addEventListener("change", loadTurfs);
+  document.getElementById("nearby-btn").addEventListener("click", () => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition((pos) => {
+      userCoords = {
+        latitude: pos.coords.latitude.toFixed(6),
+        longitude: pos.coords.longitude.toFixed(6),
+      };
+      document.getElementById("nearby-btn").textContent = "Nearby arenas";
+      loadTurfs();
+    });
+  });
+
+  loadTurfs();
+</script>
+</body>
+</html>

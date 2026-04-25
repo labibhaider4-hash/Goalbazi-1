@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Goalbazi</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="/assets/goalbazi-logo.svg">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="ambient ambient-a"></div>
+  <div class="ambient ambient-b"></div>
+
+  <header class="site-header">
+    <div class="brand-wrap">
+      <img class="brand-logo" src="/assets/goalbazi-logo.svg" alt="Goalbazi logo">
+      <div>
+        <div class="brand-name">Football bookings, squads, leagues, and live community play</div>
+        <div class="brand-sub">Delhi NCR's community football platform</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="ghost-btn" data-jump="games">Games</button>
+      <button class="ghost-btn" data-jump="turfs">Turfs</button>
+      <button class="ghost-btn" data-jump="leagues">Leagues</button>
+      <button class="primary-btn" data-jump="create">Create match</button>
+      <button class="ghost-btn" id="logout-btn">Log out</button>
+    </div>
+  </header>
+
+  <main class="page-shell">
+    <section class="hero-panel">
+      <p class="eyebrow">Built for real football communities</p>
+      <h1>Run football bookings, squads, and league play from one platform.</h1>
+      <p class="hero-copy">Profiles, bookings, chats, attendance, and created games all stay in sync so players and organizers always see the latest state.</p>
+      <div class="hero-badges">
+        <span class="badge-chip">PostgreSQL</span>
+        <span class="badge-chip">Bookings</span>
+        <span class="badge-chip">Chat</span>
+        <span class="badge-chip">Attendance</span>
+        <span class="badge-chip">Leagues</span>
+      </div>
+      <div class="stats-grid" id="stats-grid"></div>
+    </section>
+
+    <section class="content-grid">
+      <div class="panel profile-panel" id="profile">
+        <div class="panel-head">
+          <h2>Player profile</h2>
+          <button class="ghost-btn" id="refresh-profile-btn">Refresh</button>
+        </div>
+        <div class="profile-top">
+          <div class="avatar" id="profile-avatar">AR</div>
+          <div>
+            <div class="profile-name" id="profile-name">Loading...</div>
+            <div class="profile-meta" id="profile-meta"></div>
+            <div class="tag-row" id="profile-tags"></div>
+          </div>
+        </div>
+        <form class="stack-form" id="profile-form">
+          <div class="field-grid">
+            <label>
+              <span>Name</span>
+              <input name="name" id="profile-name-input" required>
+            </label>
+            <label>
+              <span>Handle</span>
+              <input name="handle" id="profile-handle-input" required>
+            </label>
+          </div>
+          <div class="field-grid">
+            <label>
+              <span>Location</span>
+              <input name="location" id="profile-location-input" required>
+            </label>
+            <label>
+              <span>Preferred format</span>
+              <input name="preferred_format" id="profile-format-input" required>
+            </label>
+          </div>
+          <label>
+            <span>Bio</span>
+            <textarea name="bio" id="profile-bio-input" rows="3"></textarea>
+          </label>
+          <button class="primary-btn" type="submit">Save profile</button>
+        </form>
+      </div>
+
+      <div class="panel" id="create">
+        <div class="panel-head">
+          <h2>Create a match</h2>
+          <span class="panel-note">This writes directly to the database</span>
+        </div>
+        <form class="stack-form" id="game-form">
+          <label>
+            <span>Game title</span>
+            <input name="title" placeholder="Sunday morning 5-a-side" required>
+          </label>
+          <div class="field-grid">
+            <label>
+              <span>Format</span>
+              <select name="format" id="game-format-select"></select>
+            </label>
+            <label>
+              <span>Skill level</span>
+              <select name="skill" id="game-skill-select"></select>
+            </label>
+          </div>
+          <div class="field-grid">
+            <label>
+              <span>Date</span>
+              <input type="date" name="date" id="game-date-input" required>
+            </label>
+            <label>
+              <span>Kick-off</span>
+              <input type="time" name="time" value="18:30" required>
+            </label>
+          </div>
+          <label>
+            <span>Turf</span>
+            <select name="turf_id" id="game-turf-select"></select>
+          </label>
+          <label>
+            <span>Visibility</span>
+            <select name="visibility">
+              <option value="open">Open to all players</option>
+              <option value="invite">Invite only</option>
+              <option value="squad">Team draft</option>
+            </select>
+          </label>
+          <button class="primary-btn" type="submit">Create game</button>
+        </form>
+      </div>
+
+      <div class="panel wide-panel" id="games">
+        <div class="panel-head">
+          <h2>Games near you</h2>
+          <span class="panel-note" id="games-region"></span>
+        </div>
+        <div class="card-list" id="games-list"></div>
+      </div>
+
+      <div class="panel" id="lobby">
+        <div class="panel-head">
+          <h2>Game lobby</h2>
+          <span class="panel-note" id="lobby-status">Choose a game</span>
+        </div>
+        <div class="lobby-header">
+          <div>
+            <div class="lobby-title" id="lobby-title">No game selected</div>
+            <div class="lobby-meta" id="lobby-meta"></div>
+          </div>
+          <div class="countdown-box">
+            <span>Kick-off in</span>
+            <strong id="lobby-countdown">00:00:00</strong>
+          </div>
+        </div>
+        <div class="team-columns">
+          <div>
+            <div class="mini-head">Team A</div>
+            <div class="slot-list" id="team-a-list"></div>
+          </div>
+          <div>
+            <div class="mini-head">Team B</div>
+            <div class="slot-list" id="team-b-list"></div>
+          </div>
+        </div>
+        <div class="lobby-actions">
+          <button class="primary-btn" id="confirm-btn" type="button">Confirm attendance</button>
+          <button class="ghost-btn" id="leave-btn" type="button">Leave lobby</button>
+        </div>
+        <div class="chat-box">
+          <div class="mini-head">Lobby chat</div>
+          <div class="chat-feed" id="chat-feed"></div>
+          <form class="chat-form" id="chat-form">
+            <input id="chat-input" maxlength="140" placeholder="Say something to the group">
+            <button class="primary-btn" type="submit">Send</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="panel wide-panel" id="turfs">
+        <div class="panel-head">
+          <h2>Book a turf</h2>
+          <span class="panel-note" id="turf-summary"></span>
+        </div>
+        <div class="toolbar">
+          <input id="turf-search" placeholder="Search by area or turf name">
+          <input type="date" id="turf-date">
+        </div>
+        <div class="card-list" id="turfs-list"></div>
+      </div>
+
+      <div class="panel wide-panel" id="leagues">
+        <div class="panel-head">
+          <h2>Leagues and standings</h2>
+          <span class="panel-note">Seeded data from the database</span>
+        </div>
+        <div class="league-grid" id="league-grid"></div>
+        <div class="standings-wrap">
+          <table class="standings-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Team</th>
+                <th>P</th>
+                <th>W</th>
+                <th>Pts</th>
+                <th>Form</th>
+              </tr>
+            </thead>
+            <tbody id="standings-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" aria-live="polite"></div>
+
+  <script src="/app.js"></script>
+  <script>
+    document.getElementById("logout-btn").addEventListener("click", async () => {
+      await fetch("/api/auth/logout", { method: "POST" });
+      window.location.href = "/login";
+    });
+  </script>
+</body>
+</html>
