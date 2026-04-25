@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Goalbazi — My Profile</title>
+  <title>Goalbazi — Athlete Profile</title>
   <link rel="icon" type="image/svg+xml" href="/assets/goalbazi-logo.svg">
   <link rel="stylesheet" href="/styles.css">
   <style>
@@ -178,13 +178,13 @@
 
     <div class="tabs">
       <button class="tab-btn active" data-tab="edit">Edit profile</button>
-      <button class="tab-btn" data-tab="rate">Rate players</button>
+      <button class="tab-btn" data-tab="rate">Rate athletes</button>
       <button class="tab-btn" data-tab="teammates">Teammates</button>
     </div>
 
     <div class="tab-panel active" id="tab-edit">
       <div class="edit-card">
-        <h3>Your details</h3>
+        <h3>Your athlete details</h3>
         <form id="profile-form" style="display:grid;gap:14px" autocomplete="off">
           <div class="form-grid form-grid-2">
             <div class="form-group"><label class="form-label">Full name</label><input name="name" id="f-name" class="form-input" required autocomplete="new-password" data-lpignore="true" data-form-type="other"></div>
@@ -298,14 +298,14 @@
     // Rate tab
     const rateEl = document.getElementById("rate-content");
     if (data.rateable_games.length === 0) {
-      rateEl.innerHTML = `<div class="empty-state"><div class="empty-icon">⭐</div><div class="empty-title">No finished games to rate yet</div><p>Join and confirm attendance in games to rate teammates afterward.</p></div>`;
+      rateEl.innerHTML = `<div class="empty-state"><div class="empty-icon">⭐</div><div class="empty-title">No finished matches to rate yet</div><p>Join and confirm attendance in matches to rate teammates afterward.</p></div>`;
     } else {
       rateEl.innerHTML = data.rateable_games.map(g => `
         <div class="game-rate-card">
           <div class="game-rate-title">${g.title}</div>
           <div class="game-rate-date">📅 ${g.game_date}</div>
           ${g.players.length === 0
-            ? `<div style="color:var(--muted);font-size:.85rem">No other confirmed players to rate</div>`
+            ? `<div style="color:var(--muted);font-size:.85rem">No other confirmed athletes to rate</div>`
             : g.players.map(p => `
               <div class="rate-player-row">
                 <div class="rate-player-name">${p.name}</div>
@@ -335,7 +335,7 @@
 
     rateEl.innerHTML += `
       <div class="edit-card" style="margin-top:16px">
-        <h3>Community ratings</h3>
+        <h3>Athlete reviews</h3>
         <div style="display:grid;gap:10px">
           ${(data.open_rateable_players || []).map(p => `
             <div class="rate-player-row">
@@ -351,7 +351,7 @@
                 <button class="btn btn-ghost btn-sm" type="button" onclick="submitOpenRate(${p.id})">Save</button>
               </div>
             </div>
-          `).join("") || `<div class="empty-state"><p>No players available yet.</p></div>`}
+          `).join("") || `<div class="empty-state"><p>No athletes available yet.</p></div>`}
         </div>
       </div>
     `;
@@ -359,7 +359,7 @@
     // Teammates tab
     const teamEl = document.getElementById("teammates-content");
     if (data.teammates.length === 0) {
-      teamEl.innerHTML = `<div class="empty-state"><div class="empty-icon">👥</div><div class="empty-title">No teammates yet</div><p>Join games and confirm attendance to see players you've played with.</p></div>`;
+      teamEl.innerHTML = `<div class="empty-state"><div class="empty-icon">👥</div><div class="empty-title">No teammates yet</div><p>Join matches and confirm attendance to see athletes you've played with.</p></div>`;
     } else {
       teamEl.innerHTML = `<div class="teammates-grid">${data.teammates.map(t => {
         const initials = t.name.split(" ").map(x=>x[0]).slice(0,2).join("").toUpperCase();

@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Goalbazi — Register</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/goalbazi-logo.svg">
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
   <style>
@@ -12,9 +13,9 @@
   width:100%;
   padding:14px 16px;
   border-radius:14px;
-  border:1px solid rgba(255,255,255,0.06);
-  background:linear-gradient(145deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
-  color:#fff;
+  border:1px solid var(--line);
+  background:var(--panel-2);
+  color:var(--text);
   font-size:.95rem;
   outline:none;
   transition:all .25s ease;
@@ -23,12 +24,12 @@
 
 /* Placeholder */
 .auth-form input::placeholder{
-  color:rgba(255,255,255,0.35);
+  color:var(--muted);
 }
 
 /* Focus */
 .auth-form input:focus{
-  background:rgba(255,255,255,0.06);
+  background:var(--panel);
   border-color:rgba(63,126,42,0.7);
   box-shadow:
     0 0 0 2px rgba(63,126,42,0.15),
@@ -36,9 +37,7 @@
 }
 
 /* Labels better contrast */
-.auth-form span{
-  color:rgba(255,255,255,0.65);
-}
+.auth-form span{ color:var(--muted-2); }
 
 /* OPTIONAL: make side-by-side fields feel aligned */
 .field-grid input{
@@ -50,7 +49,7 @@
   border-radius:12px;
   border:1px solid rgba(63,126,42,0.4);
   background:linear-gradient(135deg,#3F7E2A,#2a5a1d);
-  color:#fff;
+  color:#f7fff5;
   font-weight:700;
   cursor:pointer;
   position:relative;
@@ -104,13 +103,16 @@
   <div class="ambient ambient-a"></div>
   <div class="ambient ambient-b"></div>
   <div class="auth-shell">
+    <div style="position:absolute;top:20px;right:20px;z-index:2">
+      <button class="theme-toggle" id="register-theme-toggle" type="button" data-theme-toggle></button>
+    </div>
     <div class="auth-card">
       <div class="auth-logo">
         <img src="/assets/goalbazi-logo.svg" alt="Goalbazi">
         <span>Goalbazi</span>
       </div>
       <h1 class="auth-title">Join Goalbazi</h1>
-      <p class="auth-sub">Create your player account to book arenas, join games, and track leagues across Delhi NCR.</p>
+      <p class="auth-sub">Create your athlete account to reserve arenas, join matches, and track leagues across Delhi NCR.</p>
       <form class="auth-form" id="register-form">
         <div class="field-grid">
           <label>
@@ -122,7 +124,7 @@
             <input name="handle" placeholder="arjun07" required>
           </label>
         </div>
-        <div style="color:rgba(255,255,255,0.55);font-size:.82rem;margin-top:-4px">Only lowercase letters and numbers are kept. Your profile will show it as <strong>@username</strong>.</div>
+        <div style="color:var(--muted);font-size:.82rem;margin-top:-4px">Only lowercase letters and numbers are kept. Your profile will show it as <strong>@username</strong>.</div>
         <label>
           <span>Email</span>
           <input type="email" name="email" placeholder="you@example.com" required autocomplete="email">
@@ -143,7 +145,10 @@
       <p class="auth-switch" style="margin-top:8px"><a href="/">Back to landing page</a></p>
     </div>
   </div>
+  <script src="/nav.js"></script>
   <script>
+    GoalbaziTheme.attachButton(document.getElementById("register-theme-toggle"));
+
     const handleInput = document.querySelector('input[name="handle"]');
     handleInput.addEventListener("input", () => {
       handleInput.value = handleInput.value.toLowerCase().replace(/[^a-z0-9]/g, "");

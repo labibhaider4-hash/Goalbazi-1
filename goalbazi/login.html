@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Goalbazi — Login</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/goalbazi-logo.svg">
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
   <style>
@@ -12,8 +13,8 @@
   width:100%;
   padding:14px 16px;
   border-radius:12px;
-  border:1px solid rgba(255,255,255,0.08);
-  background:linear-gradient(145deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+  border:1px solid var(--line);
+  background:var(--panel-2);
   color:var(--text);
   font-size:.95rem;
   outline:none;
@@ -23,7 +24,7 @@
 
 /* Placeholder */
 .auth-form input::placeholder{
-  color:rgba(255,255,255,0.3);
+  color:var(--muted);
 }
 
 /* Focus state (this is key) */
@@ -31,15 +32,15 @@
   border-color:rgba(63,126,42,0.6);
   box-shadow:0 0 0 2px rgba(63,126,42,0.15),
              0 8px 25px rgba(0,0,0,0.3);
-  background:rgba(255,255,255,0.03);
+  background:var(--panel);
 }
     .primary-btn{
   width:100%;
   padding:14px;
   border-radius:12px;
-  border:1px solid rgba(255,255,255,0.08);
+  border:1px solid rgba(63,126,42,0.25);
   background:linear-gradient(135deg,#3F7E2A,#2a5a1d);
-  color:#fff;
+  color:#f7fff5;
   font-weight:700;
   cursor:pointer;
   transition:all .25s ease;
@@ -61,13 +62,16 @@
   <div class="ambient ambient-a"></div>
   <div class="ambient ambient-b"></div>
   <div class="auth-shell">
+    <div style="position:absolute;top:20px;right:20px;z-index:2">
+      <button class="theme-toggle" id="login-theme-toggle" type="button" data-theme-toggle></button>
+    </div>
     <div class="auth-card">
       <div class="auth-logo">
         <img src="/assets/goalbazi-logo.svg" alt="Goalbazi">
         <span>Goalbazi</span>
       </div>
       <h1 class="auth-title">Welcome back</h1>
-      <p class="auth-sub">Sign in to your player account to book arenas, join games, and track leagues.</p>
+      <p class="auth-sub">Sign in to your athlete account to reserve arenas, join matches, and track leagues.</p>
       <form class="auth-form" id="login-form">
         <label>
           <span>Email</span>
@@ -85,7 +89,10 @@
       <p class="auth-switch" style="margin-top:8px"><a href="/">Back to landing page</a></p>
     </div>
   </div>
+  <script src="/nav.js"></script>
   <script>
+    GoalbaziTheme.attachButton(document.getElementById("login-theme-toggle"));
+
     document.getElementById("login-form").addEventListener("submit", async (e) => {
       e.preventDefault();
       const btn = document.getElementById("submit-btn");

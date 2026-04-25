@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Goalbazi — Arena Owner Register</title>
+  <title>Goalbazi — Arena Partner Register</title>
   <link rel="icon" type="image/svg+xml" href="/assets/goalbazi-logo.svg">
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
@@ -23,9 +23,9 @@
   width:100%;
   padding:12px 2px;
   border:none; border-radius: 12px;
-  border-bottom:1px solid rgba(255,255,255,0.15);
+  border-bottom:1px solid var(--line-2);
   background:transparent;
-  color:#fff;
+  color:var(--text);
   font-size:.95rem;
   outline:none;
   transition:.3s ease;
@@ -34,7 +34,7 @@
 
 /* Placeholder */
 .auth-form input::placeholder{
-  color:rgba(255,255,255,0.35);
+  color:var(--muted);
 }
 
 /* Dropdown fix */
@@ -67,7 +67,7 @@
 
 /* label text */
 .auth-form span{
-  color:rgba(255,255,255,0.65);
+  color:var(--muted-2);
   font-size:.8rem;
   font-weight:600;
 }
@@ -81,7 +81,7 @@
   border-radius:12px;
   border:1px solid rgba(63,126,42,0.4);
   background:linear-gradient(135deg,#3F7E2A,#2a5a1d);
-  color:#fff;
+  color:#f7fff5;
   font-weight:700;
   cursor:pointer;
   position:relative;
@@ -134,14 +134,17 @@
   <div class="ambient ambient-a"></div>
   <div class="ambient ambient-b"></div>
   <div class="auth-shell">
+    <div style="position:absolute;top:20px;right:20px;z-index:2">
+      <button class="theme-toggle" id="owner-register-theme-toggle" type="button" data-theme-toggle></button>
+    </div>
     <div class="auth-card">
       <div class="auth-logo">
         <img src="/assets/goalbazi-logo.svg" alt="Goalbazi">
         <span>Goalbazi</span>
       </div>
-      <div class="role-badge">🏟️ Arena Owner Account</div>
+      <div class="role-badge">🏟️ Arena Partner Account</div>
       <h1 class="auth-title">Register your arena</h1>
-      <p class="auth-sub">Create an arena owner account to list your ground, manage bookings, and receive UPI payments directly.</p>
+      <p class="auth-sub">Create an Arena Partner account to list your venue, manage reservations, and receive UPI payments directly.</p>
       <form class="auth-form" id="register-form">
         <div class="field-grid">
           <label>
@@ -211,7 +214,7 @@
         </label>
         <label>
           <span>Arena image links</span>
-          <textarea name="image_urls" placeholder="One image URL per line" style="min-height:100px;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,0.15);background:transparent;color:#fff;font-family:inherit"></textarea>
+          <textarea name="image_urls" placeholder="One image URL per line" style="min-height:100px;padding:12px;border-radius:12px;border:1px solid var(--line-2);background:transparent;color:var(--text);font-family:inherit"></textarea>
         </label>
         <input type="hidden" name="latitude">
         <input type="hidden" name="longitude">
@@ -220,11 +223,14 @@
         <button class="btn btn-ghost btn-full" type="button" style="margin-top:8px">Continue with Google (Soon)</button>
       </form>
       <p class="auth-switch">Already have an account? <a href="/owner/login">Sign in</a></p>
-      <p class="auth-switch" style="margin-top:8px">Are you a player? <a href="/register">Player registration</a></p>
+      <p class="auth-switch" style="margin-top:8px">Are you an athlete? <a href="/register">Athlete registration</a></p>
       <p class="auth-switch" style="margin-top:8px"><a href="/">Back to landing page</a></p>
     </div>
   </div>
+  <script src="/nav.js"></script>
   <script>
+    GoalbaziTheme.attachButton(document.getElementById("owner-register-theme-toggle"));
+
     document.getElementById("owner-gps-btn").addEventListener("click", () => {
       if (!navigator.geolocation) return;
       navigator.geolocation.getCurrentPosition((pos) => {

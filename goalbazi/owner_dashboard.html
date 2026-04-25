@@ -3,18 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Goalbazi — Arena Owner Dashboard</title>
+  <title>Goalbazi — Arena Partner Dashboard</title>
   <link rel="icon" type="image/svg+xml" href="/assets/goalbazi-logo.svg">
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg:#09110e; --panel:#13201b; --panel-soft:#172822;
+      --bg:#09110e; --bg-2:#050807; --panel:#13201b; --panel-soft:#172822;
       --line:rgba(255,255,255,.08); --text:#eff7f3; --muted:#8ea89c;
       --brand:#84f255; --brand-2:#dafc7c; --danger:#ff8366;
       --shadow:0 24px 90px rgba(0,0,0,.28);
     }
+    html[data-theme="light"] {
+      --bg:#f4f8f2; --bg-2:#e9f1eb; --panel:#ffffff; --panel-soft:#f1f6f0;
+      --line:rgba(18,54,31,.10); --text:#13241a; --muted:#607b69;
+      --brand:#56b82b; --brand-2:#a8e774; --danger:#d4553f;
+      --shadow:0 24px 90px rgba(51,84,61,.12);
+    }
     *{box-sizing:border-box;margin:0;padding:0}
-    html,body{font-family:"Manrope",sans-serif;background:radial-gradient(circle at 15% 20%,rgba(132,242,85,.10),transparent 24%),linear-gradient(180deg,var(--bg) 0%,#050807 100%);color:var(--text);min-height:100vh}
+    html,body{font-family:"Manrope",sans-serif;background:radial-gradient(circle at 15% 20%,rgba(132,242,85,.10),transparent 24%),linear-gradient(180deg,var(--bg) 0%,var(--bg-2) 100%);color:var(--text);min-height:100vh}
 
     /* Header */
     .header{background:var(--panel);border-bottom:1px solid var(--line);padding:16px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px}
@@ -25,7 +31,7 @@
     .header-right{display:flex;align-items:center;gap:10px}
     .btn{padding:10px 16px;border-radius:12px;border:none;font-weight:700;font-size:.88rem;cursor:pointer}
     .btn-primary{background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#08110d}
-    .btn-ghost{background:rgba(255,255,255,.04);color:var(--text);border:1px solid var(--line)}
+    .btn-ghost{background:var(--panel-soft);color:var(--text);border:1px solid var(--line)}
     .btn-danger{background:rgba(255,131,102,.1);color:var(--danger);border:1px solid rgba(255,131,102,.2)}
     .btn-sm{padding:6px 12px;font-size:.8rem;border-radius:8px}
 
@@ -105,6 +111,7 @@
     </div>
   </div>
   <div class="header-right">
+    <button class="btn btn-ghost btn-sm" id="owner-theme-toggle" type="button" data-theme-toggle></button>
     <span style="color:var(--muted);font-size:.85rem" id="owner-name-display"></span>
     <button class="btn btn-ghost btn-sm" onclick="window.location.href='/'">Landing page</button>
     <button class="btn btn-ghost btn-sm" id="logout-btn">Log out</button>
@@ -146,7 +153,7 @@
     <div class="upi-card">
       <div style="color:var(--muted);font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em">Your UPI ID</div>
       <div class="upi-id" id="upi-display">Loading...</div>
-      <div class="upi-note">Players will see this UPI ID when booking a slot. They pay directly to this UPI and enter their UTR number to confirm payment. You then verify and approve the booking.</div>
+      <div class="upi-note">Athletes will see this UPI ID when reserving a slot. They pay directly to this UPI and enter their UTR number to confirm payment. You then verify and approve the reservation.</div>
       <div style="margin-top:18px;display:grid;gap:10px">
         <div id="qr-preview" style="width:160px;height:160px;border:1px dashed var(--line);border-radius:16px;display:grid;place-items:center;color:var(--muted)">No QR uploaded</div>
         <label class="btn btn-ghost" style="width:max-content">
@@ -219,7 +226,10 @@
 
 </div>
 
+<script src="/nav.js"></script>
 <script>
+  GoalbaziTheme.attachButton(document.getElementById("owner-theme-toggle"));
+
   let ownerData = null;
 
   async function api(path, options = {}) {
@@ -230,7 +240,7 @@
 
   function showToast(msg) {
     let t = document.getElementById("toast");
-    if (!t) { t = document.createElement("div"); t.id = "toast"; t.style.cssText = "position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#13211b;border:1px solid rgba(255,255,255,.08);color:#eff7f3;padding:12px 18px;border-radius:14px;font-family:Manrope,sans-serif;font-weight:700;z-index:999;transition:.2s"; document.body.appendChild(t); }
+    if (!t) { t = document.createElement("div"); t.id = "toast"; t.style.cssText = "position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--line);color:var(--text);padding:12px 18px;border-radius:14px;font-family:Manrope,sans-serif;font-weight:700;z-index:999;transition:.2s"; document.body.appendChild(t); }
     t.textContent = msg;
     t.style.opacity = "1";
     clearTimeout(t._timer);
@@ -252,10 +262,10 @@
 
     // Stats
     document.getElementById("owner-stats").innerHTML = [
-      { value: data.stats.pending, label: "Pending approvals" },
+      { value: data.stats.pending, label: "Awaiting confirmation" },
       { value: data.stats.confirmed_today, label: "Confirmed today" },
       { value: `₹${data.stats.revenue_today}`, label: "Revenue today" },
-      { value: data.stats.total_bookings, label: "Total bookings" },
+      { value: data.stats.total_bookings, label: "Total reservations" },
     ].map(s => `
       <div class="stat-card">
         <div class="stat-value">${s.value}</div>
@@ -285,7 +295,7 @@
     }
 
     if (bookings.length === 0) {
-      html = `<div class="empty">No bookings yet. Share your turf link to get started!</div>`;
+      html = `<div class="empty">No reservations yet. Share your arena link to get started.</div>`;
     }
 
     document.getElementById("bookings-list").innerHTML = html;

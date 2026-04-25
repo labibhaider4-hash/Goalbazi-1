@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Goalbazi — Turf Owner Login</title>
+  <title>Goalbazi — Arena Partner Login</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/goalbazi-logo.svg">
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
   <style>
@@ -69,6 +70,9 @@
   <div class="ambient ambient-a"></div>
   <div class="ambient ambient-b"></div>
   <div class="auth-shell">
+    <div style="position:absolute;top:20px;right:20px;z-index:2">
+      <button class="theme-toggle" id="owner-login-theme-toggle" type="button" data-theme-toggle></button>
+    </div>
     <div class="auth-card">
       <div class="auth-logo">
         <img src="/assets/goalbazi-logo.svg" alt="Goalbazi">
@@ -76,7 +80,7 @@
       </div>
       <div class="role-badge">🏟️ Turf Owner Portal</div>
       <h1 class="auth-title">Owner sign in</h1>
-      <p class="auth-sub">Sign in to manage your turf bookings and payments.</p>
+      <p class="auth-sub">Sign in to manage your arena reservations and payments.</p>
       <form class="auth-form" id="login-form">
         <label>
           <span>Email</span>
@@ -90,12 +94,15 @@
         <button class="primary-btn" type="submit" id="submit-btn">Sign in</button>
         <button class="btn btn-ghost btn-full" type="button" style="margin-top:8px">Continue with Google (Soon)</button>
       </form>
-      <p class="auth-switch">New turf owner? <a href="/owner/register">Register your turf</a></p>
-      <p class="auth-switch" style="margin-top:8px">Are you a player? <a href="/login">Player login</a></p>
+      <p class="auth-switch">New Arena Partner? <a href="/owner/register">Register your arena</a></p>
+      <p class="auth-switch" style="margin-top:8px">Are you an athlete? <a href="/login">Athlete login</a></p>
       <p class="auth-switch" style="margin-top:8px"><a href="/">Back to landing page</a></p>
     </div>
   </div>
+  <script src="/nav.js"></script>
   <script>
+    GoalbaziTheme.attachButton(document.getElementById("owner-login-theme-toggle"));
+
     document.getElementById("login-form").addEventListener("submit", async (e) => {
       e.preventDefault();
       const btn = document.getElementById("submit-btn");

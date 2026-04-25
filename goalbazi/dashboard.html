@@ -123,14 +123,14 @@
         <h1 id="welcome-title">Welcome back</h1>
         <p id="welcome-sub">Pick up where your football network left off.</p>
       </div>
-      <a href="/games?create=1" class="btn btn-primary btn-sm">Create game</a>
+      <a href="/games?create=1" class="btn btn-primary btn-sm">Create match</a>
     </div>
 
     <div class="stats-grid-local" id="dash-stats"></div>
 
     <div class="quick-actions">
       <a href="/games" class="quick-card">
-        <div class="qc-label">Browse games</div>
+        <div class="qc-label">Find matches</div>
         <div class="qc-sub">Join upcoming matches</div>
       </a>
       <a href="/turfs" class="quick-card">
@@ -142,8 +142,8 @@
         <div class="qc-sub">Check teams and tables</div>
       </a>
       <a href="/profile" class="quick-card">
-        <div class="qc-label">My profile</div>
-        <div class="qc-sub">Update your player card</div>
+        <div class="qc-label">Athlete profile</div>
+        <div class="qc-sub">Update your athlete card</div>
       </a>
     </div>
 
@@ -180,7 +180,7 @@
           <span class="meta-line" id="community-meta"></span>
         </div>
         <div class="community-tools">
-          <input id="user-search" class="form-input" placeholder="Search players, handles, cities, or teams">
+          <input id="user-search" class="form-input" placeholder="Search athletes, handles, cities, or teams">
         </div>
         <div class="community-results" id="community-results"></div>
         <div style="height:12px"></div>
@@ -261,8 +261,8 @@
 
     document.getElementById("welcome-title").textContent = `Welcome back, ${data.profile.name.split(" ")[0]}`;
     document.getElementById("welcome-sub").textContent = data.profile.team
-      ? `${data.profile.team.name} is linked to your player profile.`
-      : "Build your squad, find players, and lock in your next match.";
+      ? `${data.profile.team.name} is linked to your athlete profile.`
+      : "Build your squad, find athletes, and lock in your next match.";
 
     document.getElementById("dash-stats").innerHTML = data.stats.map(stat => `
       <div class="stat-card">
@@ -280,7 +280,7 @@
         </div>
         <span class="pill pill-green">${esc(game.status)}</span>
       </a>
-    `).join("") : `<div class="empty-note">No games yet. Create one and bring players in.</div>`;
+    `).join("") : `<div class="empty-note">No matches yet. Create one and bring athletes in.</div>`;
 
     const p = data.profile;
     document.getElementById("profile-snap").innerHTML = `
@@ -314,7 +314,7 @@
     return `
       <div class="rate-row">
         <select class="mini-select" data-rate-select>
-          <option value="">Rate player</option>
+          <option value="">Rate athlete</option>
           ${[1,2,3,4,5,6,7,8,9,10].map(n => `<option value="${n}" ${String(currentRating) === String(n) ? "selected" : ""}>${n} / 10</option>`).join("")}
         </select>
         <button class="mini-btn primary" type="button" onclick="submitOpenRating(this, ${userId})">Save rating</button>
@@ -348,7 +348,7 @@
         </div>
         ${rateControls(user.id)}
       </div>
-    `).join("") : `<div class="empty-note">No players matched that search.</div>`;
+    `).join("") : `<div class="empty-note">No athletes matched that search.</div>`;
   }
 
   function renderFriends() {
@@ -387,7 +387,7 @@
         </div>
       `));
     }
-    document.getElementById("friends-results").innerHTML = rows.length ? rows.join("") : `<div class="empty-note">Your friend list will appear here after you connect with players.</div>`;
+    document.getElementById("friends-results").innerHTML = rows.length ? rows.join("") : `<div class="empty-note">Your friend list will appear here after you connect with other athletes.</div>`;
   }
 
   function renderConversations() {

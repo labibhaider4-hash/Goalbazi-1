@@ -18,6 +18,17 @@
       --danger: #ff8569;
       --warn: #ffd166;
     }
+    html[data-theme="light"] {
+      --bg: #f4f8f2;
+      --panel: #ffffff;
+      --panel-2: #f1f6f0;
+      --line: rgba(18,54,31,.10);
+      --text: #13241a;
+      --muted: #607b69;
+      --brand: #56b82b;
+      --danger: #d4553f;
+      --warn: #c8941f;
+    }
     * { box-sizing: border-box; }
     body {
       margin: 0;
@@ -25,7 +36,7 @@
       color: var(--text);
       background:
         radial-gradient(circle at top left, rgba(132,242,85,.12), transparent 30%),
-        linear-gradient(180deg, #08100d 0%, #040806 100%);
+        linear-gradient(180deg, var(--bg) 0%, var(--panel-2) 100%);
     }
     .shell { max-width: 1200px; margin: 0 auto; padding: 18px 14px 56px; }
     .topbar { display: grid; gap: 12px; margin-bottom: 18px; }
@@ -130,11 +141,12 @@
     <div class="topbar">
       <div class="brand-card">
         <div class="brand-name">Goalbazi Admin</div>
-        <div class="brand-sub">Manage players, leagues, teams, arenas, and ratings from one mobile-friendly control room.</div>
+        <div class="brand-sub">Manage athletes, leagues, teams, arenas, and ratings from one mobile-friendly control room.</div>
       </div>
       <div class="tab-row">
+        <button class="tab-btn" id="admin-theme-toggle" type="button" data-theme-toggle></button>
         <button class="tab-btn active" data-tab="overview">Overview</button>
-        <button class="tab-btn" data-tab="users">Players</button>
+        <button class="tab-btn" data-tab="users">Athletes</button>
         <button class="tab-btn" data-tab="teams">Teams</button>
         <button class="tab-btn" data-tab="leagues">Leagues</button>
         <button class="tab-btn" data-tab="arenas">Arenas</button>
@@ -160,12 +172,12 @@
     <section class="section-card" id="tab-users">
       <div class="section-head">
         <div>
-          <div class="section-title">Players</div>
-          <div class="section-sub">Edit every player attribute, including skill, role, and avatar link.</div>
+          <div class="section-title">Athletes</div>
+          <div class="section-sub">Edit every athlete attribute, including skill level, role, and avatar link.</div>
         </div>
       </div>
       <div class="editor-card">
-        <div class="editor-title">Create player</div>
+        <div class="editor-title">Create athlete</div>
         <form id="create-user-form" class="form-grid">
           <div class="form-grid two">
             <input name="name" placeholder="Name" required>
@@ -179,7 +191,7 @@
             <input name="location" placeholder="Location" value="Delhi NCR">
             <select name="skill"><option>Beginner</option><option selected>Intermediate</option><option>Competitive</option></select>
           </div>
-          <button class="btn primary" type="submit">Create player</button>
+          <button class="btn primary" type="submit">Create athlete</button>
         </form>
       </div>
       <div class="items-grid two-col" id="users-grid"></div>
@@ -288,7 +300,10 @@
     </section>
   </div>
 
+  <script src="/nav.js"></script>
   <script>
+    GoalbaziTheme.attachButton(document.getElementById("admin-theme-toggle"));
+
     const state = {
       users: [],
       teams: [],
@@ -331,7 +346,7 @@
       if (!el) {
         el = document.createElement("div");
         el.id = "toast";
-        el.style.cssText = "position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#12201a;border:1px solid rgba(255,255,255,.1);color:#eff7f3;padding:11px 14px;border-radius:12px;z-index:999;opacity:0;transition:.2s";
+        el.style.cssText = "position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--line);color:var(--text);padding:11px 14px;border-radius:12px;z-index:999;opacity:0;transition:.2s";
         document.body.appendChild(el);
       }
       el.textContent = message;
@@ -379,11 +394,11 @@
             <button class="list-row ${user.id === state.selectedUserId ? "active" : ""}" type="button" onclick="selectUser(${user.id})">
               <div class="list-row-top">
                 <div class="list-row-name">${esc(user.name)}</div>
-                <div class="item-meta">${user.is_admin ? "Admin" : "Player"}</div>
+                <div class="item-meta">${user.is_admin ? "Admin" : "Athlete"}</div>
               </div>
               <div class="list-row-sub">${esc(`@${user.handle}`)} · ${esc(user.location)} · ${esc(user.team_name || "No team")}</div>
             </button>
-          `).join("") || `<div class="item-card"><div class="item-meta">No players yet.</div></div>`}
+          `).join("") || `<div class="item-card"><div class="item-meta">No athletes yet.</div></div>`}
         </div>
         <div class="player-editor-panel">
           ${selectedUser ? `
@@ -391,7 +406,7 @@
               <div class="item-top">
                 <div>
                   <div class="item-title">Edit ${esc(selectedUser.name)}</div>
-                  <div class="item-meta">${esc(selectedUser.team_name || "No team")} · ${selectedUser.is_admin ? "Admin" : "Player"}</div>
+                  <div class="item-meta">${esc(selectedUser.team_name || "No team")} · ${selectedUser.is_admin ? "Admin" : "Athlete"}</div>
                 </div>
               </div>
               <div class="form-grid">
@@ -414,12 +429,12 @@
                 <textarea name="bio">${esc(selectedUser.bio || "")}</textarea>
                 <label style="display:flex;gap:8px;align-items:center"><input name="is_admin" type="checkbox" ${selectedUser.is_admin ? "checked" : ""} style="width:auto"> Admin access</label>
                 <div class="action-row">
-                  <button class="mini-btn primary" type="submit">Save player</button>
-                  <button class="mini-btn danger" type="button" onclick="deleteUser(${selectedUser.id})">Delete player</button>
+                  <button class="mini-btn primary" type="submit">Save athlete</button>
+                  <button class="mini-btn danger" type="button" onclick="deleteUser(${selectedUser.id})">Delete athlete</button>
                 </div>
               </div>
             </form>
-          ` : `<div class="item-card"><div class="item-meta">Select a player from the list to edit their attributes.</div></div>`}
+          ` : `<div class="item-card"><div class="item-meta">Select an athlete from the list to edit their attributes.</div></div>`}
         </div>
       `;
 
@@ -432,7 +447,7 @@
           data.is_admin = form.querySelector('[name="is_admin"]').checked;
           data.handle = (data.handle || "").toLowerCase().replace(/[^a-z0-9]/g, "");
           await api(`/api/admin/users/${userId}`, { method: "PUT", body: JSON.stringify(data) });
-          toast("Player updated");
+          toast("Athlete updated");
           await loadUsers();
         });
       }
@@ -444,9 +459,9 @@
     }
 
     async function deleteUser(userId) {
-      if (!confirm("Delete this player?")) return;
+      if (!confirm("Delete this athlete?")) return;
       await api(`/api/admin/users/${userId}`, { method: "DELETE" });
-      toast("Player deleted");
+      toast("Athlete deleted");
       await Promise.all([loadUsers(), loadOverview(), loadTeams()]);
     }
 
@@ -465,7 +480,7 @@
               <div class="item-top">
                 <div>
                   <div class="item-title">${esc(team.name)}</div>
-                  <div class="item-meta">${esc(team.city)} · ${team.member_count} players</div>
+                  <div class="item-meta">${esc(team.city)} · ${team.member_count} athletes</div>
                 </div>
               </div>
               <div class="form-grid">
@@ -487,10 +502,10 @@
             </form>
             <div class="divider"></div>
             <form class="member-form" data-team-id="${team.id}">
-              <div class="editor-title">Add player</div>
+              <div class="editor-title">Add athlete</div>
               <div class="form-grid two">
                 <select name="user_id">${availableOptions}</select>
-                <input name="role" placeholder="Role" value="Player">
+                <input name="role" placeholder="Role" value="Athlete">
               </div>
               <input name="jersey_number" placeholder="Jersey number">
               <div class="action-row"><button class="mini-btn primary" type="submit">Add to team</button></div>
@@ -508,7 +523,7 @@
                     <button class="mini-btn danger" type="button" onclick="deleteMembership(${member.id})">Remove</button>
                   </div>
                 </form>
-              `).join("") || `<div class="item-meta">No players in this team yet.</div>`}
+              `).join("") || `<div class="item-meta">No athletes in this team yet.</div>`}
             </div>
           </div>
         `;
@@ -524,7 +539,7 @@
       document.querySelectorAll(".member-form").forEach(form => form.addEventListener("submit", async event => {
         event.preventDefault();
         await api(`/api/admin/teams/${form.dataset.teamId}/members`, { method: "POST", body: JSON.stringify(formObject(form)) });
-        toast("Player added to team");
+        toast("Athlete added to team");
         await Promise.all([loadTeams(), loadUsers()]);
       }));
 
@@ -545,7 +560,7 @@
 
     async function deleteMembership(id) {
       await api(`/api/admin/team-memberships/${id}`, { method: "DELETE" });
-      toast("Player removed from team");
+      toast("Athlete removed from team");
       await Promise.all([loadTeams(), loadUsers()]);
     }
 
@@ -757,7 +772,7 @@
       data.handle = (data.handle || "").toLowerCase().replace(/[^a-z0-9]/g, "");
       await api("/api/admin/users", { method: "POST", body: JSON.stringify(data) });
       event.currentTarget.reset();
-      toast("Player created");
+      toast("Athlete created");
       await Promise.all([loadUsers(), loadOverview()]);
     });
 
