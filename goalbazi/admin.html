@@ -89,6 +89,30 @@
       background: rgba(255,255,255,.02);
       padding: 10px;
     }
+    .list-card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255,255,255,.02);
+      overflow: hidden;
+    }
+    .list-row {
+      display: block;
+      width: 100%;
+      text-align: left;
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-family: inherit;
+      padding: 14px;
+      cursor: pointer;
+      border-bottom: 1px solid rgba(255,255,255,.05);
+    }
+    .list-row:last-child { border-bottom: none; }
+    .list-row:hover, .list-row.active { background: rgba(132,242,85,.08); }
+    .list-row-top { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+    .list-row-name { font-weight: 700; }
+    .list-row-sub { color: var(--muted); font-size: .8rem; margin-top: 4px; line-height: 1.5; }
+    .player-editor-panel { margin-top: 14px; }
     .divider { height: 1px; background: var(--line); margin: 14px 0; }
     .hidden { display: none !important; }
     @media (min-width: 900px) {
@@ -266,6 +290,7 @@
       arenas: [],
       playersForTeams: [],
       activeTab: "overview",
+      selectedUserId: null,
     };
 
     function esc(value = "") {
@@ -321,42 +346,67 @@
       const data = await api("/api/admin/users");
       if (!data) return;
       state.users = data.users || [];
-      document.getElementById("users-grid").innerHTML = state.users.map(user => `
-        <form class="item-card user-form" data-id="${user.id}">
-          <div class="item-top">
-            <div>
-              <div class="item-title">${esc(user.name)}</div>
-              <div class="item-meta">${esc(user.team_name || "No team")} · ${user.is_admin ? "Admin" : "Player"}</div>
-            </div>
-          </div>
-          <div class="form-grid">
-            <div class="form-grid two">
-              <input name="name" value="${esc(user.name)}">
-              <input name="handle" value="${esc(user.handle)}">
-            </div>
-            <div class="form-grid two">
-              <input name="email" value="${esc(user.email)}">
-              <input name="location" value="${esc(user.location)}">
-            </div>
-            <div class="form-grid two">
-              <input name="position" value="${esc(user.position || "")}">
-              <input name="preferred_format" value="${esc(user.preferred_format || "")}">
-            </div>
-            <div class="form-grid two">
-              <input name="skill" value="${esc(user.skill || "")}">
-              <input name="avatar_base64" value="${esc(user.avatar_base64 || "")}" placeholder="Avatar image URL or base64">
-            </div>
-            <textarea name="bio">${esc(user.bio || "")}</textarea>
-            <label style="display:flex;gap:8px;align-items:center"><input name="is_admin" type="checkbox" ${user.is_admin ? "checked" : ""} style="width:auto"> Admin access</label>
-            <div class="action-row">
-              <button class="mini-btn primary" type="submit">Save</button>
-              <button class="mini-btn danger" type="button" onclick="deleteUser(${user.id})">Delete</button>
-            </div>
-          </div>
-        </form>
-      `).join("");
+      if (!state.selectedUserId && state.users.length) state.selectedUserId = state.users[0].id;
+      if (state.selectedUserId && !state.users.find(user => user.id === state.selectedUserId)) {
+        state.selectedUserId = state.users.length ? state.users[0].id : null;
+      }
+      renderUsersPanel();
+    }
 
-      document.querySelectorAll(".user-form").forEach(form => {
+    function renderUsersPanel() {
+      const selectedUser = state.users.find(user => user.id === state.selectedUserId);
+      document.getElementById("users-grid").innerHTML = `
+        <div class="list-card">
+          ${state.users.map(user => `
+            <button class="list-row ${user.id === state.selectedUserId ? "active" : ""}" type="button" onclick="selectUser(${user.id})">
+              <div class="list-row-top">
+                <div class="list-row-name">${esc(user.name)}</div>
+                <div class="item-meta">${user.is_admin ? "Admin" : "Player"}</div>
+              </div>
+              <div class="list-row-sub">${esc(`@${user.handle}`)} · ${esc(user.location)} · ${esc(user.team_name || "No team")}</div>
+            </button>
+          `).join("") || `<div class="item-card"><div class="item-meta">No players yet.</div></div>`}
+        </div>
+        <div class="player-editor-panel">
+          ${selectedUser ? `
+            <form class="item-card user-form" data-id="${selectedUser.id}">
+              <div class="item-top">
+                <div>
+                  <div class="item-title">Edit ${esc(selectedUser.name)}</div>
+                  <div class="item-meta">${esc(selectedUser.team_name || "No team")} · ${selectedUser.is_admin ? "Admin" : "Player"}</div>
+                </div>
+              </div>
+              <div class="form-grid">
+                <div class="form-grid two">
+                  <input name="name" value="${esc(selectedUser.name)}">
+                  <input name="handle" value="${esc(selectedUser.handle)}">
+                </div>
+                <div class="form-grid two">
+                  <input name="email" value="${esc(selectedUser.email)}">
+                  <input name="location" value="${esc(selectedUser.location)}">
+                </div>
+                <div class="form-grid two">
+                  <input name="position" value="${esc(selectedUser.position || "")}">
+                  <input name="preferred_format" value="${esc(selectedUser.preferred_format || "")}">
+                </div>
+                <div class="form-grid two">
+                  <input name="skill" value="${esc(selectedUser.skill || "")}">
+                  <input name="avatar_base64" value="${esc(selectedUser.avatar_base64 || "")}" placeholder="Avatar image URL or base64">
+                </div>
+                <textarea name="bio">${esc(selectedUser.bio || "")}</textarea>
+                <label style="display:flex;gap:8px;align-items:center"><input name="is_admin" type="checkbox" ${selectedUser.is_admin ? "checked" : ""} style="width:auto"> Admin access</label>
+                <div class="action-row">
+                  <button class="mini-btn primary" type="submit">Save player</button>
+                  <button class="mini-btn danger" type="button" onclick="deleteUser(${selectedUser.id})">Delete player</button>
+                </div>
+              </div>
+            </form>
+          ` : `<div class="item-card"><div class="item-meta">Select a player from the list to edit their attributes.</div></div>`}
+        </div>
+      `;
+
+      const form = document.querySelector(".user-form");
+      if (form) {
         form.addEventListener("submit", async event => {
           event.preventDefault();
           const userId = form.dataset.id;
@@ -367,7 +417,12 @@
           toast("Player updated");
           await loadUsers();
         });
-      });
+      }
+    }
+
+    function selectUser(userId) {
+      state.selectedUserId = userId;
+      renderUsersPanel();
     }
 
     async function deleteUser(userId) {
@@ -739,6 +794,7 @@
     window.deleteLeague = deleteLeague;
     window.deleteLeagueTeam = deleteLeagueTeam;
     window.deleteArena = deleteArena;
+    window.selectUser = selectUser;
   </script>
 </body>
 </html>
