@@ -1,5 +1,45 @@
 /* nav.js — shared navbar logic for all pages */
 
+const GoalbaziTheme = {
+  storageKey: "goalbazi-theme",
+  apply(theme) {
+    const next = theme === "light" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    try { localStorage.setItem(this.storageKey, next); } catch {}
+    this.syncButtons();
+  },
+  current() {
+    return document.documentElement.getAttribute("data-theme") || "dark";
+  },
+  init() {
+    try {
+      const saved = localStorage.getItem(this.storageKey);
+      if (saved) this.apply(saved);
+      else this.syncButtons();
+    } catch {
+      this.syncButtons();
+    }
+  },
+  toggle() {
+    this.apply(this.current() === "light" ? "dark" : "light");
+  },
+  syncButtons() {
+    const isLight = this.current() === "light";
+    document.querySelectorAll("[data-theme-toggle]").forEach(btn => {
+      btn.textContent = isLight ? "Dark UI" : "Light UI";
+    });
+  },
+  attachButton(button) {
+    if (!button || button.dataset.themeBound === "1") return;
+    button.dataset.themeBound = "1";
+    button.addEventListener("click", () => this.toggle());
+    this.syncButtons();
+  }
+};
+
+GoalbaziTheme.init();
+window.GoalbaziTheme = GoalbaziTheme;
+
 function initNav(activePage) {
   const pages = [
     { id: "dashboard", label: "Dashboard", href: "/dashboard" },
@@ -27,6 +67,7 @@ function initNav(activePage) {
     </a>
     <nav class="nav-links">${linksHtml}</nav>
     <div class="nav-right">
+      <button class="theme-toggle hide-mobile" id="nav-theme-toggle" type="button" data-theme-toggle></button>
       <div class="nav-avatar" id="nav-avatar" title="Profile">?</div>
       <button class="btn btn-ghost btn-sm hide-mobile" id="nav-logout">Log out</button>
     </div>
@@ -41,10 +82,14 @@ function initNav(activePage) {
     drawer.innerHTML = `
       ${drawerLinksHtml}
       <div class="nav-drawer-bottom">
+        <button class="theme-toggle btn-full" id="nav-theme-toggle-mobile" type="button" data-theme-toggle></button>
         <button class="btn btn-ghost btn-sm btn-full" id="nav-logout-mobile">Log out</button>
       </div>
     `;
   }
+
+  GoalbaziTheme.attachButton(document.getElementById("nav-theme-toggle"));
+  GoalbaziTheme.attachButton(document.getElementById("nav-theme-toggle-mobile"));
 
   // Load avatar initials
   fetch("/api/auth/me").then(r => r.ok ? r.json() : null).then(user => {

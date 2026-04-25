@@ -13,17 +13,35 @@
     /* ── Top nav ── */
     .land-nav {
       position: fixed; top: 0; left: 0; right: 0;
-      height: 64px;
+      min-height: 64px;
       display: flex; align-items: center; justify-content: space-between;
-      padding: 15px;
-      background: rgba(7,13,10,.85);
+      padding: 12px 14px;
+      gap: 10px;
+      flex-wrap: wrap;
+      background: var(--nav-bg);
       backdrop-filter: blur(20px);
       border-bottom: 1px solid var(--line);
       z-index: 100;
     }
-    .land-brand { display: flex; align-items: center; gap: 10px; font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.15rem; color: var(--text); text-decoration: none; }
+    .land-brand { display: flex; align-items: center; gap: 10px; font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.02rem; color: var(--text); text-decoration: none; min-width: 0; }
     .land-brand img { width: 32px; border-radius: 8px; }
-    .land-nav-right { display: flex; gap: 10px; }
+    .land-nav-right { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
+
+    @media (max-width: 560px) {
+      .land-nav {
+        align-items: flex-start;
+      }
+      .land-brand {
+        flex: 1 1 100%;
+      }
+      .land-nav-right {
+        width: 100%;
+      }
+      .land-nav-right .btn,
+      .land-nav-right .theme-toggle {
+        flex: 1 1 0;
+      }
+    }
 
     /* ── Hero ── */
     .hero {
@@ -265,6 +283,7 @@
     Goalbazi
   </a>
   <div class="land-nav-right">
+    <button class="theme-toggle" id="landing-theme-toggle" type="button" data-theme-toggle></button>
     <a href="/login" class="btn btn-ghost btn-sm">Sign in</a>
     <a href="/register" class="btn btn-primary btn-sm">Join free</a>
   </div>
@@ -295,7 +314,7 @@
   <div class="hero-stats">
     <div class="hero-stat-item">
       <div class="hero-stat-num" id="stat-players">—</div>
-      <div class="hero-stat-label">Players</div>
+      <div class="hero-stat-label">Athletes</div>
     </div>
     <div class="hero-stat-item">
       <div class="hero-stat-num" id="stat-games">—</div>
@@ -347,7 +366,7 @@
       <div class="feature-card">
         <div class="feature-icon">⚡</div>
         <div class="feature-name">UPI payments</div>
-        <div class="feature-desc">Pay for arena bookings directly via UPI. Fast, familiar, and no extra apps needed. Owners confirm after verifying.</div>
+        <div class="feature-desc">Pay for arena reservations directly via UPI. Fast, familiar, and no extra apps needed. Arena Partners confirm after verifying.</div>
       </div>
     </div>
   </div>
@@ -378,7 +397,7 @@
         <div class="step-num">3</div>
         <div>
           <div class="step-title">Book & pay via UPI</div>
-          <div class="step-desc">Secure your slot with a UPI payment. Enter your UTR number and the arena owner confirms your booking.</div>
+          <div class="step-desc">Secure your slot with a UPI payment. Enter your UTR number and the Arena Partner confirms your reservation.</div>
         </div>
       </div>
       <div class="step-item">
@@ -408,12 +427,15 @@
 <footer class="footer">
   <div>© 2026 Goalbazi · India </div>
   <div style="display:flex;gap:20px">
-    <a href="/login" style="color:var(--muted)">Player login</a>
-    <a href="/owner/login" style="color:var(--muted)">Turf owner login</a>
+    <a href="/login" style="color:var(--muted)">Athlete login</a>
+    <a href="/owner/login" style="color:var(--muted)">Arena Partner login</a>
   </div>
 </footer>
 
+<script src="/nav.js"></script>
 <script>
+  GoalbaziTheme.attachButton(document.getElementById("landing-theme-toggle"));
+
   // Load live stats
   fetch("/api/public/stats").then(r => r.ok ? r.json() : null).then(data => {
     if (!data) return;
