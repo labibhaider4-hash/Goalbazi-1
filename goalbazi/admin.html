@@ -269,6 +269,8 @@
           </div>
           <input name="upi_id" placeholder="UPI ID">
           <input name="map_link" placeholder="Map link">
+          <textarea name="description" placeholder="Arena description"></textarea>
+          <textarea name="image_urls" placeholder="Arena image links, one per line"></textarea>
           <button class="btn primary" type="submit">Create arena</button>
         </form>
       </div>
@@ -347,6 +349,15 @@
           <div class="stat-label">${esc(stat.label)}</div>
         </div>
       `).join("");
+      const notifyData = await api("/api/notifications");
+      document.getElementById("admin-notifications").innerHTML = (notifyData?.notifications || []).length
+        ? notifyData.notifications.map(item => `
+          <div class="notify-item">
+            <div class="item-title">${esc(item.title)}</div>
+            <div class="item-meta">${esc(item.message)}</div>
+          </div>
+        `).join("")
+        : `<div class="item-meta">No notifications right now.</div>`;
     }
 
     async function loadUsers() {
@@ -697,6 +708,8 @@
             </div>
             <input name="upi_id" value="${esc(arena.upi_id || "")}">
             <input name="map_link" value="${esc(arena.map_link || "")}">
+            <textarea name="description">${esc(arena.description || "")}</textarea>
+            <textarea name="image_urls">${esc((arena.image_urls || []).join("\n"))}</textarea>
             <div class="action-row">
               <button class="mini-btn primary" type="submit">Save arena</button>
               <button class="mini-btn danger" type="button" onclick="deleteArena(${arena.id})">Delete arena</button>

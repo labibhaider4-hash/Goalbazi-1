@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Goalbazi — Turf Owner Register</title>
+  <title>Goalbazi — Arena Owner Register</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/goalbazi-logo.svg">
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
   <style>
@@ -138,9 +139,9 @@
         <img src="/assets/goalbazi-logo.svg" alt="Goalbazi">
         <span>Goalbazi</span>
       </div>
-      <div class="role-badge">🏟️ Turf Owner Account</div>
-      <h1 class="auth-title">Register your turf</h1>
-      <p class="auth-sub">Create a turf owner account to list your ground, manage bookings, and receive UPI payments directly.</p>
+      <div class="role-badge">🏟️ Arena Owner Account</div>
+      <h1 class="auth-title">Register your arena</h1>
+      <p class="auth-sub">Create an arena owner account to list your ground, manage bookings, and receive UPI payments directly.</p>
       <form class="auth-form" id="register-form">
         <div class="field-grid">
           <label>
@@ -162,7 +163,7 @@
         </label>
         <hr style="border-color:var(--line);margin:4px 0">
         <label>
-          <span>Turf name</span>
+          <span>Arena name</span>
           <input name="turf_name" placeholder="Siri Fort Sports Complex" required>
         </label>
         <div class="field-grid">
@@ -204,10 +205,18 @@
             <button class="btn btn-ghost btn-full" type="button" id="owner-gps-btn">Use current location</button>
           </label>
         </div>
+        <label>
+          <span>Arena description</span>
+          <input name="description" placeholder="Tell players what makes your arena special">
+        </label>
+        <label>
+          <span>Arena image links</span>
+          <textarea name="image_urls" placeholder="One image URL per line" style="min-height:100px;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,0.15);background:transparent;color:#fff;font-family:inherit"></textarea>
+        </label>
         <input type="hidden" name="latitude">
         <input type="hidden" name="longitude">
         <p class="error-msg" id="error-msg"></p>
-        <button class="primary-btn" type="submit" id="submit-btn">Create turf owner account</button>
+        <button class="primary-btn" type="submit" id="submit-btn">Create arena owner account</button>
         <button class="btn btn-ghost btn-full" type="button" style="margin-top:8px">Continue with Google (Soon)</button>
       </form>
       <p class="auth-switch">Already have an account? <a href="/owner/login">Sign in</a></p>
@@ -250,7 +259,7 @@
         err.textContent = "Network error — please try again";
         err.style.display = "block";
       } finally {
-        btn.textContent = "Create turf owner account";
+        btn.textContent = "Create arena owner account";
         btn.disabled = false;
       }
     });
