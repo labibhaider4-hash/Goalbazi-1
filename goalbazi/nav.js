@@ -26,7 +26,15 @@ const GoalbaziTheme = {
   syncButtons() {
     const isLight = this.current() === "light";
     document.querySelectorAll("[data-theme-toggle]").forEach(btn => {
-      btn.textContent = isLight ? "Dark UI" : "Light UI";
+      btn.innerHTML = `
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+          <path d="M9 18h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M10 21h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M12 3a6.5 6.5 0 0 0-3.86 11.73c.55.42.86 1.05.86 1.75V17h6v-.52c0-.7.31-1.33.86-1.75A6.5 6.5 0 0 0 12 3Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        </svg>
+      `;
+      btn.title = isLight ? "Switch to dark theme" : "Switch to light theme";
+      btn.setAttribute("aria-label", btn.title);
     });
   },
   attachButton(button) {

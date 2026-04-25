@@ -26,38 +26,42 @@
 .auth-form input {
   width: 100%;
   padding: 12px 16px;
-  background: var(--panel); /* Keeps your theme color */
+  background: var(--panel-2);
   border: 1px solid var(--line);
   border-radius: 12px;
-  color: inherit;
+  color: var(--text);
   font-family: inherit;
   font-size: 1rem;
-  box-sizing: border-box; /* Prevents boxes from overflowing the card */
-  transition: border-color 0.2s;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
 }
 
 .auth-form input:focus {
   outline: none;
-  border-color: var(--brand);
+  border-color: rgba(63,126,42,0.65);
+  background: var(--panel);
+  box-shadow: 0 0 0 2px rgba(63,126,42,.12);
 }
 
 /* Structural fixes for the sign-in button */
 .primary-btn {
   width: 100%;
   padding: 14px;
-  background: var(--brand); /* Uses your brand color */
-  color: #000; /* Standard contrast for the brand green */
+  background: linear-gradient(135deg,#3F7E2A,#2a5a1d);
+  color: #f7fff5;
   border: none;
   border-radius: 12px;
   font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
   font-family: 'Manrope', sans-serif;
-  transition: opacity 0.2s;
+  transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
 }
 
 .primary-btn:hover {
-  opacity: 0.9;
+  opacity: 0.98;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 26px rgba(63,126,42,.28);
 }
 
 .primary-btn:disabled {
@@ -79,7 +83,7 @@
         <span>Goalbazi</span>
       </div>
       <div class="role-badge">🏟️ Turf Owner Portal</div>
-      <h1 class="auth-title">Owner sign in</h1>
+      <h1 class="auth-title">Arena Partner sign in</h1>
       <p class="auth-sub">Sign in to manage your arena reservations and payments.</p>
       <form class="auth-form" id="login-form">
         <label>

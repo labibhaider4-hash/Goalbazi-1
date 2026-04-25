@@ -8,7 +8,9 @@ import secrets
 import uuid
 from datetime import datetime, timedelta
 from functools import wraps
+from urllib import error as urllib_error
 from urllib.parse import parse_qs, urlparse
+from urllib.request import Request, urlopen
 
 import psycopg2
 import psycopg2.extras
@@ -18,6 +20,8 @@ app = Flask(__name__, static_folder="static", template_folder=".")
 app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "").strip()
 
 
 # ---------------------------------------------------------------------------
@@ -380,6 +384,16 @@ def seed_db():
     """)
 
     cur.execute("""
+        CREATE TABLE IF NOT EXISTS ai_assistant_messages (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            role TEXT NOT NULL,
+            message TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+    """)
+
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS player_open_ratings (
             id SERIAL PRIMARY KEY,
             rater_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -636,6 +650,232 @@ def get_notifications():
                 "message": f"{row['player_name']} booked {row['slot_date']} at {row['slot_time']}.",
             })
     return items[:10]
+
+
+def get_assistant_prompt_suggestions(profile=None):
+    location = (profile or {}).get("location") or "my area"
+    first_name = ((profile or {}).get("name") or "me").split(" ")[0]
+    return [
+        {"label": "Find arenas near me", "message": f"Find the best arenas near {location} and tell me which one to try first.", "action": "arena_nearby"},
+        {"label": "Show open matches", "message": f"Show me upcoming matches that suit {first_name}.", "action": "games_overview"},
+        {"label": "Explain leagues", "message": "Explain the leagues and the current standings in a simple way.", "action": "league_info"},
+        {"label": "Review my profile", "message": "Review my athlete profile and tell me what I should improve.", "action": "profile_review"},
+        {"label": "Find athletes", "message": f"Suggest athletes in {location} I should connect with.", "action": "community_search"},
+    ]
+
+
+def get_assistant_messages(user_id, limit=16):
+    rows = [dict(r) for r in query(
+        """SELECT role, message, created_at
+           FROM ai_assistant_messages
+           WHERE user_id = %s
+           ORDER BY id DESC
+           LIMIT %s""",
+        (user_id, limit),
+    )]
+    return list(reversed(rows))
+
+
+def build_assistant_context(user_id):
+    profile = get_profile(user_id) or {}
+    user_location = profile.get("location", "")
+    profile_team = profile.get("team", {})
+
+    game_rows = [dict(r) for r in query(
+        """SELECT g.id, g.title, g.game_date, g.game_time, g.format, g.skill_level, g.status,
+                  t.name AS arena_name, t.area
+           FROM games g
+           JOIN turfs t ON t.id = g.turf_id
+           ORDER BY g.game_date ASC, g.game_time ASC
+           LIMIT 4"""
+    )]
+    arena_rows = [dict(r) for r in query(
+        """SELECT id, name, area, rating, price_per_hour, surface
+           FROM turfs
+           WHERE LOWER(name) LIKE %s OR LOWER(area) LIKE %s
+           ORDER BY rating DESC, price_per_hour ASC
+           LIMIT 4""",
+        (f"%{user_location.lower()}%", f"%{user_location.lower()}%"),
+    )]
+    if not arena_rows:
+        arena_rows = [dict(r) for r in query(
+            """SELECT id, name, area, rating, price_per_hour, surface
+               FROM turfs
+               ORDER BY rating DESC, price_per_hour ASC
+               LIMIT 4"""
+        )]
+
+    friend_count = query(
+        """SELECT COUNT(*) AS count FROM friendships
+           WHERE status = 'accepted' AND (user_one_id = %s OR user_two_id = %s)""",
+        (user_id, user_id),
+        one=True,
+    )["count"]
+    community_rows = [dict(r) for r in query(
+        """SELECT u.id, u.name, u.location, u.position, u.skill,
+                  t.name AS team_name
+           FROM users u
+           LEFT JOIN team_memberships tm ON tm.user_id = u.id
+           LEFT JOIN teams t ON t.id = tm.team_id
+           WHERE u.id != %s
+           ORDER BY u.id DESC
+           LIMIT 5""",
+        (user_id,),
+    )]
+    league_rows = [dict(r) for r in query(
+        """SELECT l.id, l.name, l.season, COUNT(lt.id) AS team_count
+           FROM leagues l
+           LEFT JOIN league_teams lt ON lt.league_id = l.id
+           GROUP BY l.id
+           ORDER BY l.id DESC
+           LIMIT 3"""
+    )]
+
+    return {
+        "profile": {
+            "name": profile.get("name", ""),
+            "location": profile.get("location", ""),
+            "position": profile.get("position", ""),
+            "preferred_format": profile.get("preferred_format", ""),
+            "skill": profile.get("skill", ""),
+            "team_name": profile_team.get("name", "") if profile_team else "",
+        },
+        "community": {
+            "friend_count": friend_count,
+            "athletes": community_rows,
+        },
+        "games": game_rows,
+        "arenas": arena_rows,
+        "leagues": league_rows,
+    }
+
+
+def build_local_assistant_reply(user_id, message, context):
+    text = (message or "").strip()
+    lowered = text.lower()
+    profile = context["profile"]
+
+    if any(word in lowered for word in ("arena", "venue", "book", "near", "turf")):
+        arenas = context["arenas"][:3]
+        if not arenas:
+            return "I could not find arenas right now. Try again after more arenas are added."
+        lines = ["Here are the best arena options I found for you:"]
+        for arena in arenas:
+            lines.append(
+                f"- {arena['name']} in {arena['area']} · rating {arena['rating']} · Rs {arena['price_per_hour']}/hour · {arena['surface']}"
+            )
+        lines.append("If you want, tap the arena finder section and I can help narrow this down by area, budget, or surface.")
+        return "\n".join(lines)
+
+    if any(word in lowered for word in ("match", "game", "kickoff", "play today", "open match")):
+        games = context["games"][:4]
+        if not games:
+            return "There are no upcoming matches listed yet. You can create one from the dashboard and invite athletes into it."
+        lines = ["These are the upcoming matches I would look at first:"]
+        for game in games:
+            lines.append(
+                f"- {game['title']} · {game['game_date']} at {game['game_time']} · {game['arena_name']} · {game['format']} · {game['skill_level']}"
+            )
+        lines.append("If you want, I can next help you choose the best one for your skill level and preferred format.")
+        return "\n".join(lines)
+
+    if any(word in lowered for word in ("league", "standing", "table", "team")):
+        leagues = context["leagues"]
+        team_name = profile.get("team_name")
+        lines = []
+        if team_name:
+            lines.append(f"Your athlete profile is currently linked to {team_name}.")
+        if leagues:
+            lines.append("These are the main leagues currently visible in Goalbazi:")
+            for league in leagues:
+                season = f" ({league['season']})" if league.get("season") else ""
+                lines.append(f"- {league['name']}{season} · {league['team_count']} teams")
+            lines.append("Open the leagues section if you want the full table, team details, or edits.")
+        else:
+            lines.append("There are no leagues available yet.")
+        return "\n".join(lines)
+
+    if any(word in lowered for word in ("friend", "community", "athlete", "connect", "message")):
+        athletes = context["community"]["athletes"][:3]
+        lines = [f"You currently have {context['community']['friend_count']} confirmed connections."]
+        if athletes:
+            lines.append("Athletes worth checking next:")
+            for athlete in athletes:
+                parts = [athlete["location"], athlete["position"], athlete["skill"], athlete.get("team_name", "")]
+                lines.append(f"- {athlete['name']} · " + " · ".join([p for p in parts if p]))
+        lines.append("Use the Community section to send requests, chat privately, and rate athletes.")
+        return "\n".join(lines)
+
+    if any(word in lowered for word in ("profile", "improve", "bio", "rating", "skill")):
+        lines = [
+            f"Your profile currently shows {profile.get('position') or 'your position'} in {profile.get('location') or 'your city'}.",
+            f"Preferred format: {profile.get('preferred_format') or 'not set'} · Skill level: {profile.get('skill') or 'not set'}."
+        ]
+        if profile.get("team_name"):
+            lines.append(f"You are also linked to {profile['team_name']}.")
+        lines.append("To make your athlete card stronger, keep your bio specific, update your avatar, and make sure your skill level is accurate.")
+        return "\n".join(lines)
+
+    return (
+        "I can help with arenas, matches, leagues, athlete profiles, and community connections. "
+        "Try one of the suggestion chips below, or ask me something specific like finding arenas near you, reviewing your profile, or recommending a match."
+    )
+
+
+def extract_openai_text(payload):
+    if isinstance(payload, dict):
+        if payload.get("output_text"):
+            return str(payload["output_text"]).strip()
+        for item in payload.get("output", []):
+            for content in item.get("content", []):
+                if isinstance(content, dict) and content.get("type") == "output_text" and content.get("text"):
+                    return str(content["text"]).strip()
+    return ""
+
+
+def generate_assistant_reply(user_id, message):
+    context = build_assistant_context(user_id)
+    history = get_assistant_messages(user_id, limit=12)
+    fallback_reply = build_local_assistant_reply(user_id, message, context)
+
+    if not OPENAI_API_KEY:
+        return fallback_reply
+
+    model = OPENAI_MODEL or "gpt-4.1-mini"
+    system_prompt = (
+        "You are Goalbazi AI, a concise and practical football app assistant. "
+        "Use the supplied Goalbazi app context to answer. Be warm, clear, and mobile-friendly. "
+        "Prefer short paragraphs or flat bullets. Do not invent data beyond the provided context."
+    )
+    history_text = "\n".join([f"{item['role'].upper()}: {item['message']}" for item in history[-10:]])
+    input_text = (
+        f"App context:\n{json.dumps(context, ensure_ascii=True)}\n\n"
+        f"Recent chat:\n{history_text or 'No prior messages.'}\n\n"
+        f"User message:\n{message}"
+    )
+    body = {
+        "model": model,
+        "input": [
+            {"role": "system", "content": [{"type": "input_text", "text": system_prompt}]},
+            {"role": "user", "content": [{"type": "input_text", "text": input_text}]},
+        ],
+    }
+    req = Request(
+        "https://api.openai.com/v1/responses",
+        data=json.dumps(body).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {OPENAI_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(req, timeout=20) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+        reply = extract_openai_text(payload)
+        return reply or fallback_reply
+    except (urllib_error.URLError, urllib_error.HTTPError, TimeoutError, ValueError, json.JSONDecodeError):
+        return fallback_reply
 
 
 def get_turfs(date_value, search="", user_lat=None, user_lng=None):
@@ -1131,6 +1371,7 @@ def api_admin_delete_user(user_id):
     cur.execute("DELETE FROM bookings WHERE user_id = %s", (user_id,))
     cur.execute("DELETE FROM friendships WHERE user_one_id = %s OR user_two_id = %s", (user_id, user_id))
     cur.execute("DELETE FROM direct_messages WHERE sender_id = %s OR receiver_id = %s", (user_id, user_id))
+    cur.execute("DELETE FROM ai_assistant_messages WHERE user_id = %s", (user_id,))
     cur.execute("DELETE FROM team_memberships WHERE user_id = %s", (user_id,))
     cur.execute("DELETE FROM game_players WHERE user_id = %s", (user_id,))
     cur.execute("UPDATE turf_slots SET is_booked = 0, booked_by = NULL WHERE booked_by = %s", (user_id,))
@@ -2187,6 +2428,59 @@ def api_send_direct_message():
     )
     log_event("direct_message", "/api/direct-messages", {"receiver_id": receiver_id})
     return jsonify({"ok": True}), 201
+
+
+@app.route("/api/assistant/messages")
+@login_required
+def api_assistant_messages():
+    profile = get_profile(current_user_id()) or {}
+    messages = get_assistant_messages(current_user_id(), limit=18)
+    if not messages:
+        first_name = (profile.get("name") or "there").split(" ")[0]
+        welcome_message = (
+            f"Hi {first_name}, I’m your Goalbazi assistant. I can help you find arenas, matches, leagues, "
+            "and athletes to connect with. Tap one of the suggestions below or ask me anything."
+        )
+        query(
+            "INSERT INTO ai_assistant_messages (user_id, role, message, created_at) VALUES (%s,%s,%s,%s)",
+            (current_user_id(), "assistant", welcome_message, datetime.now().isoformat()),
+            commit=True,
+        )
+        messages = get_assistant_messages(current_user_id(), limit=18)
+    return jsonify({
+        "messages": messages,
+        "suggestions": get_assistant_prompt_suggestions(profile),
+    })
+
+
+@app.route("/api/assistant/messages", methods=["POST"])
+@login_required
+def api_assistant_reply():
+    data = request.get_json() or {}
+    message = (data.get("message") or "").strip()
+    if not message:
+        return jsonify({"error": "Message cannot be empty"}), 400
+    if len(message) > 1200:
+        return jsonify({"error": "Message is too long"}), 400
+    now = datetime.now().isoformat()
+    query(
+        "INSERT INTO ai_assistant_messages (user_id, role, message, created_at) VALUES (%s,%s,%s,%s)",
+        (current_user_id(), "user", message, now),
+        commit=True,
+    )
+    reply = generate_assistant_reply(current_user_id(), message)
+    query(
+        "INSERT INTO ai_assistant_messages (user_id, role, message, created_at) VALUES (%s,%s,%s,%s)",
+        (current_user_id(), "assistant", reply, datetime.now().isoformat()),
+        commit=True,
+    )
+    log_event("assistant_message", "/api/assistant/messages")
+    profile = get_profile(current_user_id()) or {}
+    return jsonify({
+        "reply": reply,
+        "messages": get_assistant_messages(current_user_id(), limit=18),
+        "suggestions": get_assistant_prompt_suggestions(profile),
+    }), 201
 
 
 @app.route("/api/notifications")

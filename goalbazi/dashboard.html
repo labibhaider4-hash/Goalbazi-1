@@ -52,6 +52,18 @@
     .meta-line { color: var(--muted); font-size: .82rem; }
     .tag-line { display: flex; flex-wrap: wrap; gap: 6px; }
     .community-card, .arena-card, .notify-card { padding: 16px; }
+    .assistant-card { padding: 16px; margin-bottom: 16px; background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
+    .assistant-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    .assistant-badge { display: inline-flex; align-items: center; gap: 8px; font-family: 'Syne', sans-serif; font-weight: 700; }
+    .assistant-dot { width: 10px; height: 10px; border-radius: 999px; background: linear-gradient(135deg, var(--brand), var(--accent)); box-shadow: 0 0 0 6px rgba(127,255,69,.08); }
+    .assistant-feed { display: grid; gap: 10px; max-height: 320px; overflow: auto; padding-right: 4px; }
+    .assistant-bubble { border-radius: 16px; padding: 12px 14px; line-height: 1.55; font-size: .86rem; white-space: pre-wrap; }
+    .assistant-bubble.user { background: rgba(127,255,69,.14); justify-self: end; max-width: 88%; }
+    .assistant-bubble.assistant { background: var(--surface-soft); border: 1px solid var(--line); max-width: 100%; }
+    .assistant-suggestions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .assistant-chip { border-radius: 999px; border: 1px solid var(--line); background: var(--panel); color: var(--text); padding: 9px 12px; font-size: .8rem; font-weight: 600; }
+    .assistant-chip:hover { border-color: rgba(127,255,69,.25); color: var(--brand); }
+    .assistant-compose { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 12px; }
     .community-tools, .arena-tools { display: grid; gap: 10px; margin-bottom: 14px; }
     .community-results, .friends-results, .chat-results, .arena-results { display: grid; gap: 10px; }
     .user-card, .chat-card, .arena-result {
@@ -155,6 +167,22 @@
       <div class="notify-list" id="notifications-list"></div>
     </div>
 
+    <div class="assistant-card">
+      <div class="assistant-head">
+        <div>
+          <div class="assistant-badge"><span class="assistant-dot"></span>Goalbazi AI</div>
+          <div class="meta-line">Tap a task or ask for help with arenas, matches, leagues, or athletes.</div>
+        </div>
+        <span class="pill pill-green">Remembers your chat</span>
+      </div>
+      <div class="assistant-feed" id="assistant-feed"></div>
+      <div class="assistant-suggestions" id="assistant-suggestions"></div>
+      <div class="assistant-compose">
+        <input id="assistant-input" class="form-input" placeholder="Ask Goalbazi AI anything">
+        <button id="assistant-send" class="btn btn-primary btn-sm" type="button">Send</button>
+      </div>
+    </div>
+
     <div class="stack-grid">
       <div class="panel-card">
         <div class="section-head">
@@ -235,6 +263,8 @@
     pending: [],
     conversations: [],
     activeChatUserId: null,
+    assistantMessages: [],
+    assistantSuggestions: [],
   };
 
   function esc(value = "") {
@@ -247,6 +277,70 @@
     return user.avatar_base64
       ? `<div class="${cls}"><img src="${user.avatar_base64}" alt="${esc(user.name)}"></div>`
       : `<div class="${cls}">${esc(initials)}</div>`;
+  }
+
+  function renderAssistant() {
+    const feed = document.getElementById("assistant-feed");
+    feed.innerHTML = state.assistantMessages.length ? state.assistantMessages.map(item => `
+      <div class="assistant-bubble ${item.role === "user" ? "user" : "assistant"}">${esc(item.message)}</div>
+    `).join("") : `<div class="empty-note">Your Goalbazi AI conversation will appear here.</div>`;
+    feed.scrollTop = feed.scrollHeight;
+
+    document.getElementById("assistant-suggestions").innerHTML = (state.assistantSuggestions || []).map((item, index) => `
+      <button class="assistant-chip" type="button" data-ai-suggestion="${index}">${esc(item.label || item.message || "")}</button>
+    `).join("");
+  }
+
+  async function loadAssistant() {
+    const data = await apiFetch("/api/assistant/messages");
+    if (!data) return;
+    state.assistantMessages = data.messages || [];
+    state.assistantSuggestions = data.suggestions || [];
+    renderAssistant();
+  }
+
+  async function sendAssistantMessage(messageOverride = "") {
+    const input = document.getElementById("assistant-input");
+    const button = document.getElementById("assistant-send");
+    const message = (messageOverride || input.value).trim();
+    if (!message) return;
+    button.disabled = true;
+    button.textContent = "Thinking...";
+    try {
+      const data = await apiFetch("/api/assistant/messages", {
+        method: "POST",
+        body: JSON.stringify({ message }),
+      });
+      if (!data) return;
+      input.value = "";
+      state.assistantMessages = data.messages || [];
+      state.assistantSuggestions = data.suggestions || [];
+      renderAssistant();
+    } finally {
+      button.disabled = false;
+      button.textContent = "Send";
+    }
+  }
+
+  async function runAssistantSuggestion(index) {
+    const item = state.assistantSuggestions[index];
+    if (!item) return;
+    document.getElementById("assistant-input").value = item.message || item.label || "";
+    await sendAssistantMessage(item.message || item.label || "");
+    if (item.action === "arena_nearby") {
+      await searchNearbyArenas();
+    } else if (item.action === "games_overview") {
+      document.getElementById("recent-games").scrollIntoView({ behavior: "smooth", block: "start" });
+    } else if (item.action === "community_search") {
+      const q = (state.dashboard?.profile?.location || "").trim();
+      document.getElementById("user-search").value = q;
+      await searchUsers();
+      document.getElementById("community-results").scrollIntoView({ behavior: "smooth", block: "start" });
+    } else if (item.action === "profile_review") {
+      document.getElementById("profile-snap").scrollIntoView({ behavior: "smooth", block: "start" });
+    } else if (item.action === "league_info") {
+      window.location.href = "/leagues";
+    }
   }
 
   async function loadDashboard(extra = {}) {
@@ -509,6 +603,15 @@
   }
 
   document.getElementById("user-search").addEventListener("input", searchUsers);
+  document.getElementById("assistant-send").addEventListener("click", () => sendAssistantMessage());
+  document.getElementById("assistant-input").addEventListener("keydown", e => {
+    if (e.key === "Enter") sendAssistantMessage();
+  });
+  document.getElementById("assistant-suggestions").addEventListener("click", e => {
+    const btn = e.target.closest("[data-ai-suggestion]");
+    if (!btn) return;
+    runAssistantSuggestion(Number(btn.dataset.aiSuggestion));
+  });
   document.getElementById("chat-send").addEventListener("click", sendChat);
   document.getElementById("chat-input").addEventListener("keydown", e => {
     if (e.key === "Enter") sendChat();
@@ -517,6 +620,7 @@
   document.getElementById("nearby-btn").addEventListener("click", searchNearbyArenas);
 
   loadDashboard();
+  loadAssistant();
   loadFriends();
   loadConversations();
   searchUsers();
@@ -525,6 +629,7 @@
   window.acceptFriend = acceptFriend;
   window.acceptFriendshipId = acceptFriendshipId;
   window.openChat = openChat;
+  window.runAssistantSuggestion = runAssistantSuggestion;
   window.submitOpenRating = submitOpenRating;
 </script>
 </body>
