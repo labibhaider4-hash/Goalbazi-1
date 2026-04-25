@@ -247,9 +247,9 @@
       <div class="profile-info">
         <div class="profile-name">${p.name}</div>
         <div class="profile-handle">${p.handle_display || `@${p.handle}`} · ${p.location}</div>
-        <div class="profile-tags">${[p.position,p.preferred_format,p.skill].filter(Boolean).map(t=>`<span class="pill pill-green">${t}</span>`).join("")}</div>
+        <div class="profile-tags">${[p.position,p.preferred_format,p.skill].filter(Boolean).map(t=>`<span class="pill pill-green">${t}</span>`).join("")}${p.team ? `<span class="pill pill-muted">${p.team.name}</span>` : ""}</div>
         ${p.bio ? `<div class="profile-bio">${p.bio}</div>` : ""}
-        <div id="rating-display"><div class="no-rating">No ratings yet — play games to get rated</div></div>
+        <div id="rating-display"><div class="no-rating">No ratings yet — play games or collect community ratings.</div></div>
       </div>
     `;
     document.getElementById("avatar-upload-btn").addEventListener("click", () => document.getElementById("avatar-file-input").click());
@@ -281,7 +281,7 @@
     document.getElementById("stats-row").innerHTML = [
       { value: s.games_played, label: "Games played" },
       { value: s.games_created, label: "Games created" },
-      { value: s.turfs_booked, label: "Turfs booked" },
+      { value: s.turfs_booked, label: "Arenas booked" },
     ].map(x=>`<div class="stat-card"><div class="stat-value">${x.value}</div><div class="stat-label">${x.label}</div></div>`).join("");
 
     const rEl = document.getElementById("rating-display");
@@ -289,16 +289,16 @@
       if (s.avg_rating) {
         const filled = Math.round(s.avg_rating);
         const stars = "★".repeat(filled) + "☆".repeat(5-filled);
-        rEl.innerHTML = `<div class="rating-badge"><span style="color:var(--warn);font-size:1rem">${stars}</span><span class="rating-num">${s.avg_rating}</span><span class="rating-count">(${s.total_ratings} ratings)</span></div>`;
+        rEl.innerHTML = `<div class="rating-badge"><span style="color:var(--warn);font-size:1rem">${stars}</span><span class="rating-num">${s.avg_rating}</span><span class="rating-count">(${s.total_ratings} ratings · ${s.game_rating_count} match · ${s.open_rating_count} community)</span></div>`;
       } else {
-        rEl.innerHTML = `<div class="no-rating">No ratings yet — play games to get rated</div>`;
+        rEl.innerHTML = `<div class="no-rating">No ratings yet — play games or collect community ratings.</div>`;
       }
     }
 
     // Rate tab
     const rateEl = document.getElementById("rate-content");
     if (data.rateable_games.length === 0) {
-      rateEl.innerHTML = `<div class="empty-state"><div class="empty-icon">⭐</div><div class="empty-title">No games to rate yet</div><p>Join and confirm attendance in games to rate teammates afterward.</p></div>`;
+      rateEl.innerHTML = `<div class="empty-state"><div class="empty-icon">⭐</div><div class="empty-title">No finished games to rate yet</div><p>Join and confirm attendance in games to rate teammates afterward.</p></div>`;
     } else {
       rateEl.innerHTML = data.rateable_games.map(g => `
         <div class="game-rate-card">
@@ -333,6 +333,29 @@
       });
     }
 
+    rateEl.innerHTML += `
+      <div class="edit-card" style="margin-top:16px">
+        <h3>Community ratings</h3>
+        <div style="display:grid;gap:10px">
+          ${(data.open_rateable_players || []).map(p => `
+            <div class="rate-player-row">
+              <div>
+                <div class="rate-player-name">${p.name}</div>
+                <div style="color:var(--muted);font-size:.8rem">${p.team_name || "No team yet"}</div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <select class="form-input" style="width:120px;padding:9px 12px" id="open-rate-${p.id}">
+                  <option value="">Rate</option>
+                  ${[1,2,3,4,5].map(n => `<option value="${n}" ${String(p.my_rating) === String(n) ? "selected" : ""}>${n} star</option>`).join("")}
+                </select>
+                <button class="btn btn-ghost btn-sm" type="button" onclick="submitOpenRate(${p.id})">Save</button>
+              </div>
+            </div>
+          `).join("") || `<div class="empty-state"><p>No players available yet.</p></div>`}
+        </div>
+      </div>
+    `;
+
     // Teammates tab
     const teamEl = document.getElementById("teammates-content");
     if (data.teammates.length === 0) {
@@ -341,9 +364,18 @@
       teamEl.innerHTML = `<div class="teammates-grid">${data.teammates.map(t => {
         const initials = t.name.split(" ").map(x=>x[0]).slice(0,2).join("").toUpperCase();
         const av = t.avatar_base64 ? `<img src="${t.avatar_base64}" class="teammate-avatar">` : `<div class="teammate-initials">${initials}</div>`;
-        return `<div class="teammate-card">${av}<div class="teammate-name">${t.name}</div><div class="teammate-rating">${t.avg_rating ? `★ ${t.avg_rating}` : "No ratings yet"}</div></div>`;
+        return `<div class="teammate-card">${av}<div class="teammate-name">${t.name}</div><div class="teammate-rating">${t.avg_rating ? `★ ${t.avg_rating}` : "No ratings yet"}</div>${t.team_name ? `<div class="teammate-rating" style="color:var(--muted)">${t.team_name}</div>` : ""}</div>`;
       }).join("")}</div>`;
     }
+  }
+
+  async function submitOpenRate(playerId) {
+    const select = document.getElementById(`open-rate-${playerId}`);
+    if (!select || !select.value) return showToast("Choose a rating first");
+    await apiFetch("/api/open-ratings", { method:"POST", body: JSON.stringify({ rated_id: playerId, rating: select.value }) });
+    showToast("Community rating saved");
+    statsLoaded = false;
+    loadStats();
   }
 
   // ── Crop logic ──

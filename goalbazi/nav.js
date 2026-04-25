@@ -4,7 +4,7 @@ function initNav(activePage) {
   const pages = [
     { id: "dashboard", label: "Dashboard", href: "/dashboard" },
     { id: "games",     label: "Games",     href: "/games" },
-    { id: "turfs",     label: "Turfs",     href: "/turfs" },
+    { id: "turfs",     label: "Arenas",    href: "/turfs" },
     { id: "leagues",   label: "Leagues",   href: "/leagues" },
     { id: "profile",   label: "Profile",   href: "/profile" },
   ];
