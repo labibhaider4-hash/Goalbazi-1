@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Goalbazi Admin</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/goalbazi-logo.svg">
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -115,6 +116,8 @@
     .player-editor-panel { margin-top: 14px; }
     .divider { height: 1px; background: var(--line); margin: 14px 0; }
     .hidden { display: none !important; }
+    .notify-list { display:grid; gap:10px; margin-top:14px; }
+    .notify-item { border:1px solid var(--line); border-radius:14px; padding:12px; background:rgba(255,255,255,.02); }
     @media (min-width: 900px) {
       .shell { padding: 28px 24px 64px; }
       .stats-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -148,6 +151,10 @@
         </div>
       </div>
       <div class="stats-grid" id="overview-stats"></div>
+      <div class="editor-card" style="margin-top:14px">
+        <div class="editor-title">Notifications</div>
+        <div class="notify-list" id="admin-notifications"></div>
+      </div>
     </section>
 
     <section class="section-card" id="tab-users">

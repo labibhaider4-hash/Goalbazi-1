@@ -216,6 +216,8 @@ def seed_db():
     cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS map_link TEXT DEFAULT ''")
     cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION")
     cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION")
+    cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS description TEXT DEFAULT ''")
+    cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS image_urls TEXT NOT NULL DEFAULT '[]'")
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS analytics_events (
@@ -251,11 +253,13 @@ def seed_db():
             game_id INTEGER NOT NULL REFERENCES games(id),
             rater_id INTEGER NOT NULL REFERENCES users(id),
             rated_id INTEGER NOT NULL REFERENCES users(id),
-            rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+            rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 10),
             created_at TEXT NOT NULL,
             UNIQUE(game_id, rater_id, rated_id)
         )
     """)
+    cur.execute("ALTER TABLE player_ratings DROP CONSTRAINT IF EXISTS player_ratings_rating_check")
+    cur.execute("ALTER TABLE player_ratings ADD CONSTRAINT player_ratings_rating_check CHECK (rating >= 1 AND rating <= 10)")
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS game_players (
@@ -380,11 +384,13 @@ def seed_db():
             id SERIAL PRIMARY KEY,
             rater_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             rated_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-            rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+            rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 10),
             created_at TEXT NOT NULL,
             UNIQUE(rater_id, rated_id)
         )
     """)
+    cur.execute("ALTER TABLE player_open_ratings DROP CONSTRAINT IF EXISTS player_open_ratings_rating_check")
+    cur.execute("ALTER TABLE player_open_ratings ADD CONSTRAINT player_open_ratings_rating_check CHECK (rating >= 1 AND rating <= 10)")
 
     if ADMIN_EMAIL:
         cur.execute("UPDATE users SET is_admin = TRUE WHERE LOWER(email) = %s", (ADMIN_EMAIL.lower(),))
@@ -555,6 +561,81 @@ def get_leagues_with_teams():
         league["team_count"] = len(league["teams"])
     primary_standings = leagues[0]["teams"] if leagues else []
     return leagues, primary_standings
+
+
+def parse_image_urls(raw_value):
+    if not raw_value:
+        return []
+    if isinstance(raw_value, list):
+        return [str(item).strip() for item in raw_value if str(item).strip()]
+    text = str(raw_value).strip()
+    try:
+        data = json.loads(text)
+        if isinstance(data, list):
+            return [str(item).strip() for item in data if str(item).strip()]
+    except Exception:
+        pass
+    return [line.strip() for line in text.replace(",", "\n").splitlines() if line.strip()]
+
+
+def serialize_image_urls(raw_value):
+    return json.dumps(parse_image_urls(raw_value))
+
+
+def get_notifications():
+    items = []
+    if "user_id" in session:
+        uid = current_user_id()
+        pending_friends = [dict(r) for r in query(
+            """SELECT f.id, u.name
+               FROM friendships f
+               JOIN users u ON u.id = f.requested_by
+               WHERE (f.user_one_id = %s OR f.user_two_id = %s)
+                 AND f.status = 'pending'
+                 AND f.requested_by != %s
+               ORDER BY f.id DESC
+               LIMIT 5""",
+            (uid, uid, uid),
+        )]
+        for row in pending_friends:
+            items.append({
+                "type": "friend_request",
+                "title": "Friend request",
+                "message": f"{row['name']} sent you a friend request.",
+            })
+        recent_messages = [dict(r) for r in query(
+            """SELECT u.name, dm.message
+               FROM direct_messages dm
+               JOIN users u ON u.id = dm.sender_id
+               WHERE dm.receiver_id = %s
+               ORDER BY dm.id DESC
+               LIMIT 5""",
+            (uid,),
+        )]
+        for row in recent_messages:
+            items.append({
+                "type": "direct_message",
+                "title": "New message",
+                "message": f"{row['name']}: {row['message'][:60]}",
+            })
+    elif "owner_id" in session:
+        pending_bookings = [dict(r) for r in query(
+            """SELECT b.player_name, ts.slot_date, ts.slot_time
+               FROM bookings b
+               JOIN turf_slots ts ON ts.id = b.slot_id
+               JOIN turfs t ON t.id = ts.turf_id
+               WHERE t.owner_id = %s AND b.status = 'pending'
+               ORDER BY b.id DESC
+               LIMIT 5""",
+            (current_owner_id(),),
+        )]
+        for row in pending_bookings:
+            items.append({
+                "type": "booking_pending",
+                "title": "Booking approval needed",
+                "message": f"{row['player_name']} booked {row['slot_date']} at {row['slot_time']}.",
+            })
+    return items[:10]
 
 
 def get_turfs(date_value, search="", user_lat=None, user_lng=None):
@@ -741,6 +822,7 @@ def api_dashboard():
             "friend_count": friend_count,
             "message_count": unread_messages,
         },
+        "notifications": get_notifications(),
     })
 
 
@@ -1131,6 +1213,8 @@ def api_admin_delete_game(game_id):
 @admin_required
 def api_admin_turfs():
     turfs = [dict(r) for r in query("SELECT * FROM turfs ORDER BY id ASC")]
+    for turf in turfs:
+        turf["image_urls"] = parse_image_urls(turf.get("image_urls"))
     owners = [dict(r) for r in query("SELECT id, name FROM turf_owners ORDER BY name ASC")]
     players = [dict(r) for r in query("SELECT id, name FROM users ORDER BY name ASC LIMIT 200")]
     return jsonify({"turfs": turfs, "owners": owners, "players": players})
@@ -1380,6 +1464,9 @@ def api_admin_update_league(league_id):
 def api_admin_delete_league(league_id):
     conn = get_db()
     cur = conn.cursor()
+    cur.execute("SELECT id FROM leagues WHERE id = %s", (league_id,))
+    if not cur.fetchone():
+        return jsonify({"error": "League not found"}), 404
     cur.execute("DELETE FROM league_teams WHERE league_id = %s", (league_id,))
     cur.execute("DELETE FROM standings WHERE league_id = %s", (league_id,))
     cur.execute("DELETE FROM leagues WHERE id = %s", (league_id,))
@@ -1460,9 +1547,16 @@ def api_admin_delete_league_team(league_team_id):
 
 _db_ready = False
 
+@app.route("/health")
+def healthcheck():
+    return jsonify({"ok": True, "status": "healthy"}), 200
+
+
 @app.before_request
 def initialize():
     global _db_ready
+    if request.path == "/health":
+        return
     if not _db_ready:
         seed_db()
         _db_ready = True
@@ -1527,6 +1621,8 @@ def api_owner_register():
     distance_km = float(data.get("distance_km", 0))
     upi_id = data.get("upi_id", "").strip()
     map_link = data.get("map_link", "").strip()
+    description = data.get("description", "").strip()
+    image_urls = serialize_image_urls(data.get("image_urls", ""))
     latitude = float(data["latitude"]) if data.get("latitude") not in (None, "") else None
     longitude = float(data["longitude"]) if data.get("longitude") not in (None, "") else None
     if not all([name, email, password, turf_name, area, upi_id]):
@@ -1545,9 +1641,9 @@ def api_owner_register():
     owner_id = cur.fetchone()["id"]
     cur.execute(
         """INSERT INTO turfs
-           (name, area, distance_km, surface, rating, price_per_hour, owner_id, upi_id, map_link, latitude, longitude)
-           VALUES (%s,%s,%s,%s,4.5,%s,%s,%s,%s,%s,%s) RETURNING id""",
-        (turf_name, area, distance_km, surface, price_per_hour, owner_id, upi_id, map_link, latitude, longitude),
+           (name, area, distance_km, surface, rating, price_per_hour, owner_id, upi_id, map_link, latitude, longitude, description, image_urls)
+           VALUES (%s,%s,%s,%s,4.5,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+        (turf_name, area, distance_km, surface, price_per_hour, owner_id, upi_id, map_link, latitude, longitude, description, image_urls),
     )
     turf_id = cur.fetchone()["id"]
     default_times = ["06:00", "07:00", "08:00", "09:00", "17:00", "18:00", "19:00", "20:00"]
@@ -1601,9 +1697,11 @@ def api_owner_dashboard():
     pending_count = sum(1 for b in bookings if b["status"] == "pending")
     confirmed_today = sum(1 for b in bookings if b["status"] == "confirmed" and b["slot_date"] == today)
     revenue_today = sum(b["amount"] for b in bookings if b["status"] == "confirmed" and b["slot_date"] == today)
+    turf_data = dict(turf)
+    turf_data["image_urls"] = parse_image_urls(turf_data.get("image_urls"))
     return jsonify({
         "owner": dict(owner),
-        "turf": dict(turf),
+        "turf": turf_data,
         "bookings": bookings,
         "stats": {
             "pending": pending_count,
@@ -1611,6 +1709,7 @@ def api_owner_dashboard():
             "revenue_today": revenue_today,
             "total_bookings": len(bookings),
         },
+        "notifications": get_notifications(),
     })
 
 
@@ -1682,7 +1781,8 @@ def api_owner_settings():
     data = request.get_json()
     query(
         """UPDATE turfs
-           SET name=%s, area=%s, price_per_hour=%s, upi_id=%s, map_link=%s, latitude=%s, longitude=%s
+           SET name=%s, area=%s, price_per_hour=%s, upi_id=%s, map_link=%s, latitude=%s, longitude=%s,
+               description=%s, image_urls=%s
            WHERE owner_id=%s""",
         (
             data.get("turf_name"),
@@ -1692,6 +1792,8 @@ def api_owner_settings():
             data.get("map_link", ""),
             float(data["latitude"]) if data.get("latitude") not in (None, "") else None,
             float(data["longitude"]) if data.get("longitude") not in (None, "") else None,
+            data.get("description", ""),
+            serialize_image_urls(data.get("image_urls", "")),
             current_owner_id(),
         ),
         commit=True,
@@ -1868,8 +1970,8 @@ def api_submit_rating():
     game_id = int(data.get("game_id"))
     rated_id = int(data.get("rated_id"))
     rating = int(data.get("rating"))
-    if not 1 <= rating <= 5:
-        return jsonify({"error": "Rating must be 1-5"}), 400
+    if not 1 <= rating <= 10:
+        return jsonify({"error": "Rating must be 1-10"}), 400
     if rated_id == current_user_id():
         return jsonify({"error": "Cannot rate yourself"}), 400
     game = query("SELECT id, game_date FROM games WHERE id = %s", (game_id,), one=True)
@@ -1912,8 +2014,8 @@ def api_submit_open_rating():
     data = request.get_json()
     rated_id = int(data.get("rated_id"))
     rating = int(data.get("rating"))
-    if not 1 <= rating <= 5:
-        return jsonify({"error": "Rating must be 1-5"}), 400
+    if not 1 <= rating <= 10:
+        return jsonify({"error": "Rating must be 1-10"}), 400
     if rated_id == current_user_id():
         return jsonify({"error": "Cannot rate yourself"}), 400
     if not query("SELECT id FROM users WHERE id = %s", (rated_id,), one=True):
@@ -1985,6 +2087,8 @@ def api_friends():
            ORDER BY f.id DESC""",
         (current_user_id(), current_user_id(), current_user_id()),
     )]
+    for row in pending:
+        row["is_outgoing"] = row["requested_by"] == current_user_id()
     return jsonify({"friends": accepted, "pending": pending})
 
 
@@ -2085,6 +2189,13 @@ def api_send_direct_message():
     return jsonify({"ok": True}), 201
 
 
+@app.route("/api/notifications")
+def api_notifications():
+    if "user_id" not in session and "owner_id" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    return jsonify({"notifications": get_notifications()})
+
+
 # ---------------------------------------------------------------------------
 # Admin — management
 # ---------------------------------------------------------------------------
@@ -2096,14 +2207,15 @@ def api_admin_add_turf():
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
-        """INSERT INTO turfs (name, area, distance_km, surface, rating, price_per_hour, upi_id, map_link, latitude, longitude, owner_id)
-           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+        """INSERT INTO turfs (name, area, distance_km, surface, rating, price_per_hour, upi_id, map_link, latitude, longitude, owner_id, description, image_urls)
+           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
         (data["name"], data["area"], float(data.get("distance_km",0)),
          data.get("surface","Astroturf"), float(data.get("rating",4.5)),
          int(data.get("price_per_hour",500)), data.get("upi_id",""), data.get("map_link", ""),
          float(data["latitude"]) if data.get("latitude") not in (None, "") else None,
          float(data["longitude"]) if data.get("longitude") not in (None, "") else None,
-         int(data["owner_id"]) if data.get("owner_id") not in (None, "") else None),
+         int(data["owner_id"]) if data.get("owner_id") not in (None, "") else None,
+         data.get("description", ""), serialize_image_urls(data.get("image_urls", ""))),
     )
     turf_id = cur.fetchone()["id"]
     # Seed slots for next 7 days
@@ -2126,13 +2238,15 @@ def api_admin_edit_turf(turf_id):
     data = request.get_json()
     query(
         """UPDATE turfs SET name=%s, area=%s, distance_km=%s, surface=%s,
-           rating=%s, price_per_hour=%s, upi_id=%s, map_link=%s, latitude=%s, longitude=%s, owner_id=%s WHERE id=%s""",
+           rating=%s, price_per_hour=%s, upi_id=%s, map_link=%s, latitude=%s, longitude=%s, owner_id=%s,
+           description=%s, image_urls=%s WHERE id=%s""",
         (data["name"], data["area"], float(data.get("distance_km",0)),
          data.get("surface","Astroturf"), float(data.get("rating",4.5)),
          int(data.get("price_per_hour",500)), data.get("upi_id",""), data.get("map_link", ""),
          float(data["latitude"]) if data.get("latitude") not in (None, "") else None,
          float(data["longitude"]) if data.get("longitude") not in (None, "") else None,
-         int(data["owner_id"]) if data.get("owner_id") not in (None, "") else None, turf_id),
+         int(data["owner_id"]) if data.get("owner_id") not in (None, "") else None,
+         data.get("description", ""), serialize_image_urls(data.get("image_urls", "")), turf_id),
         commit=True,
     )
     log_event("admin_edit_turf", f"/api/admin/turfs/{turf_id}", {"turf_id": turf_id})

@@ -22,7 +22,6 @@
     }
     .quick-card { padding: 16px; display: grid; gap: 6px; }
     .quick-card:hover { border-color: rgba(127,255,69,.25); }
-    .qc-icon { font-size: 1.25rem; }
     .qc-label { font-family: 'Syne', sans-serif; font-weight: 700; font-size: .95rem; }
     .qc-sub { color: var(--muted); font-size: .8rem; }
     .stack-grid { display: grid; gap: 16px; }
@@ -52,7 +51,7 @@
     .avatar-48 img, .avatar-40 img { width: 100%; height: 100%; object-fit: cover; }
     .meta-line { color: var(--muted); font-size: .82rem; }
     .tag-line { display: flex; flex-wrap: wrap; gap: 6px; }
-    .community-card, .arena-card { padding: 16px; }
+    .community-card, .arena-card, .notify-card { padding: 16px; }
     .community-tools, .arena-tools { display: grid; gap: 10px; margin-bottom: 14px; }
     .community-results, .friends-results, .chat-results, .arena-results { display: grid; gap: 10px; }
     .user-card, .chat-card, .arena-result {
@@ -100,6 +99,9 @@
     .arena-result .slots { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
     .slot-pill { padding: 5px 8px; border-radius: 999px; font-size: .75rem; border: 1px solid var(--line); color: var(--muted); }
     .empty-note { color: var(--muted); font-size: .84rem; }
+    .notify-list { display: grid; gap: 10px; }
+    .notify-item { border: 1px solid var(--line); border-radius: 16px; background: rgba(255,255,255,.02); padding: 12px; }
+    .notify-title { font-weight: 700; margin-bottom: 4px; }
     @media (min-width: 860px) {
       .dash-shell { padding: 32px 24px 80px; }
       .stats-grid-local { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -128,25 +130,29 @@
 
     <div class="quick-actions">
       <a href="/games" class="quick-card">
-        <div class="qc-icon">Game</div>
         <div class="qc-label">Browse games</div>
         <div class="qc-sub">Join upcoming matches</div>
       </a>
       <a href="/turfs" class="quick-card">
-        <div class="qc-icon">Arena</div>
         <div class="qc-label">Find arenas</div>
         <div class="qc-sub">Search by area or city</div>
       </a>
       <a href="/leagues" class="quick-card">
-        <div class="qc-icon">League</div>
         <div class="qc-label">Leagues</div>
         <div class="qc-sub">Check teams and tables</div>
       </a>
       <a href="/profile" class="quick-card">
-        <div class="qc-icon">Profile</div>
         <div class="qc-label">My profile</div>
         <div class="qc-sub">Update your player card</div>
       </a>
+    </div>
+
+    <div class="notify-card" style="margin-bottom:16px">
+      <div class="section-head">
+        <h2>Notifications</h2>
+        <span class="meta-line">Updates you should see first</span>
+      </div>
+      <div class="notify-list" id="notifications-list"></div>
     </div>
 
     <div class="stack-grid">
@@ -294,6 +300,14 @@
 
     renderArenaResults(data.turfs);
     document.getElementById("community-meta").textContent = `${data.community.friend_count} friends · ${data.community.message_count} messages`;
+    document.getElementById("notifications-list").innerHTML = (data.notifications || []).length
+      ? data.notifications.map(item => `
+        <div class="notify-item">
+          <div class="notify-title">${esc(item.title)}</div>
+          <div class="meta-line">${esc(item.message)}</div>
+        </div>
+      `).join("")
+      : `<div class="empty-note">No new notifications right now.</div>`;
   }
 
   function rateControls(userId, currentRating = "") {
@@ -301,7 +315,7 @@
       <div class="rate-row">
         <select class="mini-select" data-rate-select>
           <option value="">Rate player</option>
-          ${[1,2,3,4,5].map(n => `<option value="${n}" ${String(currentRating) === String(n) ? "selected" : ""}>${n} stars</option>`).join("")}
+          ${[1,2,3,4,5,6,7,8,9,10].map(n => `<option value="${n}" ${String(currentRating) === String(n) ? "selected" : ""}>${n} / 10</option>`).join("")}
         </select>
         <button class="mini-btn primary" type="button" onclick="submitOpenRating(this, ${userId})">Save rating</button>
       </div>
@@ -327,7 +341,7 @@
             : user.can_accept
               ? `<button class="mini-btn primary" type="button" onclick="acceptFriend(${user.id})">Accept request</button>`
               : user.friendship_status === "pending"
-                ? `<button class="mini-btn" type="button" disabled>Request sent</button>`
+                ? `<button class="mini-btn" type="button" disabled>Waiting</button>`
                 : `<button class="mini-btn primary" type="button" onclick="sendFriendRequest(${user.id})">Add friend</button>`
           }
           <button class="mini-btn" type="button" onclick="openChat(${user.id})">Private chat</button>
@@ -346,11 +360,11 @@
             ${avatarHtml(item)}
             <div class="user-main-body">
               <div class="user-name">${esc(item.name)}</div>
-              <div class="user-sub">${item.requested_by === item.user_id ? "Sent request" : "Incoming request"}</div>
+              <div class="user-sub">${item.is_outgoing ? "Sent request" : "Incoming request"}</div>
             </div>
           </div>
           <div class="user-actions">
-            ${item.requested_by === item.user_id ? `<button class="mini-btn" type="button" disabled>Waiting</button>` : `<button class="mini-btn primary" type="button" onclick="acceptFriendshipId(${item.id})">Accept</button>`}
+            ${item.is_outgoing ? `<button class="mini-btn" type="button" disabled>Waiting</button>` : `<button class="mini-btn primary" type="button" onclick="acceptFriendshipId(${item.id})">Accept</button>`}
           </div>
         </div>
       `));

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Goalbazi — Book a Turf</title>
+  <title>Goalbazi — Book an Arena</title>
   <link rel="icon" type="image/svg+xml" href="/assets/goalbazi-logo.svg">
   <link rel="stylesheet" href="/styles.css">
   <style>
@@ -31,6 +31,8 @@
     .turf-meta { color: var(--muted); font-size: .85rem; margin-top: 4px; line-height: 1.6; }
     .turf-price { font-family: 'Syne', sans-serif; font-weight: 800; color: var(--brand); font-size: 1.1rem; white-space: nowrap; }
     .turf-price span { color: var(--muted); font-size: .78rem; font-weight: 400; }
+    .turf-image { width: 100%; aspect-ratio: 16/10; object-fit: cover; border-radius: 16px; margin-bottom: 14px; border: 1px solid var(--line); }
+    .turf-desc { color: var(--muted); font-size: .84rem; line-height: 1.6; margin-bottom: 12px; }
 
     .slots-label { font-size: .78rem; font-weight: 700; color: var(--muted-2); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 10px; }
     .slots-row { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -192,6 +194,7 @@
 
       return `
         <div class="turf-card">
+          ${t.image_urls && t.image_urls.length ? `<img class="turf-image" src="${t.image_urls[0]}" alt="${t.name}">` : ``}
           <div class="turf-top">
             <div>
               <div class="turf-name">${t.name}</div>
@@ -199,6 +202,7 @@
             </div>
             <div class="turf-price">₹${t.price_per_hour}<span>/hr</span></div>
           </div>
+          ${t.description ? `<div class="turf-desc">${t.description}</div>` : ``}
           ${t.map_link ? `<div style="margin:0 0 12px"><a class="btn btn-ghost btn-sm" href="${t.map_link}" target="_blank" rel="noopener noreferrer">Open map</a></div>` : ``}
           <div class="slots-label">Available slots — ${date}</div>
           ${slotsHtml}

@@ -288,7 +288,7 @@
     if (rEl) {
       if (s.avg_rating) {
         const filled = Math.round(s.avg_rating);
-        const stars = "★".repeat(filled) + "☆".repeat(5-filled);
+        const stars = `${s.avg_rating}/10`;
         rEl.innerHTML = `<div class="rating-badge"><span style="color:var(--warn);font-size:1rem">${stars}</span><span class="rating-num">${s.avg_rating}</span><span class="rating-count">(${s.total_ratings} ratings · ${s.game_rating_count} match · ${s.open_rating_count} community)</span></div>`;
       } else {
         rEl.innerHTML = `<div class="no-rating">No ratings yet — play games or collect community ratings.</div>`;
@@ -312,7 +312,7 @@
                 ${p.my_rating
                   ? `<div class="rated-badge">✓ You rated ${p.my_rating}★</div>`
                   : `<div class="stars-input" data-game="${g.id}" data-player="${p.user_id}">
-                      ${[1,2,3,4,5].map(n=>`<button class="star-btn" data-val="${n}" type="button">★</button>`).join("")}
+                      ${[1,2,3,4,5,6,7,8,9,10].map(n=>`<button class="star-btn" data-val="${n}" type="button">${n}</button>`).join("")}
                     </div>`
                 }
               </div>`).join("")}
@@ -325,7 +325,7 @@
           btn.addEventListener("mouseleave", () => btns.forEach(b=>b.classList.remove("active")));
           btn.addEventListener("click", async () => {
             await apiFetch("/api/ratings", { method:"POST", body: JSON.stringify({ game_id: row.dataset.game, rated_id: row.dataset.player, rating: btn.dataset.val }) });
-            showToast(`Rated ${btn.dataset.val}★`);
+            showToast(`Rated ${btn.dataset.val}/10`);
             statsLoaded = false;
             loadStats();
           });
@@ -346,7 +346,7 @@
               <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                 <select class="form-input" style="width:120px;padding:9px 12px" id="open-rate-${p.id}">
                   <option value="">Rate</option>
-                  ${[1,2,3,4,5].map(n => `<option value="${n}" ${String(p.my_rating) === String(n) ? "selected" : ""}>${n} star</option>`).join("")}
+                  ${[1,2,3,4,5,6,7,8,9,10].map(n => `<option value="${n}" ${String(p.my_rating) === String(n) ? "selected" : ""}>${n} / 10</option>`).join("")}
                 </select>
                 <button class="btn btn-ghost btn-sm" type="button" onclick="submitOpenRate(${p.id})">Save</button>
               </div>
