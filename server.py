@@ -1460,9 +1460,16 @@ def api_admin_delete_league_team(league_team_id):
 
 _db_ready = False
 
+@app.route("/health")
+def healthcheck():
+    return jsonify({"ok": True, "status": "healthy"}), 200
+
+
 @app.before_request
 def initialize():
     global _db_ready
+    if request.path == "/health":
+        return
     if not _db_ready:
         seed_db()
         _db_ready = True
