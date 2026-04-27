@@ -1026,13 +1026,14 @@ def generate_assistant_reply(user_id, message):
 
 
 def get_turfs(date_value, search="", user_lat=None, user_lng=None):
-    like = f"%{search.lower()}%"
+    search = (search or "").strip().lower()
+    like = f"%{search}%"
     turfs = [dict(r) for r in query(
         """SELECT * FROM turfs
            WHERE archived_at IS NULL
-             AND (LOWER(name) LIKE %s OR LOWER(area) LIKE %s)
-           ORDER BY distance_km ASC""",
-        (like, like),
+             AND (%s = '' OR LOWER(name) LIKE %s OR LOWER(area) LIKE %s OR LOWER(surface) LIKE %s)
+           ORDER BY id DESC""",
+        (search, like, like, like),
     )]
     if user_lat is not None and user_lng is not None:
         for turf in turfs:
@@ -2159,8 +2160,8 @@ def api_owner_register():
     owner_id = cur.fetchone()["id"]
     cur.execute(
         """INSERT INTO turfs
-           (name, area, distance_km, surface, rating, price_per_hour, owner_id, upi_id, map_link, latitude, longitude, description, image_urls)
-           VALUES (%s,%s,%s,%s,4.5,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+           (name, area, distance_km, surface, rating, price_per_hour, owner_id, upi_id, map_link, latitude, longitude, description, image_urls, archived_at)
+           VALUES (%s,%s,%s,%s,4.5,%s,%s,%s,%s,%s,%s,%s,%s,NULL) RETURNING id""",
         (turf_name, area, distance_km, surface, price_per_hour, owner_id, upi_id, map_link, latitude, longitude, description, image_urls),
     )
     turf_id = cur.fetchone()["id"]
@@ -2297,30 +2298,84 @@ def api_owner_slots():
 @owner_required
 def api_owner_settings():
     data = request.get_json()
-    query(
+    turf_name = (data.get("turf_name") or "").strip()
+    area = (data.get("area") or "").strip()
+    surface = (data.get("surface") or "Astroturf").strip()
+    distance_km = float(data.get("distance_km", 0) or 0)
+    rating = float(data.get("rating", 4.5) or 4.5)
+    price_per_hour = int(data.get("price_per_hour", 0) or 0)
+    upi_id = (data.get("upi_id") or "").strip()
+    map_link = (data.get("map_link") or "").strip()
+    latitude = float(data["latitude"]) if data.get("latitude") not in (None, "") else None
+    longitude = float(data["longitude"]) if data.get("longitude") not in (None, "") else None
+    description = data.get("description", "")
+    image_urls = serialize_image_urls(data.get("image_urls", ""))
+    if not turf_name or not area:
+        return jsonify({"error": "Arena name and area are required"}), 400
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
         """UPDATE turfs
            SET name=%s, area=%s, surface=%s, distance_km=%s, rating=%s, price_per_hour=%s,
-               upi_id=%s, map_link=%s, latitude=%s, longitude=%s, description=%s, image_urls=%s
-           WHERE owner_id=%s AND archived_at IS NULL""",
+               upi_id=%s, map_link=%s, latitude=%s, longitude=%s, description=%s, image_urls=%s,
+               archived_at=NULL
+           WHERE owner_id=%s
+           RETURNING id""",
         (
-            data.get("turf_name"),
-            data.get("area"),
-            data.get("surface", "Astroturf"),
-            float(data.get("distance_km", 0) or 0),
-            float(data.get("rating", 4.5) or 4.5),
-            int(data.get("price_per_hour", 0)),
-            data.get("upi_id"),
-            data.get("map_link", ""),
-            float(data["latitude"]) if data.get("latitude") not in (None, "") else None,
-            float(data["longitude"]) if data.get("longitude") not in (None, "") else None,
-            data.get("description", ""),
-            serialize_image_urls(data.get("image_urls", "")),
+            turf_name,
+            area,
+            surface,
+            distance_km,
+            rating,
+            price_per_hour,
+            upi_id,
+            map_link,
+            latitude,
+            longitude,
+            description,
+            image_urls,
             current_owner_id(),
         ),
-        commit=True,
     )
+    turf = cur.fetchone()
+    if not turf:
+        cur.execute(
+            """INSERT INTO turfs
+               (name, area, distance_km, surface, rating, price_per_hour, owner_id, upi_id, map_link, latitude, longitude, description, image_urls, archived_at)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NULL)
+               RETURNING id""",
+            (
+                turf_name,
+                area,
+                distance_km,
+                surface,
+                rating,
+                price_per_hour,
+                current_owner_id(),
+                upi_id,
+                map_link,
+                latitude,
+                longitude,
+                description,
+                image_urls,
+            ),
+        )
+        turf = cur.fetchone()
+    turf_id = turf["id"]
+    cur.execute("SELECT COUNT(*) AS count FROM turf_slots WHERE turf_id = %s", (turf_id,))
+    if cur.fetchone()["count"] == 0:
+        default_times = ["06:00", "07:00", "08:00", "09:00", "17:00", "18:00", "19:00", "20:00"]
+        for day_offset in range(14):
+            slot_date = (datetime.now() + timedelta(days=day_offset)).date().isoformat()
+            for slot_time in default_times:
+                cur.execute(
+                    "INSERT INTO turf_slots (turf_id, slot_date, slot_time, is_booked, status) VALUES (%s,%s,%s,0,'available')",
+                    (turf_id, slot_date, slot_time),
+                )
+    conn.commit()
     log_event("owner_update_settings", "/api/owner/settings")
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "turf_id": turf_id})
 
 
 # ---------------------------------------------------------------------------
