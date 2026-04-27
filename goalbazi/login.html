@@ -89,7 +89,7 @@
         </label>
         <p class="error-msg" id="error-msg"></p>
         <button class="primary-btn" type="submit" id="submit-btn">Sign in</button>
-        <button class="btn btn-ghost btn-full" type="button" style="margin-top:8px">Continue with Google (Soon)</button>
+        <a class="btn btn-ghost btn-full" href="/auth/google" style="margin-top:8px">Continue with Google</a>
       </form>
       <p class="auth-switch">New to Goalbazi? <a href="/register">Create an account</a></p>
       <p class="auth-switch" style="margin-top:8px"><a href="/">Back to landing page</a></p>
@@ -98,6 +98,22 @@
   <script src="/nav.js"></script>
   <script>
     GoalbaziTheme.attachButton(document.getElementById("login-theme-toggle"));
+
+    const params = new URLSearchParams(window.location.search);
+    const googleError = params.get("error");
+    if (googleError) {
+      const err = document.getElementById("error-msg");
+      const messages = {
+        google_not_configured: "Google login is not configured yet.",
+        google_cancelled: "Google sign-in was cancelled.",
+        google_state: "Google sign-in expired. Please try again.",
+        google_missing_code: "Google sign-in did not complete. Please try again.",
+        google_failed: "Google sign-in failed. Please try again.",
+        google_profile: "Google did not return a usable profile.",
+      };
+      err.textContent = messages[googleError] || "Google sign-in failed. Please try again.";
+      err.style.display = "block";
+    }
 
     document.getElementById("login-form").addEventListener("submit", async (e) => {
       e.preventDefault();

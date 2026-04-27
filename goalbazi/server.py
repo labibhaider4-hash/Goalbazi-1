@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime, timedelta
 from functools import wraps
 from urllib import error as urllib_error
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
 from urllib.request import Request, urlopen
 
 import psycopg2
@@ -22,6 +22,8 @@ app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "").strip()
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "").strip()
 
 
 # ---------------------------------------------------------------------------
@@ -97,6 +99,49 @@ def sanitize_handle(handle: str) -> str:
 def display_handle(handle: str) -> str:
     clean = sanitize_handle(handle)
     return f"@{clean}" if clean else "@player"
+
+
+def unique_handle_from_email_name(email: str, name: str) -> str:
+    base = sanitize_handle((email or "").split("@")[0]) or sanitize_handle(name) or "athlete"
+    base = base[:20] or "athlete"
+    candidate = base
+    suffix = 1
+    while query("SELECT id FROM users WHERE handle = %s", (candidate,), one=True):
+        suffix += 1
+        candidate = f"{base[:16]}{suffix}"
+    return candidate
+
+
+def google_redirect_uri() -> str:
+    return request.url_root.rstrip("/") + "/auth/google/callback"
+
+
+def exchange_google_code(code: str) -> dict:
+    token_body = urlencode({
+        "code": code,
+        "client_id": GOOGLE_CLIENT_ID,
+        "client_secret": GOOGLE_CLIENT_SECRET,
+        "redirect_uri": google_redirect_uri(),
+        "grant_type": "authorization_code",
+    }).encode("utf-8")
+    token_req = Request(
+        "https://oauth2.googleapis.com/token",
+        data=token_body,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST",
+    )
+    with urlopen(token_req, timeout=20) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def fetch_google_profile(access_token: str) -> dict:
+    profile_req = Request(
+        "https://www.googleapis.com/oauth2/v3/userinfo",
+        headers={"Authorization": f"Bearer {access_token}"},
+        method="GET",
+    )
+    with urlopen(profile_req, timeout=20) as resp:
+        return json.loads(resp.read().decode("utf-8"))
 
 
 def haversine_km(lat1, lon1, lat2, lon2):
@@ -216,6 +261,8 @@ def seed_db():
     # New columns for existing tables
     cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_base64 TEXT DEFAULT ''")
     cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE")
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id TEXT")
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_provider TEXT NOT NULL DEFAULT 'password'")
     cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS qr_base64 TEXT DEFAULT ''")
     cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS map_link TEXT DEFAULT ''")
     cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION")
@@ -1029,6 +1076,74 @@ def api_login():
     session["user_id"] = user["id"]
     log_event("auth_login", "/api/auth/login", {"user_id": user["id"]})
     return jsonify({"ok": True})
+
+
+@app.route("/auth/google")
+def google_login():
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        return redirect("/login?error=google_not_configured")
+    state = secrets.token_urlsafe(24)
+    session["google_oauth_state"] = state
+    params = {
+        "client_id": GOOGLE_CLIENT_ID,
+        "redirect_uri": google_redirect_uri(),
+        "response_type": "code",
+        "scope": "openid email profile",
+        "state": state,
+        "prompt": "select_account",
+    }
+    return redirect("https://accounts.google.com/o/oauth2/v2/auth?" + urlencode(params))
+
+
+@app.route("/auth/google/callback")
+def google_callback():
+    if request.args.get("error"):
+        return redirect("/login?error=google_cancelled")
+    if request.args.get("state") != session.pop("google_oauth_state", None):
+        return redirect("/login?error=google_state")
+    code = request.args.get("code", "")
+    if not code:
+        return redirect("/login?error=google_missing_code")
+    try:
+        token_data = exchange_google_code(code)
+        profile = fetch_google_profile(token_data["access_token"])
+    except Exception:
+        return redirect("/login?error=google_failed")
+
+    email = (profile.get("email") or "").strip().lower()
+    google_id = profile.get("sub", "").strip()
+    name = (profile.get("name") or email.split("@")[0] or "Goalbazi Athlete").strip()
+    avatar_url = profile.get("picture", "").strip()
+    if not email or not google_id:
+        return redirect("/login?error=google_profile")
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM users WHERE google_id = %s OR email = %s", (google_id, email))
+    user = cur.fetchone()
+    if user:
+        user_id = user["id"]
+        cur.execute(
+            """UPDATE users
+               SET google_id = %s, auth_provider = 'google',
+                   avatar_base64 = CASE WHEN COALESCE(avatar_base64, '') = '' THEN %s ELSE avatar_base64 END
+               WHERE id = %s""",
+            (google_id, avatar_url, user_id),
+        )
+    else:
+        handle = unique_handle_from_email_name(email, name)
+        cur.execute(
+            """INSERT INTO users
+               (name, handle, email, password_hash, location, avatar_base64, google_id, auth_provider)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,'google') RETURNING id""",
+            (name, handle, email, hash_password(secrets.token_urlsafe(32)), "Delhi NCR", avatar_url, google_id),
+        )
+        user_id = cur.fetchone()["id"]
+    conn.commit()
+    session.clear()
+    session["user_id"] = user_id
+    log_event("google_login", "/auth/google/callback", {"user_id": user_id})
+    return redirect("/dashboard")
 
 
 @app.route("/api/auth/logout", methods=["POST"])
