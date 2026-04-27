@@ -13,4 +13,4 @@ COPY goalbazi/ .
 
 EXPOSE 8000
 
-CMD ["python", "server.py"]
+CMD ["sh", "-c", "case \"$PORT\" in ''|*[!0-9]*) export PORT=8000;; esac; python server.py"]
