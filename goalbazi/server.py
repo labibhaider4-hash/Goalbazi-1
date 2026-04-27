@@ -715,8 +715,12 @@ def get_rating_summary(user_id):
     }
 
 
-def get_leagues_with_teams():
-    leagues = [dict(r) for r in query("SELECT * FROM leagues ORDER BY id ASC")]
+def get_leagues_with_teams(include_empty=False):
+    leagues = [dict(r) for r in query(
+        """SELECT * FROM leagues
+           WHERE LOWER(status) IN ('open', 'live')
+           ORDER BY id ASC"""
+    )]
     league_ids = [league["id"] for league in leagues]
     league_rows = [dict(r) for r in query(
         """SELECT lt.id, lt.league_id, lt.team_id, lt.played, lt.won, lt.drawn, lt.lost,
@@ -730,6 +734,8 @@ def get_leagues_with_teams():
     for league in leagues:
         league["teams"] = [row for row in league_rows if row["league_id"] == league["id"]]
         league["team_count"] = len(league["teams"])
+    if not include_empty:
+        leagues = [league for league in leagues if league["team_count"] > 0]
     primary_standings = leagues[0]["teams"] if leagues else []
     return leagues, primary_standings
 
@@ -1935,7 +1941,7 @@ def api_admin_delete_team_member(membership_id):
 @app.route("/api/admin/leagues")
 @admin_required
 def api_admin_leagues():
-    leagues, _ = get_leagues_with_teams()
+    leagues, _ = get_leagues_with_teams(include_empty=True)
     teams = [dict(r) for r in query("SELECT id, name, city, logo_url, skill_level FROM teams WHERE archived_at IS NULL ORDER BY name ASC")]
     return jsonify({"leagues": leagues, "teams": teams})
 
