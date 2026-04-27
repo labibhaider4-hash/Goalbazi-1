@@ -83,7 +83,7 @@
       z-index: 210;
       cursor: pointer;
     }
-    .assistant-fab svg { width: 24px; height: 24px; }
+    .assistant-fab svg { width: 28px; height: 28px; }
     .assistant-modal {
       position: fixed;
       inset: 0;
@@ -101,7 +101,18 @@
     .assistant-head-actions { display:flex; align-items:center; gap:8px; }
     .assistant-close { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel); color: var(--text); font-size: 1.1rem; cursor: pointer; }
     .assistant-badge { display: inline-flex; align-items: center; gap: 8px; font-family: 'Syne', sans-serif; font-weight: 700; }
-    .assistant-dot { width: 10px; height: 10px; border-radius: 999px; background: linear-gradient(135deg, var(--brand), var(--accent)); box-shadow: 0 0 0 6px rgba(127,255,69,.08); }
+    .assistant-mark {
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: rgba(127,255,69,.10);
+      border: 1px solid rgba(127,255,69,.18);
+      color: var(--brand);
+      flex-shrink: 0;
+    }
+    .assistant-mark svg { width: 18px; height: 18px; }
     .assistant-feed { display: grid; gap: 10px; max-height: 320px; overflow: auto; padding-right: 4px; }
     .assistant-bubble { border-radius: 16px; padding: 12px 14px; line-height: 1.55; font-size: .86rem; white-space: pre-wrap; }
     .assistant-bubble.user { background: rgba(127,255,69,.14); justify-self: end; max-width: 88%; }
@@ -293,10 +304,15 @@
 </div>
 
 <button class="assistant-fab" id="assistant-fab" type="button" aria-label="Open Goalbazi AI">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    <path d="M12 3a6.5 6.5 0 0 0-3.86 11.73c.55.42.86 1.05.86 1.75V17h6v-.52c0-.7.31-1.33.86-1.75A6.5 6.5 0 0 0 12 3Z"></path>
-    <path d="M9 18h6"></path>
-    <path d="M10 21h4"></path>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M9.1 6.2c-2 0-3.6 1.6-3.6 3.5 0 1 .4 1.8 1 2.4.5.5.8 1.1.8 1.8v.3"></path>
+    <path d="M14.9 6.2c2 0 3.6 1.6 3.6 3.5 0 1-.4 1.8-1 2.4-.5.5-.8 1.1-.8 1.8v.3"></path>
+    <path d="M9.2 6.3c.5-1.1 1.6-1.8 2.8-1.8s2.3.7 2.8 1.8"></path>
+    <path d="M8.4 14.2c.8-.6 1.8-1 3.6-1s2.8.4 3.6 1"></path>
+    <path d="M9.5 17.2a2.9 2.9 0 0 1 5 0"></path>
+    <path d="M12 10.4a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6Z"></path>
+    <path d="M10.8 12.6c.4-.4.8-.6 1.2-.6.5 0 .9.2 1.2.6"></path>
+    <path d="M11 19.6h2"></path>
   </svg>
 </button>
 
@@ -304,7 +320,21 @@
   <div class="assistant-card">
     <div class="assistant-head">
       <div>
-        <div class="assistant-badge"><span class="assistant-dot"></span>Goalbazi AI</div>
+        <div class="assistant-badge">
+          <span class="assistant-mark">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9.1 6.2c-2 0-3.6 1.6-3.6 3.5 0 1 .4 1.8 1 2.4.5.5.8 1.1.8 1.8v.3"></path>
+              <path d="M14.9 6.2c2 0 3.6 1.6 3.6 3.5 0 1-.4 1.8-1 2.4-.5.5-.8 1.1-.8 1.8v.3"></path>
+              <path d="M9.2 6.3c.5-1.1 1.6-1.8 2.8-1.8s2.3.7 2.8 1.8"></path>
+              <path d="M8.4 14.2c.8-.6 1.8-1 3.6-1s2.8.4 3.6 1"></path>
+              <path d="M9.5 17.2a2.9 2.9 0 0 1 5 0"></path>
+              <path d="M12 10.4a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6Z"></path>
+              <path d="M10.8 12.6c.4-.4.8-.6 1.2-.6.5 0 .9.2 1.2.6"></path>
+              <path d="M11 19.6h2"></path>
+            </svg>
+          </span>
+          Goalbazi AI
+        </div>
         <div class="meta-line">Tap a task or ask for help with arenas, matches, leagues, or athletes.</div>
       </div>
       <div class="assistant-head-actions">
