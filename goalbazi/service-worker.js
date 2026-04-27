@@ -1,4 +1,4 @@
-const CACHE_NAME = "goalbazi-pwa-v2";
+const CACHE_NAME = "goalbazi-pwa-v3";
 
 const APP_SHELL = [
   "/",
@@ -24,6 +24,12 @@ self.addEventListener("activate", event => {
       .then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))))
       .then(() => self.clients.claim())
   );
+});
+
+self.addEventListener("message", event => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener("fetch", event => {

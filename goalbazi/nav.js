@@ -126,6 +126,70 @@ window.addEventListener("appinstalled", () => {
 
 window.GoalbaziInstall = GoalbaziInstall;
 
+const GoalbaziUpdates = {
+  refreshing: false,
+  waitingWorker: null,
+  ensureBanner() {
+    if (document.getElementById("app-update-banner")) return;
+    const banner = document.createElement("div");
+    banner.id = "app-update-banner";
+    banner.className = "install-app-banner";
+    banner.hidden = true;
+    banner.innerHTML = `
+      <div class="install-app-copy">
+        <strong>Update available</strong>
+        <span>A new Goalbazi version is ready.</span>
+      </div>
+      <button class="btn btn-primary btn-sm" type="button" id="app-update-btn">Update</button>
+      <button class="install-app-close" type="button" id="app-update-close" aria-label="Close update prompt">x</button>
+    `;
+    document.body.appendChild(banner);
+    document.getElementById("app-update-btn").addEventListener("click", () => this.apply());
+    document.getElementById("app-update-close").addEventListener("click", () => {
+      banner.hidden = true;
+    });
+  },
+  show(worker) {
+    this.waitingWorker = worker;
+    this.ensureBanner();
+    const banner = document.getElementById("app-update-banner");
+    if (banner) banner.hidden = false;
+  },
+  apply() {
+    if (!this.waitingWorker) {
+      window.location.reload();
+      return;
+    }
+    this.waitingWorker.postMessage({ type: "SKIP_WAITING" });
+  },
+  bindRegistration(registration) {
+    if (!registration) return;
+    if (registration.waiting && navigator.serviceWorker.controller) {
+      this.show(registration.waiting);
+    }
+    registration.addEventListener("updatefound", () => {
+      const worker = registration.installing;
+      if (!worker) return;
+      worker.addEventListener("statechange", () => {
+        if (worker.state === "installed" && navigator.serviceWorker.controller) {
+          this.show(worker);
+        }
+      });
+    });
+  },
+  bindControllerChange() {
+    if (!("serviceWorker" in navigator) || this.controllerBound) return;
+    this.controllerBound = true;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (this.refreshing) return;
+      this.refreshing = true;
+      window.location.reload();
+    });
+  }
+};
+
+window.GoalbaziUpdates = GoalbaziUpdates;
+
 const GoalbaziPush = {
   async publicKey() {
     const res = await fetch("/api/push/public-key");
@@ -337,7 +401,9 @@ async function apiFetch(path, options = {}) {
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/service-worker.js").then(() => {
+    GoalbaziUpdates.bindControllerChange();
+    navigator.serviceWorker.register("/service-worker.js").then(registration => {
+      GoalbaziUpdates.bindRegistration(registration);
       GoalbaziPush.updateButtons();
     }).catch(() => {});
   });
