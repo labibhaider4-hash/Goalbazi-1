@@ -126,6 +126,68 @@ window.addEventListener("appinstalled", () => {
 
 window.GoalbaziInstall = GoalbaziInstall;
 
+const GoalbaziPush = {
+  async publicKey() {
+    const res = await fetch("/api/push/public-key");
+    if (!res.ok) return null;
+    return res.json();
+  },
+  urlBase64ToUint8Array(base64String) {
+    const padding = "=".repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const rawData = window.atob(base64);
+    return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)));
+  },
+  supported() {
+    return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  },
+  updateButtons() {
+    const show = this.supported() && Notification.permission !== "granted";
+    document.querySelectorAll("[data-enable-push]").forEach(btn => {
+      btn.hidden = !show;
+    });
+  },
+  async enable() {
+    if (!this.supported()) {
+      showToast("Phone notifications are not supported in this browser.");
+      return;
+    }
+    const keyData = await this.publicKey();
+    if (!keyData?.enabled || !keyData.publicKey) {
+      showToast("Phone notifications are not configured yet.");
+      return;
+    }
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      showToast("Notifications were not allowed.");
+      this.updateButtons();
+      return;
+    }
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: this.urlBase64ToUint8Array(keyData.publicKey),
+    });
+    await fetch("/api/push/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(subscription),
+    });
+    showToast("Phone notifications enabled");
+    this.updateButtons();
+  },
+  bind() {
+    document.querySelectorAll("[data-enable-push]").forEach(btn => {
+      if (btn.dataset.pushBound === "1") return;
+      btn.dataset.pushBound = "1";
+      btn.addEventListener("click", () => this.enable());
+    });
+    this.updateButtons();
+  }
+};
+
+window.GoalbaziPush = GoalbaziPush;
+
 function initNav(activePage) {
   const pages = [
     { id: "dashboard", label: "Dashboard", href: "/dashboard" },
@@ -159,6 +221,7 @@ function initNav(activePage) {
         <div class="nav-profile-menu" id="nav-profile-menu" hidden>
           <a href="/profile">Profile</a>
           <a href="/admin" id="nav-admin-link" hidden>Admin Panel</a>
+          <button type="button" data-enable-push hidden>Enable phone notifications</button>
           <button type="button" id="nav-menu-logout">Log out</button>
         </div>
       </div>
@@ -176,6 +239,7 @@ function initNav(activePage) {
       ${drawerLinksHtml}
       <div class="nav-drawer-bottom">
         <a href="/admin" class="btn btn-ghost btn-sm btn-full" id="nav-admin-link-mobile" hidden>Admin Panel</a>
+        <button class="btn btn-ghost btn-sm btn-full" type="button" data-enable-push hidden>Enable phone notifications</button>
         <button class="btn btn-primary btn-sm btn-full install-app-btn" id="nav-install-mobile" type="button" data-install-app hidden>Install app</button>
         <button class="theme-toggle btn-full" id="nav-theme-toggle-mobile" type="button" data-theme-toggle></button>
         <button class="btn btn-ghost btn-sm btn-full" id="nav-logout-mobile">Log out</button>
@@ -186,6 +250,7 @@ function initNav(activePage) {
   GoalbaziTheme.attachButton(document.getElementById("nav-theme-toggle"));
   GoalbaziTheme.attachButton(document.getElementById("nav-theme-toggle-mobile"));
   GoalbaziInstall.bind();
+  GoalbaziPush.bind();
 
   // Load avatar initials
   fetch("/api/auth/me").then(r => r.ok ? r.json() : null).then(user => {
@@ -206,6 +271,7 @@ function initNav(activePage) {
       adminLinkMobile.hidden = false;
       adminLinkMobile.style.display = user.is_admin ? "inline-flex" : "none";
     }
+    GoalbaziPush.updateButtons();
   });
 
   const avatarBtn = document.getElementById("nav-avatar");
@@ -271,6 +337,8 @@ async function apiFetch(path, options = {}) {
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/service-worker.js").catch(() => {});
+    navigator.serviceWorker.register("/service-worker.js").then(() => {
+      GoalbaziPush.updateButtons();
+    }).catch(() => {});
   });
 }

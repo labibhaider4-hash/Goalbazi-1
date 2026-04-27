@@ -1,4 +1,4 @@
-const CACHE_NAME = "goalbazi-pwa-v1";
+const CACHE_NAME = "goalbazi-pwa-v2";
 
 const APP_SHELL = [
   "/",
@@ -55,6 +55,40 @@ self.addEventListener("fetch", event => {
         caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
         return response;
       });
+    })
+  );
+});
+
+self.addEventListener("push", event => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { title: "Goalbazi", body: "You have a new notification." };
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(data.title || "Goalbazi", {
+      body: data.body || "You have a new notification.",
+      icon: data.icon || "/assets/goalbazi-logo.svg",
+      badge: data.badge || "/assets/goalbazi-logo.svg",
+      data: { url: data.url || "/dashboard" },
+    })
+  );
+});
+
+self.addEventListener("notificationclick", event => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || "/dashboard";
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then(clientList => {
+      for (const client of clientList) {
+        if ("focus" in client) {
+          client.navigate(targetUrl);
+          return client.focus();
+        }
+      }
+      return clients.openWindow(targetUrl);
     })
   );
 });

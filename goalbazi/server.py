@@ -6,6 +6,7 @@ import os
 import re
 import secrets
 import uuid
+import base64
 from datetime import datetime, timedelta
 from functools import wraps
 from urllib import error as urllib_error
@@ -15,6 +16,7 @@ from urllib.request import Request, urlopen
 import psycopg2
 import psycopg2.extras
 from flask import Flask, g, jsonify, redirect, render_template, request, send_from_directory, session
+from pywebpush import WebPushException, webpush
 
 app = Flask(__name__, static_folder="static", template_folder=".")
 app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
@@ -24,6 +26,9 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "").strip()
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "").strip()
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "").strip()
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "").strip()
+VAPID_CLAIMS_EMAIL = os.environ.get("VAPID_CLAIMS_EMAIL", "admin@goalbazi.app").strip()
 
 
 # ---------------------------------------------------------------------------
@@ -142,6 +147,46 @@ def fetch_google_profile(access_token: str) -> dict:
     )
     with urlopen(profile_req, timeout=20) as resp:
         return json.loads(resp.read().decode("utf-8"))
+
+
+def push_is_configured() -> bool:
+    return bool(VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY)
+
+
+def send_push_to_user(user_id: int, title: str, body: str, url: str = "/dashboard") -> None:
+    if not push_is_configured():
+        return
+    subscriptions = [dict(r) for r in query(
+        "SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = %s",
+        (user_id,),
+    )]
+    payload = json.dumps({
+        "title": title,
+        "body": body,
+        "url": url,
+        "icon": "/assets/goalbazi-logo.svg",
+        "badge": "/assets/goalbazi-logo.svg",
+    })
+    for subscription in subscriptions:
+        try:
+            webpush(
+                subscription_info={
+                    "endpoint": subscription["endpoint"],
+                    "keys": {
+                        "p256dh": subscription["p256dh"],
+                        "auth": subscription["auth"],
+                    },
+                },
+                data=payload,
+                vapid_private_key=VAPID_PRIVATE_KEY,
+                vapid_claims={"sub": f"mailto:{VAPID_CLAIMS_EMAIL}"},
+            )
+        except WebPushException as exc:
+            status = getattr(getattr(exc, "response", None), "status_code", None)
+            if status in (404, 410):
+                query("DELETE FROM push_subscriptions WHERE id = %s", (subscription["id"],), commit=True)
+        except Exception:
+            pass
 
 
 def haversine_km(lat1, lon1, lat2, lon2):
@@ -428,6 +473,19 @@ def seed_db():
             receiver_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             message TEXT NOT NULL,
             created_at TEXT NOT NULL
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS push_subscriptions (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            endpoint TEXT NOT NULL UNIQUE,
+            p256dh TEXT NOT NULL,
+            auth TEXT NOT NULL,
+            user_agent TEXT DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
         )
     """)
 
@@ -2642,6 +2700,9 @@ def api_send_direct_message():
         (current_user_id(), receiver_id, message, datetime.now().isoformat()),
         commit=True,
     )
+    sender = get_profile(current_user_id()) or {"name": "Goalbazi"}
+    preview = message[:90] + ("..." if len(message) > 90 else "")
+    send_push_to_user(receiver_id, f"New message from {sender['name']}", preview, "/dashboard")
     log_event("direct_message", "/api/direct-messages", {"receiver_id": receiver_id})
     return jsonify({"ok": True}), 201
 
@@ -2704,6 +2765,50 @@ def api_notifications():
     if "user_id" not in session and "owner_id" not in session:
         return jsonify({"error": "Unauthorized"}), 401
     return jsonify({"notifications": get_notifications()})
+
+
+@app.route("/api/push/public-key")
+@login_required
+def api_push_public_key():
+    return jsonify({
+        "publicKey": VAPID_PUBLIC_KEY,
+        "enabled": push_is_configured(),
+    })
+
+
+@app.route("/api/push/subscribe", methods=["POST"])
+@login_required
+def api_push_subscribe():
+    data = request.get_json() or {}
+    endpoint = (data.get("endpoint") or "").strip()
+    keys = data.get("keys") or {}
+    p256dh = (keys.get("p256dh") or "").strip()
+    auth = (keys.get("auth") or "").strip()
+    if not endpoint or not p256dh or not auth:
+        return jsonify({"error": "Invalid push subscription"}), 400
+    now = datetime.now().isoformat()
+    query(
+        """INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, user_agent, created_at, updated_at)
+           VALUES (%s,%s,%s,%s,%s,%s,%s)
+           ON CONFLICT (endpoint) DO UPDATE SET
+             user_id = EXCLUDED.user_id,
+             p256dh = EXCLUDED.p256dh,
+             auth = EXCLUDED.auth,
+             user_agent = EXCLUDED.user_agent,
+             updated_at = EXCLUDED.updated_at""",
+        (
+            current_user_id(),
+            endpoint,
+            p256dh,
+            auth,
+            request.headers.get("User-Agent", "")[:500],
+            now,
+            now,
+        ),
+        commit=True,
+    )
+    log_event("push_subscribe", "/api/push/subscribe")
+    return jsonify({"ok": True})
 
 
 # ---------------------------------------------------------------------------
