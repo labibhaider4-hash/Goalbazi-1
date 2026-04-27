@@ -48,6 +48,51 @@ const GoalbaziTheme = {
 GoalbaziTheme.init();
 window.GoalbaziTheme = GoalbaziTheme;
 
+const GoalbaziInstall = {
+  promptEvent: null,
+  isInstalled() {
+    return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  },
+  updateButtons() {
+    const canInstall = Boolean(this.promptEvent) && !this.isInstalled();
+    document.querySelectorAll("[data-install-app]").forEach(btn => {
+      btn.hidden = !canInstall;
+    });
+  },
+  async install() {
+    if (!this.promptEvent) {
+      showToast("Use your browser menu and choose Add to Home Screen.");
+      return;
+    }
+    this.promptEvent.prompt();
+    await this.promptEvent.userChoice;
+    this.promptEvent = null;
+    this.updateButtons();
+  },
+  bind() {
+    document.querySelectorAll("[data-install-app]").forEach(btn => {
+      if (btn.dataset.installBound === "1") return;
+      btn.dataset.installBound = "1";
+      btn.addEventListener("click", () => this.install());
+    });
+    this.updateButtons();
+  }
+};
+
+window.addEventListener("beforeinstallprompt", event => {
+  event.preventDefault();
+  GoalbaziInstall.promptEvent = event;
+  GoalbaziInstall.updateButtons();
+});
+
+window.addEventListener("appinstalled", () => {
+  GoalbaziInstall.promptEvent = null;
+  GoalbaziInstall.updateButtons();
+  showToast("Goalbazi installed");
+});
+
+window.GoalbaziInstall = GoalbaziInstall;
+
 function initNav(activePage) {
   const pages = [
     { id: "dashboard", label: "Dashboard", href: "/dashboard" },
@@ -90,6 +135,7 @@ function initNav(activePage) {
     drawer.innerHTML = `
       ${drawerLinksHtml}
       <div class="nav-drawer-bottom">
+        <button class="btn btn-primary btn-sm btn-full install-app-btn" id="nav-install-mobile" type="button" data-install-app hidden>Install app</button>
         <button class="theme-toggle btn-full" id="nav-theme-toggle-mobile" type="button" data-theme-toggle></button>
         <button class="btn btn-ghost btn-sm btn-full" id="nav-logout-mobile">Log out</button>
       </div>
@@ -98,6 +144,7 @@ function initNav(activePage) {
 
   GoalbaziTheme.attachButton(document.getElementById("nav-theme-toggle"));
   GoalbaziTheme.attachButton(document.getElementById("nav-theme-toggle-mobile"));
+  GoalbaziInstall.bind();
 
   // Load avatar initials
   fetch("/api/auth/me").then(r => r.ok ? r.json() : null).then(user => {

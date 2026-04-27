@@ -208,9 +208,12 @@ img { display: block; max-width: 100%; }
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 10px;
 }
+
+.install-app-btn[hidden] { display: none !important; }
 
 @media (min-width: 768px) {
   .navbar { padding: 0 28px; }

@@ -47,6 +47,9 @@
       .land-nav-right .theme-toggle {
         flex: 1 1 0;
       }
+      .land-nav-right [data-install-app] {
+        flex: 1 1 100%;
+      }
     }
 
     /* ── Hero ── */
@@ -289,6 +292,7 @@
     Goalbazi
   </a>
   <div class="land-nav-right">
+    <button class="btn btn-primary btn-sm install-app-btn" id="landing-install-btn" type="button" data-install-app hidden>Install app</button>
     <button class="theme-toggle" id="landing-theme-toggle" type="button" data-theme-toggle></button>
     <a href="/login" class="btn btn-ghost btn-sm">Sign in</a>
     <a href="/register" class="btn btn-primary btn-sm">Join free</a>
@@ -441,6 +445,7 @@
 <script src="/nav.js"></script>
 <script>
   GoalbaziTheme.attachButton(document.getElementById("landing-theme-toggle"));
+  GoalbaziInstall.bind();
 
   // Load live stats
   fetch("/api/public/stats").then(r => r.ok ? r.json() : null).then(data => {
