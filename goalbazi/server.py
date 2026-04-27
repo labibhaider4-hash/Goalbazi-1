@@ -1060,6 +1060,16 @@ def serve_css():
     return send_from_directory(".", "styles.css")
 
 
+@app.route("/manifest.webmanifest")
+def serve_manifest():
+    return send_from_directory(".", "manifest.webmanifest", mimetype="application/manifest+json")
+
+
+@app.route("/service-worker.js")
+def serve_service_worker():
+    return send_from_directory(".", "service-worker.js", mimetype="application/javascript")
+
+
 @app.route("/assets/<path:filename>")
 def serve_assets(filename):
     return send_from_directory("assets", filename)

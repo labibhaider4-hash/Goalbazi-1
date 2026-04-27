@@ -151,3 +151,9 @@ async function apiFetch(path, options = {}) {
   }
   return res.json();
 }
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/service-worker.js").catch(() => {});
+  });
+}

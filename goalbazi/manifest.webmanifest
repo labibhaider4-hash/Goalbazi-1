@@ -1,0 +1,34 @@
+{
+  "name": "Goalbazi",
+  "short_name": "Goalbazi",
+  "description": "Find matches, reserve arenas, manage leagues, and connect with athletes.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#07110d",
+  "theme_color": "#07110d",
+  "categories": ["sports", "social", "productivity"],
+  "icons": [
+    {
+      "src": "/assets/goalbazi-logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Find matches",
+      "short_name": "Matches",
+      "url": "/games",
+      "icons": [{ "src": "/assets/goalbazi-logo.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Find arenas",
+      "short_name": "Arenas",
+      "url": "/turfs",
+      "icons": [{ "src": "/assets/goalbazi-logo.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ]
+}
