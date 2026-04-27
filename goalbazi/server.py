@@ -36,6 +36,14 @@ VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "").strip()
 VAPID_CLAIMS_EMAIL = os.environ.get("VAPID_CLAIMS_EMAIL", "admin@goalbazi.app").strip()
 
 
+def app_port() -> int:
+    raw_port = os.environ.get("PORT", "8000")
+    try:
+        return int(raw_port)
+    except (TypeError, ValueError):
+        return 8000
+
+
 # ---------------------------------------------------------------------------
 # Database helpers
 # ---------------------------------------------------------------------------
@@ -2093,7 +2101,7 @@ def initialize():
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8000)), debug=False)
+    app.run(host="0.0.0.0", port=app_port(), debug=False)
 
 
 # ---------------------------------------------------------------------------
