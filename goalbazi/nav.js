@@ -50,14 +50,38 @@ window.GoalbaziTheme = GoalbaziTheme;
 
 const GoalbaziInstall = {
   promptEvent: null,
+  dismissedKey: "goalbazi-install-dismissed",
   isInstalled() {
     return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  },
+  isDismissed() {
+    try { return localStorage.getItem(this.dismissedKey) === "1"; } catch { return false; }
   },
   updateButtons() {
     const canInstall = Boolean(this.promptEvent) && !this.isInstalled();
     document.querySelectorAll("[data-install-app]").forEach(btn => {
       btn.hidden = !canInstall;
     });
+    document.querySelectorAll("[data-install-banner]").forEach(banner => {
+      banner.hidden = !canInstall || this.isDismissed();
+    });
+  },
+  ensureBanner() {
+    if (document.getElementById("install-app-banner")) return;
+    const banner = document.createElement("div");
+    banner.id = "install-app-banner";
+    banner.className = "install-app-banner";
+    banner.setAttribute("data-install-banner", "");
+    banner.hidden = true;
+    banner.innerHTML = `
+      <div class="install-app-copy">
+        <strong>Install Goalbazi</strong>
+        <span>Open it faster from your phone home screen.</span>
+      </div>
+      <button class="btn btn-primary btn-sm" type="button" data-install-app>Install</button>
+      <button class="install-app-close" type="button" data-install-dismiss aria-label="Close install prompt">x</button>
+    `;
+    document.body.appendChild(banner);
   },
   async install() {
     if (!this.promptEvent) {
@@ -70,10 +94,19 @@ const GoalbaziInstall = {
     this.updateButtons();
   },
   bind() {
+    this.ensureBanner();
     document.querySelectorAll("[data-install-app]").forEach(btn => {
       if (btn.dataset.installBound === "1") return;
       btn.dataset.installBound = "1";
       btn.addEventListener("click", () => this.install());
+    });
+    document.querySelectorAll("[data-install-dismiss]").forEach(btn => {
+      if (btn.dataset.dismissBound === "1") return;
+      btn.dataset.dismissBound = "1";
+      btn.addEventListener("click", () => {
+        try { localStorage.setItem(this.dismissedKey, "1"); } catch {}
+        this.updateButtons();
+      });
     });
     this.updateButtons();
   }

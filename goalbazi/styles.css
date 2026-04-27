@@ -376,6 +376,48 @@ img { display: block; max-width: 100%; }
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+.install-app-banner {
+  position: fixed;
+  left: 14px;
+  right: 14px;
+  bottom: 14px;
+  z-index: 998;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--line-2);
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: var(--shadow-lg);
+}
+
+.install-app-banner[hidden] { display: none !important; }
+.install-app-copy { display: grid; gap: 2px; min-width: 0; }
+.install-app-copy strong { font-family: 'Syne', sans-serif; font-size: .94rem; }
+.install-app-copy span { color: var(--muted); font-size: .78rem; line-height: 1.35; }
+.install-app-close {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--muted-2);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+@media (min-width: 720px) {
+  .install-app-banner {
+    left: auto;
+    right: 24px;
+    bottom: 24px;
+    width: min(420px, calc(100vw - 48px));
+  }
+}
+
 /* ============================================================
    LOADING SPINNER
    ============================================================ */
