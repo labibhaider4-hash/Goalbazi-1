@@ -164,6 +164,17 @@
     const data = await apiFetch("/api/dashboard");
     if (!data) return;
 
+    const turfSelect = document.getElementById("turf-select");
+    if (data.turfs.length) {
+      turfSelect.disabled = false;
+      turfSelect.innerHTML = data.turfs.map(t =>
+        `<option value="${t.id}">${t.name} / ${t.area}</option>`
+      ).join("");
+    } else {
+      turfSelect.disabled = true;
+      turfSelect.innerHTML = `<option value="">No arenas available yet</option>`;
+    }
+
     const el = document.getElementById("games-list");
     if (data.games.length === 0) {
       el.innerHTML = `<div class="empty-state"><div class="empty-icon">🎮</div><div class="empty-title">No games yet</div><p>Be the first to create one!</p></div>`;
@@ -185,10 +196,6 @@
       </div>
     `).join("")}</div>`;
 
-    // Populate turf select
-    document.getElementById("turf-select").innerHTML = data.turfs.map(t =>
-      `<option value="${t.id}">${t.name} / ${t.area}</option>`
-    ).join("");
   }
 
   // Setup form selects
@@ -203,6 +210,12 @@
     btn.disabled = true;
     try {
       const data = Object.fromEntries(new FormData(e.currentTarget).entries());
+      if (!data.turf_id) {
+        showToast("Please add or restore an arena first");
+        btn.textContent = "Create match";
+        btn.disabled = false;
+        return;
+      }
       const result = await apiFetch("/api/games", { method: "POST", body: JSON.stringify(data) });
       showToast("Game created!");
       window.location.href = `/lobby?id=${result.id}`;
