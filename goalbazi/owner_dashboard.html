@@ -26,15 +26,16 @@
       --shadow:0 24px 90px rgba(51,84,61,.12);
     }
     *{box-sizing:border-box;margin:0;padding:0}
-    html,body{font-family:"Manrope",sans-serif;background:radial-gradient(circle at 15% 20%,rgba(132,242,85,.10),transparent 24%),linear-gradient(180deg,var(--bg) 0%,var(--bg-2) 100%);color:var(--text);min-height:100vh}
+    html,body{font-family:"Manrope",sans-serif;background:radial-gradient(circle at 15% 20%,rgba(132,242,85,.10),transparent 24%),linear-gradient(180deg,var(--bg) 0%,var(--bg-2) 100%);color:var(--text);min-height:100vh;overflow-x:hidden}
 
     /* Header */
     .header{background:var(--panel);border-bottom:1px solid var(--line);padding:16px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px}
-    .header-left{display:flex;align-items:center;gap:14px}
-    .header-logo{font-size:1.1rem;font-weight:800;color:var(--brand)}
-    .turf-name{font-size:1rem;font-weight:700}
+    .header-left{display:flex;align-items:center;gap:14px;min-width:0}
+    .header-logo{display:flex;align-items:center;gap:9px;font-size:1.1rem;font-weight:800;color:var(--brand);white-space:nowrap}
+    .header-logo img{width:34px;height:34px;object-fit:contain;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid var(--line);padding:3px}
+    .turf-name{font-size:1rem;font-weight:700;overflow-wrap:anywhere}
     .turf-meta{color:var(--muted);font-size:.82rem;margin-top:2px}
-    .header-right{display:flex;align-items:center;gap:10px}
+    .header-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
     .btn{padding:10px 16px;border-radius:12px;border:none;font-weight:700;font-size:.88rem;cursor:pointer}
     .btn-primary{background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#08110d}
     .btn-ghost{background:var(--panel-soft);color:var(--text);border:1px solid var(--line)}
@@ -51,13 +52,14 @@
     .stat-label{color:var(--muted);font-size:.85rem;margin-top:4px}
 
     /* Tabs */
-    .tabs{display:flex;gap:8px;margin-bottom:24px;border-bottom:1px solid var(--line);padding-bottom:0}
+    .tabs{display:flex;gap:8px;margin-bottom:24px;border-bottom:1px solid var(--line);padding-bottom:0;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+    .tabs::-webkit-scrollbar{display:none}
     .tab{padding:10px 18px;border-radius:12px 12px 0 0;border:none;background:transparent;color:var(--muted);font-weight:700;font-size:.9rem;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
     .tab.active{color:var(--brand);border-bottom-color:var(--brand)}
 
     /* Cards */
-    .table-card{background:var(--panel);border:1px solid var(--line);border-radius:20px;overflow:hidden;box-shadow:var(--shadow);margin-bottom:20px}
-    .card-head{padding:18px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
+    .table-card{background:var(--panel);border:1px solid var(--line);border-radius:20px;overflow-x:auto;box-shadow:var(--shadow);margin-bottom:20px}
+    .card-head{padding:18px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);gap:12px;flex-wrap:wrap}
     .card-head h3{font-size:1rem;font-weight:800}
     table{width:100%;border-collapse:collapse}
     th{text-align:left;padding:12px 16px;color:var(--muted);font-size:.8rem;font-weight:700;border-bottom:1px solid var(--line)}
@@ -79,7 +81,7 @@
     .utr-box{background:var(--panel-soft);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:12px 0}
     .utr-label{font-size:.78rem;color:var(--muted);font-weight:700;margin-bottom:4px}
     .utr-value{font-size:1rem;font-weight:800;color:var(--brand-2)}
-    .action-row{display:flex;gap:10px;margin-top:14px}
+    .action-row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
 
     /* UPI info */
     .upi-card{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:24px;box-shadow:var(--shadow);margin-bottom:20px}
@@ -100,9 +102,32 @@
     .gallery-thumb{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:12px;border:1px solid var(--line)}
 
     @media(max-width:700px){
-      .stats-row{grid-template-columns:1fr 1fr}
-      .header{flex-direction:column;align-items:flex-start}
+      .header{flex-direction:column;align-items:stretch;padding:14px 16px}
+      .header-left{width:100%}
+      .header-logo{font-size:1rem;white-space:nowrap}
+      .header-right{width:100%;justify-content:flex-start;gap:8px}
+      .header-right .btn{flex:1 1 auto;min-width:max-content}
+      .shell{padding:18px 12px 72px}
+      .stats-row{grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
+      .stat-card{padding:16px 14px;border-radius:16px}
+      .stat-value{font-size:1.55rem}
+      .tabs{margin-left:-12px;margin-right:-12px;padding:0 12px}
+      .tab{flex:0 0 auto;padding:10px 13px;font-size:.82rem}
+      .booking-card,.upi-card{padding:16px;border-radius:16px}
+      .booking-top{flex-direction:column;gap:10px}
+      .booking-meta{overflow-wrap:anywhere}
+      .action-row .btn{flex:1 1 120px}
       td,th{padding:10px 12px;font-size:.82rem}
+      table{min-width:560px}
+      #settings-form > div{grid-template-columns:1fr !important}
+      #settings-form button[type="submit"]{width:100%;justify-self:stretch !important}
+      input,select,textarea{font-size:16px !important}
+      #qr-preview{width:140px !important;height:140px !important}
+    }
+
+    @media(max-width:420px){
+      .stats-row{grid-template-columns:1fr}
+      .header-right .btn{width:100%;justify-content:center}
     }
   </style>
 </head>
@@ -110,7 +135,7 @@
 
 <div class="header">
   <div class="header-left">
-    <div class="header-logo">⚽ Goalbazi</div>
+    <div class="header-logo"><img src="/assets/goalbazi-logo.svg" alt="Goalbazi">Goalbazi</div>
     <div>
       <div class="turf-name" id="owner-turf-name">Loading...</div>
       <div class="turf-meta" id="owner-turf-meta"></div>
