@@ -197,9 +197,15 @@ function initNav(activePage) {
       el.title = user.name;
     }
     const adminLink = document.getElementById("nav-admin-link");
-    if (adminLink) adminLink.hidden = !user.is_admin;
+    if (adminLink) {
+      adminLink.hidden = false;
+      adminLink.style.display = user.is_admin ? "flex" : "none";
+    }
     const adminLinkMobile = document.getElementById("nav-admin-link-mobile");
-    if (adminLinkMobile) adminLinkMobile.hidden = !user.is_admin;
+    if (adminLinkMobile) {
+      adminLinkMobile.hidden = false;
+      adminLinkMobile.style.display = user.is_admin ? "inline-flex" : "none";
+    }
   });
 
   const avatarBtn = document.getElementById("nav-avatar");
