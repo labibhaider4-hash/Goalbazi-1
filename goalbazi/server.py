@@ -16,7 +16,12 @@ from urllib.request import Request, urlopen
 import psycopg2
 import psycopg2.extras
 from flask import Flask, g, jsonify, redirect, render_template, request, send_from_directory, session
-from pywebpush import WebPushException, webpush
+
+try:
+    from pywebpush import WebPushException, webpush
+except Exception:
+    WebPushException = Exception
+    webpush = None
 
 app = Flask(__name__, static_folder="static", template_folder=".")
 app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
@@ -150,7 +155,7 @@ def fetch_google_profile(access_token: str) -> dict:
 
 
 def push_is_configured() -> bool:
-    return bool(VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY)
+    return bool(webpush and VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY)
 
 
 def send_push_to_user(user_id: int, title: str, body: str, url: str = "/dashboard") -> None:
