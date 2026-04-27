@@ -296,6 +296,10 @@
           <button class="btn primary" type="submit">Create arena</button>
         </form>
       </div>
+      <div class="editor-card">
+        <div class="editor-title">Archived arenas</div>
+        <div class="items-grid" id="archived-arenas-grid"></div>
+      </div>
       <div class="items-grid two-col" id="arenas-grid"></div>
     </section>
 
@@ -323,6 +327,7 @@
       leagues: [],
       ratings: [],
       arenas: [],
+      archivedArenas: [],
       playersForTeams: [],
       activeTab: "overview",
       selectedUserId: null,
@@ -735,6 +740,7 @@
       const data = await api("/api/admin/turfs");
       if (!data) return;
       state.arenas = data.turfs || [];
+      state.archivedArenas = data.archived_turfs || [];
       document.getElementById("arenas-grid").innerHTML = state.arenas.map(arena => `
         <form class="item-card arena-form" data-id="${arena.id}">
           <div class="item-top">
@@ -778,12 +784,40 @@
         toast("Arena updated");
         await loadArenas();
       }));
+
+      document.getElementById("archived-arenas-grid").innerHTML = state.archivedArenas.length ? state.archivedArenas.map(arena => `
+        <div class="item-card">
+          <div class="item-top">
+            <div>
+              <div class="item-title">${esc(arena.name)}</div>
+              <div class="item-meta">${esc(arena.area || "No area")} · archived</div>
+            </div>
+          </div>
+          <div class="action-row">
+            <button class="mini-btn primary" type="button" onclick="restoreArena(${arena.id})">Restore</button>
+            <button class="mini-btn danger" type="button" onclick="permanentlyDeleteArena(${arena.id})">Delete permanently</button>
+          </div>
+        </div>
+      `).join("") : `<div class="item-meta">No archived arenas.</div>`;
     }
 
     async function deleteArena(arenaId) {
-      if (!confirm("Delete this arena?")) return;
+      if (!confirm("Archive this arena? It will disappear from the app, but you can restore it later.")) return;
       await api(`/api/admin/turfs/${arenaId}`, { method: "DELETE" });
-      toast("Arena deleted");
+      toast("Arena archived");
+      await Promise.all([loadArenas(), loadOverview()]);
+    }
+
+    async function restoreArena(arenaId) {
+      await api(`/api/admin/turfs/${arenaId}/restore`, { method: "POST" });
+      toast("Arena restored");
+      await Promise.all([loadArenas(), loadOverview()]);
+    }
+
+    async function permanentlyDeleteArena(arenaId) {
+      if (!confirm("Delete this archived arena permanently? This cannot be undone.")) return;
+      await api(`/api/admin/turfs/${arenaId}/permanent-delete`, { method: "DELETE" });
+      toast("Arena permanently deleted");
       await Promise.all([loadArenas(), loadOverview()]);
     }
 
@@ -870,6 +904,8 @@
     window.deleteLeague = deleteLeague;
     window.deleteLeagueTeam = deleteLeagueTeam;
     window.deleteArena = deleteArena;
+    window.restoreArena = restoreArena;
+    window.permanentlyDeleteArena = permanentlyDeleteArena;
     window.selectUser = selectUser;
   </script>
 </body>

@@ -314,6 +314,7 @@ def seed_db():
     cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION")
     cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS description TEXT DEFAULT ''")
     cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS image_urls TEXT NOT NULL DEFAULT '[]'")
+    cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS archived_at TEXT")
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS analytics_events (
@@ -634,7 +635,7 @@ def get_stats():
     return [
         {"value": query("SELECT COUNT(*) FROM users", one=True)["count"], "label": "Players"},
         {"value": query("SELECT COUNT(*) FROM games", one=True)["count"], "label": "Games"},
-        {"value": query("SELECT COUNT(*) FROM turfs", one=True)["count"], "label": "Arenas"},
+        {"value": query("SELECT COUNT(*) FROM turfs WHERE archived_at IS NULL", one=True)["count"], "label": "Arenas"},
         {"value": query("SELECT COUNT(*) FROM leagues", one=True)["count"], "label": "Leagues"},
     ]
 
@@ -781,7 +782,7 @@ def get_notifications():
                FROM bookings b
                JOIN turf_slots ts ON ts.id = b.slot_id
                JOIN turfs t ON t.id = ts.turf_id
-               WHERE t.owner_id = %s AND b.status = 'pending'
+               WHERE t.owner_id = %s AND t.archived_at IS NULL AND b.status = 'pending'
                ORDER BY b.id DESC
                LIMIT 5""",
             (current_owner_id(),),
@@ -829,13 +830,15 @@ def build_assistant_context(user_id):
                   t.name AS arena_name, t.area
            FROM games g
            JOIN turfs t ON t.id = g.turf_id
+           WHERE t.archived_at IS NULL
            ORDER BY g.game_date ASC, g.game_time ASC
            LIMIT 4"""
     )]
     arena_rows = [dict(r) for r in query(
         """SELECT id, name, area, rating, price_per_hour, surface
            FROM turfs
-           WHERE LOWER(name) LIKE %s OR LOWER(area) LIKE %s
+           WHERE archived_at IS NULL
+             AND (LOWER(name) LIKE %s OR LOWER(area) LIKE %s)
            ORDER BY rating DESC, price_per_hour ASC
            LIMIT 4""",
         (f"%{user_location.lower()}%", f"%{user_location.lower()}%"),
@@ -844,6 +847,7 @@ def build_assistant_context(user_id):
         arena_rows = [dict(r) for r in query(
             """SELECT id, name, area, rating, price_per_hour, surface
                FROM turfs
+               WHERE archived_at IS NULL
                ORDER BY rating DESC, price_per_hour ASC
                LIMIT 4"""
         )]
@@ -1024,7 +1028,10 @@ def generate_assistant_reply(user_id, message):
 def get_turfs(date_value, search="", user_lat=None, user_lng=None):
     like = f"%{search.lower()}%"
     turfs = [dict(r) for r in query(
-        "SELECT * FROM turfs WHERE LOWER(name) LIKE %s OR LOWER(area) LIKE %s ORDER BY distance_km ASC",
+        """SELECT * FROM turfs
+           WHERE archived_at IS NULL
+             AND (LOWER(name) LIKE %s OR LOWER(area) LIKE %s)
+           ORDER BY distance_km ASC""",
         (like, like),
     )]
     if user_lat is not None and user_lng is not None:
@@ -1051,7 +1058,8 @@ def get_game_detail(game_id):
         """
         SELECT g.*, t.name AS location,
                CASE g.format WHEN '11v11' THEN 11 WHEN '7v7' THEN 7 ELSE 5 END AS players_per_team
-        FROM games g JOIN turfs t ON t.id = g.turf_id WHERE g.id = %s
+        FROM games g JOIN turfs t ON t.id = g.turf_id
+        WHERE g.id = %s AND t.archived_at IS NULL
         """,
         (game_id,), one=True,
     )
@@ -1073,7 +1081,13 @@ def get_game_detail(game_id):
 
 
 def get_games():
-    rows = query("SELECT id FROM games ORDER BY game_date ASC, game_time ASC")
+    rows = query(
+        """SELECT g.id
+           FROM games g
+           JOIN turfs t ON t.id = g.turf_id
+           WHERE t.archived_at IS NULL
+           ORDER BY g.game_date ASC, g.game_time ASC"""
+    )
     return [get_game_detail(row["id"]) for row in rows]
 
 
@@ -1314,12 +1328,15 @@ def api_profile_update():
 @login_required
 def api_create_game():
     data = request.get_json()
+    turf_id = int(data["turf_id"])
+    if not query("SELECT id FROM turfs WHERE id = %s AND archived_at IS NULL", (turf_id,), one=True):
+        return jsonify({"error": "Arena not found"}), 404
     kickoff = datetime.fromisoformat(f"{data['date']}T{data['time']}:00").isoformat()
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
         "INSERT INTO games (title, format, skill_level, visibility, game_date, game_time, kickoff_at, turf_id, created_by) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
-        (data["title"], data["format"], data["skill"], data["visibility"], data["date"], data["time"], kickoff, int(data["turf_id"]), current_user_id()),
+        (data["title"], data["format"], data["skill"], data["visibility"], data["date"], data["time"], kickoff, turf_id, current_user_id()),
     )
     game_id = cur.fetchone()["id"]
     user = get_profile(current_user_id())
@@ -1466,8 +1483,8 @@ def admin_page():
 def api_admin_overview():
     stats = [
         {"value": query("SELECT COUNT(*) FROM users", one=True)["count"], "label": "Total users"},
-        {"value": query("SELECT COUNT(*) FROM games", one=True)["count"], "label": "Total games"},
-        {"value": query("SELECT COUNT(*) FROM turf_slots WHERE is_booked = 1", one=True)["count"], "label": "Bookings"},
+        {"value": query("SELECT COUNT(*) FROM games g JOIN turfs t ON t.id = g.turf_id WHERE t.archived_at IS NULL", one=True)["count"], "label": "Total games"},
+        {"value": query("SELECT COUNT(*) FROM turf_slots ts JOIN turfs t ON t.id = ts.turf_id WHERE ts.is_booked = 1 AND t.archived_at IS NULL", one=True)["count"], "label": "Bookings"},
         {"value": query("SELECT COUNT(*) FROM game_messages WHERE is_system = 0", one=True)["count"], "label": "Chat messages"},
         {"value": query("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'page_view'", one=True)["count"], "label": "Page views"},
         {"value": query("SELECT COUNT(*) FROM analytics_events WHERE event_type != 'page_view'", one=True)["count"], "label": "Tracked actions"},
@@ -1478,7 +1495,10 @@ def api_admin_overview():
     recent_games = [dict(r) for r in query(
         """SELECT g.id, g.title, g.format, g.game_date, g.status,
            COUNT(gp.id) as player_count
-           FROM games g LEFT JOIN game_players gp ON gp.game_id = g.id
+           FROM games g
+           JOIN turfs t ON t.id = g.turf_id
+           LEFT JOIN game_players gp ON gp.game_id = g.id
+           WHERE t.archived_at IS NULL
            GROUP BY g.id ORDER BY g.id DESC LIMIT 5"""
     )]
     analytics = {
@@ -1608,7 +1628,10 @@ def api_admin_games():
     games = [dict(r) for r in query(
         """SELECT g.id, g.title, g.format, g.skill_level, g.game_date, g.game_time, g.status, g.turf_id, g.created_by,
            COUNT(gp.id) as player_count
-           FROM games g LEFT JOIN game_players gp ON gp.game_id = g.id
+           FROM games g
+           JOIN turfs t ON t.id = g.turf_id
+           LEFT JOIN game_players gp ON gp.game_id = g.id
+           WHERE t.archived_at IS NULL
            GROUP BY g.id ORDER BY g.id DESC"""
     )]
     return jsonify({"games": games})
@@ -1623,6 +1646,8 @@ def api_admin_create_game():
     created_by = int(data.get("created_by") or current_user_id())
     if not title or not turf_id:
         return jsonify({"error": "Title and turf are required"}), 400
+    if not query("SELECT id FROM turfs WHERE id = %s AND archived_at IS NULL", (turf_id,), one=True):
+        return jsonify({"error": "Arena not found"}), 404
     kickoff = datetime.fromisoformat(f"{data['date']}T{data['time']}:00").isoformat()
     conn = get_db()
     cur = conn.cursor()
@@ -1674,12 +1699,15 @@ def api_admin_delete_game(game_id):
 @app.route("/api/admin/turfs")
 @admin_required
 def api_admin_turfs():
-    turfs = [dict(r) for r in query("SELECT * FROM turfs ORDER BY id ASC")]
+    turfs = [dict(r) for r in query("SELECT * FROM turfs WHERE archived_at IS NULL ORDER BY id ASC")]
     for turf in turfs:
+        turf["image_urls"] = parse_image_urls(turf.get("image_urls"))
+    archived_turfs = [dict(r) for r in query("SELECT * FROM turfs WHERE archived_at IS NOT NULL ORDER BY archived_at DESC, id DESC")]
+    for turf in archived_turfs:
         turf["image_urls"] = parse_image_urls(turf.get("image_urls"))
     owners = [dict(r) for r in query("SELECT id, name FROM turf_owners ORDER BY name ASC")]
     players = [dict(r) for r in query("SELECT id, name FROM users ORDER BY name ASC LIMIT 200")]
-    return jsonify({"turfs": turfs, "owners": owners, "players": players})
+    return jsonify({"turfs": turfs, "archived_turfs": archived_turfs, "owners": owners, "players": players})
 
 
 @app.route("/api/admin/bookings")
@@ -1691,7 +1719,7 @@ def api_admin_bookings():
            FROM turf_slots ts
            JOIN turfs t ON t.id = ts.turf_id
            LEFT JOIN users u ON u.id = ts.booked_by
-           WHERE ts.is_booked = 1
+           WHERE ts.is_booked = 1 AND t.archived_at IS NULL
            ORDER BY ts.slot_date DESC, ts.slot_time DESC"""
     )]
     return jsonify({"bookings": bookings})
@@ -2173,7 +2201,7 @@ def api_owner_logout():
 @owner_required
 def api_owner_dashboard():
     owner = query("SELECT id, name, email FROM turf_owners WHERE id = %s", (current_owner_id(),), one=True)
-    turf = query("SELECT * FROM turfs WHERE owner_id = %s", (current_owner_id(),), one=True)
+    turf = query("SELECT * FROM turfs WHERE owner_id = %s AND archived_at IS NULL", (current_owner_id(),), one=True)
     if not turf:
         return jsonify({"error": "No turf found"}), 404
     today = datetime.now().date().isoformat()
@@ -2211,7 +2239,7 @@ def api_owner_approve(booking_id):
            FROM bookings b
            JOIN turf_slots ts ON ts.id = b.slot_id
            JOIN turfs t ON t.id = ts.turf_id
-           WHERE b.id = %s AND t.owner_id = %s""",
+           WHERE b.id = %s AND t.owner_id = %s AND t.archived_at IS NULL""",
         (booking_id, current_owner_id()),
         one=True,
     )
@@ -2234,7 +2262,7 @@ def api_owner_reject(booking_id):
            FROM bookings b
            JOIN turf_slots ts ON ts.id = b.slot_id
            JOIN turfs t ON t.id = ts.turf_id
-           WHERE b.id = %s AND t.owner_id = %s""",
+           WHERE b.id = %s AND t.owner_id = %s AND t.archived_at IS NULL""",
         (booking_id, current_owner_id()),
         one=True,
     )
@@ -2253,7 +2281,7 @@ def api_owner_reject(booking_id):
 @owner_required
 def api_owner_slots():
     date = request.args.get("date", datetime.now().date().isoformat())
-    turf = query("SELECT id FROM turfs WHERE owner_id = %s", (current_owner_id(),), one=True)
+    turf = query("SELECT id FROM turfs WHERE owner_id = %s AND archived_at IS NULL", (current_owner_id(),), one=True)
     if not turf:
         return jsonify({"slots": []})
     slots = [dict(r) for r in query(
@@ -2271,12 +2299,15 @@ def api_owner_settings():
     data = request.get_json()
     query(
         """UPDATE turfs
-           SET name=%s, area=%s, price_per_hour=%s, upi_id=%s, map_link=%s, latitude=%s, longitude=%s,
-               description=%s, image_urls=%s
-           WHERE owner_id=%s""",
+           SET name=%s, area=%s, surface=%s, distance_km=%s, rating=%s, price_per_hour=%s,
+               upi_id=%s, map_link=%s, latitude=%s, longitude=%s, description=%s, image_urls=%s
+           WHERE owner_id=%s AND archived_at IS NULL""",
         (
             data.get("turf_name"),
             data.get("area"),
+            data.get("surface", "Astroturf"),
+            float(data.get("distance_km", 0) or 0),
+            float(data.get("rating", 4.5) or 4.5),
             int(data.get("price_per_hour", 0)),
             data.get("upi_id"),
             data.get("map_link", ""),
@@ -2342,8 +2373,8 @@ def serve_nav_js():
 def api_public_stats():
     return jsonify({
         "players": query("SELECT COUNT(*) FROM users", one=True)["count"],
-        "games": query("SELECT COUNT(*) FROM games", one=True)["count"],
-        "turfs": query("SELECT COUNT(*) FROM turfs", one=True)["count"],
+        "games": query("SELECT COUNT(*) FROM games g JOIN turfs t ON t.id = g.turf_id WHERE t.archived_at IS NULL", one=True)["count"],
+        "turfs": query("SELECT COUNT(*) FROM turfs WHERE archived_at IS NULL", one=True)["count"],
         "leagues": query("SELECT COUNT(*) FROM leagues", one=True)["count"],
     })
 
@@ -2395,7 +2426,8 @@ def api_profile_stats():
         """SELECT DISTINCT g.id, g.title, g.game_date
            FROM games g
            JOIN game_players gp ON gp.game_id = g.id AND gp.user_id = %s AND gp.confirmed = 1
-           WHERE g.game_date <= %s
+           JOIN turfs t ON t.id = g.turf_id
+           WHERE g.game_date <= %s AND t.archived_at IS NULL
            ORDER BY g.game_date DESC LIMIT 10""",
         (uid, datetime.now().date().isoformat()),
     )]
@@ -2853,7 +2885,7 @@ def api_admin_edit_turf(turf_id):
     data = request.get_json()
     query(
         """UPDATE turfs SET name=%s, area=%s, distance_km=%s, surface=%s,
-           rating=%s, price_per_hour=%s, upi_id=%s, map_link=%s, latitude=%s, longitude=%s, owner_id=%s,
+           rating=%s, price_per_hour=%s, upi_id=%s, map_link=%s, latitude=%s, longitude=%s, owner_id=COALESCE(%s, owner_id),
            description=%s, image_urls=%s WHERE id=%s""",
         (data["name"], data["area"], float(data.get("distance_km",0)),
          data.get("surface","Astroturf"), float(data.get("rating",4.5)),
@@ -2871,6 +2903,22 @@ def api_admin_edit_turf(turf_id):
 @app.route("/api/admin/turfs/<int:turf_id>", methods=["DELETE"])
 @admin_required
 def api_admin_delete_turf(turf_id):
+    query("UPDATE turfs SET archived_at = %s WHERE id = %s", (datetime.now().isoformat(), turf_id), commit=True)
+    log_event("admin_archive_turf", f"/api/admin/turfs/{turf_id}", {"turf_id": turf_id})
+    return jsonify({"ok": True})
+
+
+@app.route("/api/admin/turfs/<int:turf_id>/restore", methods=["POST"])
+@admin_required
+def api_admin_restore_turf(turf_id):
+    query("UPDATE turfs SET archived_at = NULL WHERE id = %s", (turf_id,), commit=True)
+    log_event("admin_restore_turf", f"/api/admin/turfs/{turf_id}/restore", {"turf_id": turf_id})
+    return jsonify({"ok": True})
+
+
+@app.route("/api/admin/turfs/<int:turf_id>/permanent-delete", methods=["DELETE"])
+@admin_required
+def api_admin_permanent_delete_turf(turf_id):
     conn = get_db()
     cur = conn.cursor()
     cur.execute("SELECT id FROM games WHERE turf_id = %s", (turf_id,))
@@ -2884,7 +2932,7 @@ def api_admin_delete_turf(turf_id):
     cur.execute("DELETE FROM turf_slots WHERE turf_id=%s", (turf_id,))
     cur.execute("DELETE FROM turfs WHERE id=%s", (turf_id,))
     conn.commit()
-    log_event("admin_delete_turf", f"/api/admin/turfs/{turf_id}", {"turf_id": turf_id})
+    log_event("admin_permanent_delete_turf", f"/api/admin/turfs/{turf_id}/permanent-delete", {"turf_id": turf_id})
     return jsonify({"ok": True})
 
 
@@ -2899,7 +2947,7 @@ def api_owner_upload_qr():
     qr_b64 = data.get("qr_base64", "")
     if len(qr_b64) > 2_000_000:
         return jsonify({"error": "Image too large"}), 400
-    query("UPDATE turfs SET qr_base64=%s WHERE owner_id=%s", (qr_b64, current_owner_id()), commit=True)
+    query("UPDATE turfs SET qr_base64=%s WHERE owner_id=%s AND archived_at IS NULL", (qr_b64, current_owner_id()), commit=True)
     log_event("owner_upload_qr", "/api/owner/qr")
     return jsonify({"ok": True})
 
@@ -2909,7 +2957,7 @@ def api_slot_info_updated(slot_id):
     info = query(
         """SELECT t.upi_id, t.price_per_hour, t.name as turf_name, t.qr_base64, t.map_link
            FROM turf_slots ts JOIN turfs t ON t.id = ts.turf_id
-           WHERE ts.id = %s""",
+           WHERE ts.id = %s AND t.archived_at IS NULL""",
         (slot_id,), one=True,
     )
     if not info:

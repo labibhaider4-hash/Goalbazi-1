@@ -228,6 +228,25 @@
               <input name="upi_id" id="settings-upi" style="padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--panel-soft);color:var(--text);font-family:inherit">
             </label>
           </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
+            <label style="display:grid;gap:8px">
+              <span style="font-size:.85rem;color:var(--muted);font-weight:700">Surface</span>
+              <select name="surface" id="settings-surface" style="padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--panel-soft);color:var(--text);font-family:inherit">
+                <option>Astroturf</option>
+                <option>Natural grass</option>
+                <option>Hybrid</option>
+                <option>Concrete</option>
+              </select>
+            </label>
+            <label style="display:grid;gap:8px">
+              <span style="font-size:.85rem;color:var(--muted);font-weight:700">Distance km</span>
+              <input type="number" step="0.1" name="distance_km" id="settings-distance" style="padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--panel-soft);color:var(--text);font-family:inherit">
+            </label>
+            <label style="display:grid;gap:8px">
+              <span style="font-size:.85rem;color:var(--muted);font-weight:700">Rating</span>
+              <input type="number" step="0.1" min="1" max="5" name="rating" id="settings-rating" style="padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--panel-soft);color:var(--text);font-family:inherit">
+            </label>
+          </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
             <label style="display:grid;gap:8px">
               <span style="font-size:.85rem;color:var(--muted);font-weight:700">Map link</span>
@@ -376,6 +395,9 @@
     document.getElementById("settings-area").value = turf.area;
     document.getElementById("settings-price").value = turf.price_per_hour;
     document.getElementById("settings-upi").value = turf.upi_id || "";
+    document.getElementById("settings-surface").value = turf.surface || "Astroturf";
+    document.getElementById("settings-distance").value = turf.distance_km || 0;
+    document.getElementById("settings-rating").value = turf.rating || 4.5;
     document.getElementById("settings-map-link").value = turf.map_link || "";
     document.getElementById("settings-description").value = turf.description || "";
     document.getElementById("settings-image-urls").value = (turf.image_urls || []).join("\n");
