@@ -557,6 +557,7 @@ def get_profile(user_id):
     if not row:
         return None
     profile = dict(row)
+    profile["is_admin"] = bool(profile.get("is_admin"))
     profile["handle"] = sanitize_handle(profile.get("handle", ""))
     profile["handle_display"] = display_handle(profile["handle"])
     team = query(

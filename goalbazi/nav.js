@@ -175,6 +175,7 @@ function initNav(activePage) {
     drawer.innerHTML = `
       ${drawerLinksHtml}
       <div class="nav-drawer-bottom">
+        <a href="/admin" class="btn btn-ghost btn-sm btn-full" id="nav-admin-link-mobile" hidden>Admin Panel</a>
         <button class="btn btn-primary btn-sm btn-full install-app-btn" id="nav-install-mobile" type="button" data-install-app hidden>Install app</button>
         <button class="theme-toggle btn-full" id="nav-theme-toggle-mobile" type="button" data-theme-toggle></button>
         <button class="btn btn-ghost btn-sm btn-full" id="nav-logout-mobile">Log out</button>
@@ -197,6 +198,8 @@ function initNav(activePage) {
     }
     const adminLink = document.getElementById("nav-admin-link");
     if (adminLink) adminLink.hidden = !user.is_admin;
+    const adminLinkMobile = document.getElementById("nav-admin-link-mobile");
+    if (adminLinkMobile) adminLinkMobile.hidden = !user.is_admin;
   });
 
   const avatarBtn = document.getElementById("nav-avatar");
