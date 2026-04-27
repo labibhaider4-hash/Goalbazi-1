@@ -33,8 +33,6 @@
     .game-item { padding: 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     .game-item-title { font-weight: 700; font-size: .94rem; }
     .game-item-meta { color: var(--muted); font-size: .8rem; margin-top: 4px; line-height: 1.5; }
-    .profile-snap { display: grid; gap: 12px; }
-    .profile-top { display: flex; align-items: center; gap: 12px; }
     .avatar-48, .avatar-40 {
       border-radius: 50%;
       display: grid;
@@ -69,8 +67,39 @@
     .athlete-pane.active { display: block; }
     .suggestion-strip { display: grid; gap: 10px; margin-bottom: 12px; }
     .helper-note { color: var(--muted); font-size: .78rem; line-height: 1.5; margin-top: 8px; }
-    .assistant-card { padding: 16px; margin-bottom: 16px; background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
+    .assistant-fab {
+      position: fixed;
+      right: 16px;
+      bottom: 88px;
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      border: 1px solid rgba(127,255,69,.28);
+      background: linear-gradient(135deg, var(--brand), var(--accent));
+      color: #07110d;
+      display: grid;
+      place-items: center;
+      box-shadow: var(--shadow);
+      z-index: 210;
+      cursor: pointer;
+    }
+    .assistant-fab svg { width: 24px; height: 24px; }
+    .assistant-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(5,10,7,.52);
+      backdrop-filter: blur(8px);
+      z-index: 220;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      padding: 16px;
+    }
+    .assistant-modal.open { display: flex; }
+    .assistant-card { width: min(100%, 460px); max-height: min(78vh, 720px); overflow: hidden; padding: 16px; background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%); border: 1px solid var(--line); border-radius: 24px; box-shadow: var(--shadow-sm); }
     .assistant-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    .assistant-head-actions { display:flex; align-items:center; gap:8px; }
+    .assistant-close { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel); color: var(--text); font-size: 1.1rem; cursor: pointer; }
     .assistant-badge { display: inline-flex; align-items: center; gap: 8px; font-family: 'Syne', sans-serif; font-weight: 700; }
     .assistant-dot { width: 10px; height: 10px; border-radius: 999px; background: linear-gradient(135deg, var(--brand), var(--accent)); box-shadow: 0 0 0 6px rgba(127,255,69,.08); }
     .assistant-feed { display: grid; gap: 10px; max-height: 320px; overflow: auto; padding-right: 4px; }
@@ -135,8 +164,8 @@
     @media (min-width: 860px) {
       .dash-shell { padding: 32px 24px 80px; }
       .stats-grid-local { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-      .quick-actions { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-      .stack-grid { grid-template-columns: 1.15fr .85fr; align-items: start; }
+      .quick-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .stack-grid { grid-template-columns: 1fr 1fr; align-items: start; }
     }
   </style>
 </head>
@@ -171,10 +200,6 @@
         <div class="qc-label">Leagues</div>
         <div class="qc-sub">Check teams and tables</div>
       </a>
-      <a href="/profile" class="quick-card">
-        <div class="qc-label">Athlete profile</div>
-        <div class="qc-sub">Update your athlete card</div>
-      </a>
     </div>
 
     <div class="notify-card" style="margin-bottom:16px">
@@ -185,22 +210,6 @@
       <div class="notify-list" id="notifications-list"></div>
     </div>
 
-    <div class="assistant-card">
-      <div class="assistant-head">
-        <div>
-          <div class="assistant-badge"><span class="assistant-dot"></span>Goalbazi AI</div>
-          <div class="meta-line">Tap a task or ask for help with arenas, matches, leagues, or athletes.</div>
-        </div>
-        <span class="pill pill-green">Remembers your chat</span>
-      </div>
-      <div class="assistant-feed" id="assistant-feed"></div>
-      <div class="assistant-suggestions" id="assistant-suggestions"></div>
-      <div class="assistant-compose">
-        <input id="assistant-input" class="form-input" placeholder="Ask Goalbazi AI anything">
-        <button id="assistant-send" class="btn btn-primary btn-sm" type="button">Send</button>
-      </div>
-    </div>
-
     <div class="stack-grid">
       <div class="panel-card">
         <div class="section-head">
@@ -209,14 +218,7 @@
         </div>
         <div class="list-stack" id="recent-games"></div>
       </div>
-
-      <div class="panel-card">
-        <div class="section-head">
-          <h2>Your profile</h2>
-          <a href="/profile">Edit</a>
-        </div>
-        <div class="profile-snap" id="profile-snap"></div>
-      </div>
+      <div id="profile-snap" style="display:none"></div>
     </div>
 
     <div class="stack-grid" style="margin-top:16px">
@@ -235,7 +237,7 @@
           <div class="athlete-pane active" id="athlete-pane-suggested">
             <div class="section-head">
               <h2>Suggested athletes</h2>
-              <span class="meta-line">Recommended from your network and profile</span>
+              <span class="meta-line">Only a few smart suggestions, not a random list</span>
             </div>
             <div class="suggestion-strip" id="suggested-results"></div>
           </div>
@@ -290,6 +292,35 @@
   </div>
 </div>
 
+<button class="assistant-fab" id="assistant-fab" type="button" aria-label="Open Goalbazi AI">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M12 3a6.5 6.5 0 0 0-3.86 11.73c.55.42.86 1.05.86 1.75V17h6v-.52c0-.7.31-1.33.86-1.75A6.5 6.5 0 0 0 12 3Z"></path>
+    <path d="M9 18h6"></path>
+    <path d="M10 21h4"></path>
+  </svg>
+</button>
+
+<div class="assistant-modal" id="assistant-modal">
+  <div class="assistant-card">
+    <div class="assistant-head">
+      <div>
+        <div class="assistant-badge"><span class="assistant-dot"></span>Goalbazi AI</div>
+        <div class="meta-line">Tap a task or ask for help with arenas, matches, leagues, or athletes.</div>
+      </div>
+      <div class="assistant-head-actions">
+        <span class="pill pill-green">Memory on</span>
+        <button class="assistant-close" id="assistant-close" type="button" aria-label="Close Goalbazi AI">×</button>
+      </div>
+    </div>
+    <div class="assistant-feed" id="assistant-feed"></div>
+    <div class="assistant-suggestions" id="assistant-suggestions"></div>
+    <div class="assistant-compose">
+      <input id="assistant-input" class="form-input" placeholder="Ask Goalbazi AI anything">
+      <button id="assistant-send" class="btn btn-primary btn-sm" type="button">Send</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 <script src="/nav.js"></script>
 <script>
@@ -305,6 +336,7 @@
     assistantMessages: [],
     assistantSuggestions: [],
     activeAthleteTab: "suggested",
+    assistantOpen: false,
   };
 
   function esc(value = "") {
@@ -338,6 +370,11 @@
     document.getElementById("assistant-suggestions").innerHTML = (state.assistantSuggestions || []).map((item, index) => `
       <button class="assistant-chip" type="button" data-ai-suggestion="${index}">${esc(item.label || item.message || "")}</button>
     `).join("");
+  }
+
+  function setAssistantOpen(open) {
+    state.assistantOpen = open;
+    document.getElementById("assistant-modal").classList.toggle("open", open);
   }
 
   function setAthleteTab(tab) {
@@ -393,10 +430,11 @@
     } else if (item.action === "community_search") {
       const q = (state.dashboard?.profile?.location || "").trim();
       document.getElementById("user-search").value = q;
+      setAthleteTab("discover");
       await searchUsers();
       document.getElementById("community-results").scrollIntoView({ behavior: "smooth", block: "start" });
     } else if (item.action === "profile_review") {
-      document.getElementById("profile-snap").scrollIntoView({ behavior: "smooth", block: "start" });
+      window.location.href = "/profile";
     } else if (item.action === "league_info") {
       window.location.href = "/leagues";
     }
@@ -508,7 +546,7 @@
         </div>
         ${ratingControlsForUser(user)}
       </div>
-    `).join("") : `<div class="empty-note">No athletes matched that search.</div>`;
+    `).join("") : `<div class="empty-note">Search for an athlete by name, handle, city, or team to see results.</div>`;
   }
 
   function renderSuggestedAthletes() {
@@ -629,8 +667,19 @@
     renderConversations();
   }
 
+  async function loadSuggestedAthletes() {
+    const data = await apiFetch("/api/community/users?q=");
+    if (!data) return;
+    state.suggestedAthletes = data.suggested || [];
+    renderSuggestedAthletes();
+  }
+
   async function searchUsers() {
     const q = document.getElementById("user-search").value.trim();
+    if (!q) {
+      document.getElementById("community-results").innerHTML = `<div class="empty-note">Search for an athlete by name, handle, city, or team to see results.</div>`;
+      return;
+    }
     const data = await apiFetch(`/api/community/users?q=${encodeURIComponent(q)}`);
     if (!data) return;
     state.suggestedAthletes = data.suggested || [];
@@ -706,6 +755,11 @@
   document.querySelectorAll("[data-athlete-tab]").forEach(btn => {
     btn.addEventListener("click", () => setAthleteTab(btn.dataset.athleteTab));
   });
+  document.getElementById("assistant-fab").addEventListener("click", () => setAssistantOpen(true));
+  document.getElementById("assistant-close").addEventListener("click", () => setAssistantOpen(false));
+  document.getElementById("assistant-modal").addEventListener("click", e => {
+    if (e.target.id === "assistant-modal") setAssistantOpen(false);
+  });
   document.getElementById("user-search").addEventListener("input", () => {
     setAthleteTab("discover");
     searchUsers();
@@ -729,6 +783,7 @@
   setAthleteTab("suggested");
   loadDashboard();
   loadAssistant();
+  loadSuggestedAthletes();
   loadFriends();
   loadConversations();
   searchUsers();

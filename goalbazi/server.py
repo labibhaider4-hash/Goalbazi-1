@@ -329,6 +329,7 @@ def seed_db():
             created_at TEXT NOT NULL
         )
     """)
+    cur.execute("ALTER TABLE teams ADD COLUMN IF NOT EXISTS archived_at TEXT")
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS team_memberships (
@@ -515,7 +516,7 @@ def get_profile(user_id):
         """SELECT t.id, t.name, t.logo_url, tm.role, tm.jersey_number
            FROM team_memberships tm
            JOIN teams t ON t.id = tm.team_id
-           WHERE tm.user_id = %s""",
+           WHERE tm.user_id = %s AND t.archived_at IS NULL""",
         (user_id,),
         one=True,
     )
@@ -603,6 +604,7 @@ def get_leagues_with_teams():
                   t.name AS team_name, t.logo_url, t.city, t.skill_level
            FROM league_teams lt
            JOIN teams t ON t.id = lt.team_id
+           WHERE t.archived_at IS NULL
            ORDER BY lt.league_id ASC, lt.rank ASC, lt.points DESC, t.name ASC"""
     )]
     for league in leagues:
@@ -751,7 +753,7 @@ def build_assistant_context(user_id):
                   t.name AS team_name
            FROM users u
            LEFT JOIN team_memberships tm ON tm.user_id = u.id
-           LEFT JOIN teams t ON t.id = tm.team_id
+           LEFT JOIN teams t ON t.id = tm.team_id AND t.archived_at IS NULL
            WHERE u.id != %s
            ORDER BY u.id DESC
            LIMIT 5""",
@@ -1324,7 +1326,7 @@ def api_admin_users():
                   u.bio, u.avatar_base64, u.is_admin, t.name AS team_name
            FROM users u
            LEFT JOIN team_memberships tm ON tm.user_id = u.id
-           LEFT JOIN teams t ON t.id = tm.team_id
+           LEFT JOIN teams t ON t.id = tm.team_id AND t.archived_at IS NULL
            ORDER BY u.id DESC"""
     )]
     return jsonify({"users": users})
@@ -1552,24 +1554,36 @@ def api_admin_teams():
                   COUNT(tm.id) AS member_count
            FROM teams t
            LEFT JOIN team_memberships tm ON tm.team_id = t.id
+           WHERE t.archived_at IS NULL
            GROUP BY t.id
            ORDER BY t.id DESC"""
+    )]
+    archived_teams = [dict(r) for r in query(
+        """SELECT t.*,
+                  COUNT(tm.id) AS member_count
+           FROM teams t
+           LEFT JOIN team_memberships tm ON tm.team_id = t.id
+           WHERE t.archived_at IS NOT NULL
+           GROUP BY t.id
+           ORDER BY t.archived_at DESC, t.id DESC"""
     )]
     members = [dict(r) for r in query(
         """SELECT tm.id, tm.team_id, tm.user_id, tm.role, tm.jersey_number, tm.joined_at,
                   u.name AS user_name, u.handle
            FROM team_memberships tm
            JOIN users u ON u.id = tm.user_id
+           JOIN teams t ON t.id = tm.team_id
+           WHERE t.archived_at IS NULL
            ORDER BY tm.team_id ASC, u.name ASC"""
     )]
     players = [dict(r) for r in query(
         """SELECT u.id, u.name, u.handle, t.name AS team_name
            FROM users u
            LEFT JOIN team_memberships tm ON tm.user_id = u.id
-           LEFT JOIN teams t ON t.id = tm.team_id
+           LEFT JOIN teams t ON t.id = tm.team_id AND t.archived_at IS NULL
            ORDER BY u.name ASC"""
     )]
-    return jsonify({"teams": teams, "memberships": members, "players": players})
+    return jsonify({"teams": teams, "archived_teams": archived_teams, "memberships": members, "players": players})
 
 
 @app.route("/api/admin/teams", methods=["POST"])
@@ -1583,7 +1597,7 @@ def api_admin_create_team():
            VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
         (
             data.get("name", "").strip(),
-            data.get("city", "Delhi NCR").strip(),
+            data.get("city", "").strip(),
             data.get("short_name", "").strip(),
             data.get("logo_url", "").strip(),
             data.get("skill_level", "Intermediate").strip(),
@@ -1607,7 +1621,7 @@ def api_admin_update_team(team_id):
            WHERE id = %s""",
         (
             data.get("name", "").strip(),
-            data.get("city", "Delhi NCR").strip(),
+            data.get("city", "").strip(),
             data.get("short_name", "").strip(),
             data.get("logo_url", "").strip(),
             data.get("skill_level", "Intermediate").strip(),
@@ -1623,13 +1637,29 @@ def api_admin_update_team(team_id):
 @app.route("/api/admin/teams/<int:team_id>", methods=["DELETE"])
 @admin_required
 def api_admin_delete_team(team_id):
+    query("UPDATE teams SET archived_at = %s WHERE id = %s", (datetime.now().isoformat(), team_id), commit=True)
+    log_event("admin_delete_team", f"/api/admin/teams/{team_id}", {"team_id": team_id})
+    return jsonify({"ok": True})
+
+
+@app.route("/api/admin/teams/<int:team_id>/restore", methods=["POST"])
+@admin_required
+def api_admin_restore_team(team_id):
+    query("UPDATE teams SET archived_at = NULL WHERE id = %s", (team_id,), commit=True)
+    log_event("admin_restore_team", f"/api/admin/teams/{team_id}/restore", {"team_id": team_id})
+    return jsonify({"ok": True})
+
+
+@app.route("/api/admin/teams/<int:team_id>/permanent-delete", methods=["DELETE"])
+@admin_required
+def api_admin_permanent_delete_team(team_id):
     conn = get_db()
     cur = conn.cursor()
     cur.execute("DELETE FROM league_teams WHERE team_id = %s", (team_id,))
     cur.execute("DELETE FROM team_memberships WHERE team_id = %s", (team_id,))
     cur.execute("DELETE FROM teams WHERE id = %s", (team_id,))
     conn.commit()
-    log_event("admin_delete_team", f"/api/admin/teams/{team_id}", {"team_id": team_id})
+    log_event("admin_permanent_delete_team", f"/api/admin/teams/{team_id}/permanent-delete", {"team_id": team_id})
     return jsonify({"ok": True})
 
 
@@ -1680,7 +1710,7 @@ def api_admin_delete_team_member(membership_id):
 @admin_required
 def api_admin_leagues():
     leagues, _ = get_leagues_with_teams()
-    teams = [dict(r) for r in query("SELECT id, name, city, logo_url, skill_level FROM teams ORDER BY name ASC")]
+    teams = [dict(r) for r in query("SELECT id, name, city, logo_url, skill_level FROM teams WHERE archived_at IS NULL ORDER BY name ASC")]
     return jsonify({"leagues": leagues, "teams": teams})
 
 
@@ -2168,7 +2198,7 @@ def api_profile_stats():
            JOIN game_players gp2 ON gp2.game_id = gp1.game_id AND gp2.user_id != %s
            JOIN users u ON u.id = gp2.user_id
            LEFT JOIN team_memberships tm ON tm.user_id = u.id
-           LEFT JOIN teams t ON t.id = tm.team_id
+           LEFT JOIN teams t ON t.id = tm.team_id AND t.archived_at IS NULL
            LEFT JOIN player_ratings pr ON pr.rated_id = u.id
            WHERE gp1.user_id = %s AND gp1.confirmed = 1 AND gp2.confirmed = 1
            GROUP BY u.id, u.name, u.handle, u.avatar_base64, t.name
@@ -2204,7 +2234,7 @@ def api_profile_stats():
            FROM users u
            LEFT JOIN player_open_ratings por ON por.rater_id = %s AND por.rated_id = u.id
            LEFT JOIN team_memberships tm ON tm.user_id = u.id
-           LEFT JOIN teams t ON t.id = tm.team_id
+               LEFT JOIN teams t ON t.id = tm.team_id AND t.archived_at IS NULL
            WHERE u.id != %s
            ORDER BY u.name ASC
            LIMIT 24""",
@@ -2323,7 +2353,7 @@ def api_community_users():
                   t.name AS team_name
            FROM users u
            LEFT JOIN team_memberships tm ON tm.user_id = u.id
-           LEFT JOIN teams t ON t.id = tm.team_id
+           LEFT JOIN teams t ON t.id = tm.team_id AND t.archived_at IS NULL
            WHERE u.id != %s AND (
              %s = '' OR LOWER(u.name) LIKE %s OR LOWER(u.handle) LIKE %s OR LOWER(u.location) LIKE %s OR LOWER(COALESCE(t.name, '')) LIKE %s
            )
@@ -2353,7 +2383,9 @@ def api_community_users():
                 (row.get("team_name") and row.get("team_name") == (my_profile.get("team") or {}).get("name"))
             )
         )
-    suggested = [row for row in rows if row["is_suggested"]][:6]
+    suggested = [row for row in rows if row["is_suggested"]][:3]
+    if not search:
+        rows = []
     return jsonify({"users": rows, "suggested": suggested})
 
 
@@ -2366,7 +2398,7 @@ def api_friends():
            FROM friendships f
            JOIN users u ON u.id = CASE WHEN f.user_one_id = %s THEN f.user_two_id ELSE f.user_one_id END
            LEFT JOIN team_memberships tm ON tm.user_id = u.id
-           LEFT JOIN teams t ON t.id = tm.team_id
+           LEFT JOIN teams t ON t.id = tm.team_id AND t.archived_at IS NULL
            WHERE (f.user_one_id = %s OR f.user_two_id = %s) AND f.status = 'accepted'
            ORDER BY u.name ASC""",
         (current_user_id(), current_user_id(), current_user_id()),

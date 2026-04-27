@@ -212,13 +212,17 @@
             <input name="short_name" placeholder="Short name">
           </div>
           <div class="form-grid two">
-            <input name="city" placeholder="City" value="Delhi NCR">
+            <input name="city" placeholder="City">
             <select name="skill_level"><option>Beginner</option><option selected>Intermediate</option><option>Competitive</option></select>
           </div>
           <input name="logo_url" placeholder="Logo URL">
           <textarea name="description" placeholder="Team description"></textarea>
           <button class="btn primary" type="submit">Create team</button>
         </form>
+      </div>
+      <div class="editor-card">
+        <div class="editor-title">Archived teams</div>
+        <div class="items-grid" id="archived-teams-grid"></div>
       </div>
       <div class="items-grid two-col" id="teams-grid"></div>
     </section>
@@ -307,6 +311,7 @@
     const state = {
       users: [],
       teams: [],
+      archivedTeams: [],
       memberships: [],
       leagueTeams: [],
       leagues: [],
@@ -469,6 +474,7 @@
       const data = await api("/api/admin/teams");
       if (!data) return;
       state.teams = data.teams || [];
+      state.archivedTeams = data.archived_teams || [];
       state.memberships = data.memberships || [];
       state.playersForTeams = data.players || [];
       document.getElementById("teams-grid").innerHTML = state.teams.map(team => {
@@ -528,6 +534,20 @@
           </div>
         `;
       }).join("");
+      document.getElementById("archived-teams-grid").innerHTML = state.archivedTeams.length ? state.archivedTeams.map(team => `
+        <div class="item-card">
+          <div class="item-top">
+            <div>
+              <div class="item-title">${esc(team.name)}</div>
+              <div class="item-meta">${esc(team.city || "No city")} · archived</div>
+            </div>
+          </div>
+          <div class="action-row">
+            <button class="mini-btn primary" type="button" onclick="restoreTeam(${team.id})">Restore</button>
+            <button class="mini-btn danger" type="button" onclick="permanentlyDeleteTeam(${team.id})">Delete permanently</button>
+          </div>
+        </div>
+      `).join("") : `<div class="item-meta">No archived teams.</div>`;
 
       document.querySelectorAll(".team-form").forEach(form => form.addEventListener("submit", async event => {
         event.preventDefault();
@@ -552,9 +572,22 @@
     }
 
     async function deleteTeam(teamId) {
-      if (!confirm("Delete this team?")) return;
+      if (!confirm("Archive this team? You can restore it later from Archived teams.")) return;
       await api(`/api/admin/teams/${teamId}`, { method: "DELETE" });
-      toast("Team deleted");
+      toast("Team archived");
+      await Promise.all([loadTeams(), loadLeagues(), loadUsers()]);
+    }
+
+    async function restoreTeam(teamId) {
+      await api(`/api/admin/teams/${teamId}/restore`, { method: "POST" });
+      toast("Team restored");
+      await Promise.all([loadTeams(), loadLeagues(), loadUsers()]);
+    }
+
+    async function permanentlyDeleteTeam(teamId) {
+      if (!confirm("Delete this archived team permanently? This cannot be undone.")) return;
+      await api(`/api/admin/teams/${teamId}/permanent-delete`, { method: "DELETE" });
+      toast("Team permanently deleted");
       await Promise.all([loadTeams(), loadLeagues(), loadUsers()]);
     }
 
@@ -825,6 +858,8 @@
 
     window.deleteUser = deleteUser;
     window.deleteTeam = deleteTeam;
+    window.restoreTeam = restoreTeam;
+    window.permanentlyDeleteTeam = permanentlyDeleteTeam;
     window.deleteMembership = deleteMembership;
     window.deleteLeague = deleteLeague;
     window.deleteLeagueTeam = deleteLeagueTeam;
