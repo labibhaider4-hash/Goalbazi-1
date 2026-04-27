@@ -154,7 +154,14 @@ function initNav(activePage) {
     <nav class="nav-links">${linksHtml}</nav>
     <div class="nav-right">
       <button class="theme-toggle hide-mobile" id="nav-theme-toggle" type="button" data-theme-toggle></button>
-      <div class="nav-avatar" id="nav-avatar" title="Profile">?</div>
+      <div class="nav-profile-wrap">
+        <button class="nav-avatar" id="nav-avatar" type="button" title="Profile" aria-label="Open profile menu">?</button>
+        <div class="nav-profile-menu" id="nav-profile-menu" hidden>
+          <a href="/profile">Profile</a>
+          <a href="/admin" id="nav-admin-link" hidden>Admin Panel</a>
+          <button type="button" id="nav-menu-logout">Log out</button>
+        </div>
+      </div>
       <button class="btn btn-ghost btn-sm hide-mobile" id="nav-logout">Log out</button>
     </div>
     <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu">
@@ -184,8 +191,27 @@ function initNav(activePage) {
     if (!user) return;
     const initials = user.name.split(" ").map(p => p[0]).slice(0, 2).join("").toUpperCase();
     const el = document.getElementById("nav-avatar");
-    if (el) { el.textContent = initials; el.title = user.name; }
+    if (el) {
+      el.innerHTML = user.avatar_base64 ? `<img src="${user.avatar_base64}" alt="${user.name}">` : initials;
+      el.title = user.name;
+    }
+    const adminLink = document.getElementById("nav-admin-link");
+    if (adminLink) adminLink.hidden = !user.is_admin;
   });
+
+  const avatarBtn = document.getElementById("nav-avatar");
+  const profileMenu = document.getElementById("nav-profile-menu");
+  if (avatarBtn && profileMenu) {
+    avatarBtn.addEventListener("click", event => {
+      event.stopPropagation();
+      profileMenu.hidden = !profileMenu.hidden;
+    });
+    document.addEventListener("click", event => {
+      if (!profileMenu.hidden && !profileMenu.contains(event.target) && event.target !== avatarBtn) {
+        profileMenu.hidden = true;
+      }
+    });
+  }
 
   // Hamburger toggle
   const hamburger = document.getElementById("nav-hamburger");
@@ -206,8 +232,10 @@ function initNav(activePage) {
 
   const logoutBtn = document.getElementById("nav-logout");
   const logoutMobile = document.getElementById("nav-logout-mobile");
+  const logoutMenu = document.getElementById("nav-menu-logout");
   if (logoutBtn) logoutBtn.addEventListener("click", logout);
   if (logoutMobile) logoutMobile.addEventListener("click", logout);
+  if (logoutMenu) logoutMenu.addEventListener("click", logout);
 }
 
 function showToast(message, duration = 2400) {
