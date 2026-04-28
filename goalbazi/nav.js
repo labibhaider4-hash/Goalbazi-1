@@ -279,8 +279,8 @@ const GoalbaziPullRefresh = {
     indicator.className = "pull-refresh-indicator";
     indicator.setAttribute("aria-hidden", "true");
     indicator.innerHTML = `
-      <span class="pull-refresh-logo"><img src="/assets/goalbazi-logo.svg" alt=""></span>
-      <span class="pull-refresh-copy">SIUUUUU</span>
+      <span class="pull-refresh-ring"><span class="pull-refresh-logo"><img src="/assets/goalbazi-logo.svg" alt=""></span></span>
+      <span class="pull-refresh-copy">SIUU</span>
     `;
     document.body.appendChild(indicator);
   },
@@ -300,13 +300,13 @@ const GoalbaziPullRefresh = {
     const eased = Math.round(clamped * 0.72);
     indicator.classList.toggle("visible", clamped > 8);
     indicator.classList.toggle("ready", clamped >= this.threshold);
-    indicator.style.transform = `translate(-50%, ${-78 + eased}px) scale(${0.94 + Math.min(clamped / 420, .16)})`;
+    indicator.style.transform = `translate(-50%, ${-68 + eased}px) scale(${0.96 + Math.min(clamped / 560, .10)})`;
   },
   reset() {
     const indicator = document.getElementById("pull-refresh-indicator");
     if (!indicator) return;
     indicator.classList.remove("visible", "ready");
-    indicator.style.transform = "translate(-50%, -78px) scale(.94)";
+    indicator.style.transform = "translate(-50%, -68px) scale(.96)";
     document.body.classList.remove("pull-refreshing");
   },
   refresh() {
@@ -315,7 +315,7 @@ const GoalbaziPullRefresh = {
     document.body.classList.add("pull-refreshing");
     if (indicator) {
       indicator.classList.add("visible", "ready");
-      indicator.style.transform = "translate(-50%, 10px) scale(1.04)";
+      indicator.style.transform = "translate(-50%, 8px) scale(1.02)";
     }
     setTimeout(() => window.location.reload(), 420);
   },
