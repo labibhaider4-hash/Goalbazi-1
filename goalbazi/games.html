@@ -1,4 +1,10 @@
 <!DOCTYPE html>
+<!--
+  Games Page
+  ----------
+  Lets athletes browse open matches and create a match. The Arena dropdown is
+  filled from /api/dashboard turfs before the "no games yet" empty state.
+-->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -61,7 +67,7 @@
     }
   </style>
 </head>
-<body>
+<body class="goalbazi-app-bg">
 <nav class="navbar" id="navbar"></nav>
 <div class="nav-drawer" id="nav-drawer"></div>
 <div class="ambient ambient-a"></div>
@@ -139,6 +145,10 @@
 <div class="toast" id="toast"></div>
 <script src="/nav.js"></script>
 <script>
+  // Games script map:
+  // 1. Load dashboard data for games and active arenas
+  // 2. Populate the create-match arena dropdown
+  // 3. Submit new matches to /api/games and open the lobby
   initNav("games");
 
   // Tabs

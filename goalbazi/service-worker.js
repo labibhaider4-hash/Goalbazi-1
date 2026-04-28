@@ -1,5 +1,6 @@
-const CACHE_NAME = "goalbazi-pwa-v3";
+const CACHE_NAME = "goalbazi-pwa-v4";
 
+// Files that make the installed PWA open quickly and still show a useful page offline.
 const APP_SHELL = [
   "/",
   "/login",
@@ -11,6 +12,7 @@ const APP_SHELL = [
 ];
 
 self.addEventListener("install", event => {
+  // Pre-cache the app shell and move the new worker into the waiting phase quickly.
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(APP_SHELL))
@@ -19,6 +21,7 @@ self.addEventListener("install", event => {
 });
 
 self.addEventListener("activate", event => {
+  // Remove old cache versions so users do not stay stuck on stale screens.
   event.waitUntil(
     caches.keys()
       .then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))))
@@ -27,12 +30,14 @@ self.addEventListener("activate", event => {
 });
 
 self.addEventListener("message", event => {
+  // nav.js sends this when the user taps the "Update" banner.
   if (event.data && event.data.type === "SKIP_WAITING") {
     self.skipWaiting();
   }
 });
 
 self.addEventListener("fetch", event => {
+  // Network-first for pages, cache fallback for slower/offline mobile connections.
   const request = event.request;
   const url = new URL(request.url);
 
@@ -66,6 +71,7 @@ self.addEventListener("fetch", event => {
 });
 
 self.addEventListener("push", event => {
+  // Shows phone/browser notifications for direct messages and future alerts.
   let data = {};
   try {
     data = event.data ? event.data.json() : {};
@@ -84,6 +90,7 @@ self.addEventListener("push", event => {
 });
 
 self.addEventListener("notificationclick", event => {
+  // Opens or focuses Goalbazi when the user taps a notification.
   event.notification.close();
   const targetUrl = event.notification.data?.url || "/dashboard";
   event.waitUntil(

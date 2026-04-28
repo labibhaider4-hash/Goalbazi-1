@@ -1,4 +1,10 @@
 <!DOCTYPE html>
+<!--
+  Goalbazi Admin Panel
+  --------------------
+  Admin-only control room for athletes, teams, leagues, arenas, ratings, archives,
+  and notifications. Most actions call /api/admin/* routes in server.py.
+-->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -43,8 +49,37 @@
       background:
         radial-gradient(circle at top left, rgba(132,242,85,.12), transparent 30%),
         linear-gradient(180deg, var(--bg) 0%, var(--panel-2) 100%);
+      overflow-x: hidden;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: -12%;
+      pointer-events: none;
+      z-index: 0;
+      opacity: .055;
+      transform: rotate(-7deg);
+      background:
+        linear-gradient(rgba(160,255,190,.12) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(160,255,190,.08) 1px, transparent 1px);
+      background-size: 74px 74px;
+      animation: adminPitchDrift 42s linear infinite;
+    }
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      opacity: .10;
+      background: radial-gradient(circle at 80% 16%, rgba(132,242,85,.12), transparent 34%);
+    }
+    @keyframes adminPitchDrift {
+      from { background-position: 0 0, 0 0; }
+      to { background-position: 148px 74px, 148px 74px; }
     }
     .shell { max-width: 1200px; margin: 0 auto; padding: 18px 14px 56px; }
+    .shell { position: relative; z-index: 1; }
     .topbar { display: grid; gap: 12px; margin-bottom: 18px; }
     .brand-card, .section-card, .editor-card, .item-card {
       background: var(--panel);
@@ -142,7 +177,7 @@
     }
   </style>
 </head>
-<body>
+<body class="goalbazi-admin-bg">
   <div class="shell">
     <div class="topbar">
       <div class="brand-card">
@@ -316,6 +351,11 @@
 
   <script src="/nav.js"></script>
   <script>
+    // Admin page script map:
+    // 1. Load data for each tab from /api/admin/*
+    // 2. Render editable cards/forms for each entity
+    // 3. Archive/restore/delete teams and arenas safely
+    // 4. Keep related sections refreshed after every save/delete
     GoalbaziTheme.attachButton(document.getElementById("admin-theme-toggle"));
 
     const state = {

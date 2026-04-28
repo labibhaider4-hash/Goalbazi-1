@@ -1,4 +1,10 @@
 <!DOCTYPE html>
+<!--
+  Leagues Page
+  ------------
+  Public athlete view of active leagues with teams. Empty/admin-only leagues are
+  hidden so users do not see demo or unfinished standings.
+-->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -60,7 +66,7 @@
     }
   </style>
 </head>
-<body>
+<body class="goalbazi-app-bg">
 <nav class="navbar" id="navbar"></nav>
 <div class="nav-drawer" id="nav-drawer"></div>
 <div class="ambient ambient-a"></div>
@@ -70,7 +76,7 @@
   <div class="container leagues-shell">
     <div class="page-header">
       <h1>Leagues</h1>
-      <p>Active competitions and standings</p>
+      <p>Active competitions and standings across Delhi NCR</p>
     </div>
 
     <div class="section-title" style="font-size:1rem;margin-bottom:14px">Active leagues</div>
@@ -96,6 +102,10 @@
 <div class="toast" id="toast"></div>
 <script src="/nav.js"></script>
 <script>
+  // Leagues script map:
+  // 1. Load active league data from /api/dashboard
+  // 2. Show a clean empty state if no league has teams yet
+  // 3. Render standings for the first active league with teams
   initNav("leagues");
 
   function esc(value = "") {

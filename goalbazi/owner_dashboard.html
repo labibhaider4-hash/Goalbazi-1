@@ -1,4 +1,10 @@
 <!DOCTYPE html>
+<!--
+  Arena Partner Dashboard
+  -----------------------
+  Owner-facing portal for bookings, slot visibility, UPI/QR payments, and arena
+  settings. Saving settings reactivates/creates the owner's arena in server.py.
+-->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -27,9 +33,19 @@
     }
     *{box-sizing:border-box;margin:0;padding:0}
     html,body{font-family:"Manrope",sans-serif;background:radial-gradient(circle at 15% 20%,rgba(132,242,85,.10),transparent 24%),linear-gradient(180deg,var(--bg) 0%,var(--bg-2) 100%);color:var(--text);min-height:100vh;overflow-x:hidden}
+    body::before{content:"";position:fixed;inset:-12%;pointer-events:none;z-index:0;opacity:.13;transform:rotate(-7deg);background:linear-gradient(rgba(160,255,190,.12) 1px,transparent 1px),linear-gradient(90deg,rgba(160,255,190,.08) 1px,transparent 1px);background-size:74px 74px;mask-image:radial-gradient(circle at 50% 44%,black 0%,transparent 72%);animation:ownerPitchDrift 30s linear infinite}
+    body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.18;background:linear-gradient(115deg,transparent 0 34%,rgba(132,242,85,.10) 46%,transparent 58%);filter:blur(14px);animation:ownerSoftSweep 14s ease-in-out infinite alternate}
+    .ambient{position:fixed;border-radius:50%;pointer-events:none;filter:blur(80px);opacity:.5;z-index:0}
+    .ambient-a{top:-80px;left:-60px;width:360px;height:360px;background:radial-gradient(circle,rgba(132,242,85,.10),transparent 70%);animation:ownerGlowA 16s ease-in-out infinite alternate}
+    .ambient-b{bottom:-100px;right:-80px;width:420px;height:420px;background:radial-gradient(circle,rgba(61,232,160,.08),transparent 70%);animation:ownerGlowB 18s ease-in-out infinite alternate}
+    @keyframes ownerPitchDrift{from{background-position:0 0,0 0}to{background-position:148px 74px,148px 74px}}
+    @keyframes ownerSoftSweep{from{transform:translateX(-4%) scale(1);opacity:.12}to{transform:translateX(4%) scale(1.06);opacity:.22}}
+    @keyframes ownerGlowA{from{transform:translate3d(0,0,0) scale(1)}to{transform:translate3d(72px,42px,0) scale(1.16)}}
+    @keyframes ownerGlowB{from{transform:translate3d(0,0,0) scale(1)}to{transform:translate3d(-82px,-34px,0) scale(1.12)}}
+    @media (prefers-reduced-motion:reduce){body::before,body::after,.ambient-a,.ambient-b{animation:none!important}}
 
     /* Header */
-    .header{background:var(--panel);border-bottom:1px solid var(--line);padding:16px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+    .header{position:relative;z-index:10;background:var(--panel);border-bottom:1px solid var(--line);padding:16px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px}
     .header-left{display:flex;align-items:center;gap:14px;min-width:0}
     .header-logo{display:flex;align-items:center;gap:9px;font-size:1.1rem;font-weight:800;color:var(--brand);white-space:nowrap}
     .header-logo img{width:34px;height:34px;object-fit:contain;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid var(--line);padding:3px}
@@ -43,7 +59,7 @@
     .btn-sm{padding:6px 12px;font-size:.8rem;border-radius:8px}
 
     /* Layout */
-    .shell{max-width:1200px;margin:0 auto;padding:28px 20px}
+    .shell{position:relative;z-index:1;max-width:1200px;margin:0 auto;padding:28px 20px}
 
     /* Stats */
     .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px}
@@ -131,7 +147,10 @@
     }
   </style>
 </head>
-<body>
+<body class="goalbazi-app-bg">
+
+<div class="ambient ambient-a"></div>
+<div class="ambient ambient-b"></div>
 
 <div class="header">
   <div class="header-left">
@@ -278,6 +297,11 @@
 
 <script src="/nav.js"></script>
 <script>
+  // Arena Partner script map:
+  // 1. Load owner dashboard, bookings, notifications, and arena settings
+  // 2. Approve/reject UPI bookings
+  // 3. Manage slot visibility and QR upload
+  // 4. Save arena details, images, GPS, and pricing
   GoalbaziTheme.attachButton(document.getElementById("owner-theme-toggle"));
 
   let ownerData = null;
