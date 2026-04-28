@@ -44,6 +44,7 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "").strip()
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "").strip()
+PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").strip().rstrip("/")
 VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "").strip()
 VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "").strip()
 VAPID_CLAIMS_EMAIL = os.environ.get("VAPID_CLAIMS_EMAIL", "admin@goalbazi.app").strip()
@@ -149,7 +150,22 @@ def unique_handle_from_email_name(email: str, name: str) -> str:
 
 
 def google_redirect_uri() -> str:
-    return request.url_root.rstrip("/") + "/auth/google/callback"
+    """Build the exact public callback URL registered in Google Cloud.
+
+    Railway sits behind a proxy, so request.url_root can sometimes look like
+    http://... inside Flask even when the real user-facing site is https://...
+    Google requires an exact redirect_uri match, so prefer PUBLIC_BASE_URL and
+    otherwise force forwarded Railway hosts to HTTPS.
+    """
+    if PUBLIC_BASE_URL:
+        return f"{PUBLIC_BASE_URL}/auth/google/callback"
+    forwarded_host = request.headers.get("X-Forwarded-Host", "").split(",")[0].strip()
+    host = forwarded_host or request.host
+    forwarded_proto = request.headers.get("X-Forwarded-Proto", "").split(",")[0].strip()
+    scheme = forwarded_proto or request.scheme
+    if host.endswith(".up.railway.app") or host.endswith(".railway.app"):
+        scheme = "https"
+    return f"{scheme}://{host}/auth/google/callback"
 
 
 def exchange_google_code(code: str) -> dict:
