@@ -101,7 +101,7 @@
       inset: 0;
       background: rgba(5,10,7,.52);
       backdrop-filter: blur(8px);
-      z-index: 220;
+      z-index: 320;
       display: none;
       align-items: flex-end;
       justify-content: center;
@@ -266,6 +266,17 @@
         background: rgba(127,255,69,.09);
       }
       .assistant-fab { bottom: 102px; width: 52px; height: 52px; }
+      .assistant-modal {
+        z-index: 360;
+        align-items: flex-end;
+        padding: 14px 12px calc(96px + env(safe-area-inset-bottom));
+      }
+      .assistant-card {
+        max-height: calc(100vh - var(--nav-h) - 122px - env(safe-area-inset-bottom));
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto auto;
+      }
+      .assistant-feed { max-height: none; min-height: 120px; }
       .chat-feed { max-height: min(48vh, 360px); }
       body.phone-panel-open { overflow: hidden; }
     }
