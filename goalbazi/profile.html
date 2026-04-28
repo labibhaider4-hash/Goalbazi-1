@@ -74,6 +74,64 @@
     .rating-count { color: var(--muted); font-size: .8rem; }
     .no-rating { color: var(--muted); font-size: .85rem; margin-top: 10px; font-style: italic; }
 
+    .radar-card {
+      background:
+        radial-gradient(circle at 18% 12%, rgba(127,255,69,.12), transparent 30%),
+        var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 20px;
+      overflow: hidden;
+      position: relative;
+    }
+    .radar-card::before {
+      content: "";
+      position: absolute;
+      inset: -40%;
+      background: conic-gradient(from 0deg, transparent, rgba(127,255,69,.10), transparent 28%);
+      animation: radarSweep 18s linear infinite;
+      pointer-events: none;
+    }
+    .radar-content { position: relative; z-index: 1; }
+    .radar-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 16px; }
+    .radar-title { font-family: 'Syne', sans-serif; font-size: 1.05rem; font-weight: 800; }
+    .radar-sub { color: var(--muted); font-size: .84rem; margin-top: 4px; }
+    .overall-score {
+      min-width: 62px;
+      height: 62px;
+      border-radius: 18px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      color: #061008;
+      font-family: 'Syne', sans-serif;
+      font-size: 1.75rem;
+      font-weight: 900;
+      box-shadow: 0 18px 40px rgba(127,255,69,.16);
+    }
+    .radar-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(190px, .72fr); gap: 16px; align-items: center; }
+    .radar-svg { width: 100%; max-width: 320px; margin: 0 auto; display: block; }
+    .radar-grid-line { fill: rgba(255,255,255,.018); stroke: rgba(168,196,180,.28); stroke-width: 1.2; }
+    .radar-axis { stroke: rgba(168,196,180,.24); stroke-width: 1; }
+    .radar-shape { fill: rgba(127,255,69,.26); stroke: var(--brand); stroke-width: 3; filter: drop-shadow(0 0 18px rgba(127,255,69,.20)); }
+    .radar-point { fill: var(--brand); stroke: var(--panel); stroke-width: 2; }
+    .radar-label { fill: var(--muted-2); font-size: 13px; font-weight: 800; letter-spacing: .08em; }
+    .radar-stat-list { display: grid; gap: 10px; }
+    .radar-stat { display: grid; grid-template-columns: 42px 1fr 34px; gap: 10px; align-items: center; }
+    .radar-code { color: var(--muted-2); font-size: .78rem; font-weight: 900; letter-spacing: .06em; }
+    .radar-bar { height: 8px; border-radius: 999px; overflow: hidden; background: rgba(255,255,255,.07); }
+    .radar-fill { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--brand), var(--accent)); }
+    .radar-value { color: var(--brand); font-weight: 900; font-size: .9rem; text-align: right; }
+    @keyframes radarSweep {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @media (max-width: 760px) {
+      .radar-grid { grid-template-columns: 1fr; }
+      .radar-svg { max-width: 280px; }
+    }
+
     .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
 
     .tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--line); }
@@ -198,6 +256,10 @@
       <div class="page-loader"><div class="spinner"></div></div>
     </div>
 
+    <div class="radar-card" id="radar-card">
+      <div class="page-loader"><div class="spinner"></div></div>
+    </div>
+
     <div class="stats-row" id="stats-row">
       <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Games played</div></div>
       <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Games created</div></div>
@@ -282,6 +344,83 @@
     return `<div class="avatar-initials" style="width:${size}px;height:${size}px;font-size:${Math.round(size/2.5)}px">${i}</div>`;
   }
 
+  function esc(value = "") {
+    return String(value).replace(/[&<>"']/g, ch => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[ch]));
+  }
+
+  function clampScore(value) {
+    const n = Number(value || 50);
+    return Math.max(1, Math.min(100, Number.isFinite(n) ? n : 50));
+  }
+
+  function radarPoints(scores) {
+    const center = 180;
+    const maxRadius = 138;
+    return scores.map((score, index) => {
+      const angle = (-90 + index * 60) * Math.PI / 180;
+      const radius = maxRadius * (clampScore(score) / 100);
+      return {
+        x: +(center + Math.cos(angle) * radius).toFixed(1),
+        y: +(center + Math.sin(angle) * radius).toFixed(1),
+      };
+    });
+  }
+
+  function renderRadarCard(player) {
+    const stats = [
+      ["PAC", "Pace", clampScore(player.pace)],
+      ["SHO", "Shooting", clampScore(player.shooting)],
+      ["PAS", "Passing", clampScore(player.passing)],
+      ["DRI", "Dribbling", clampScore(player.dribbling)],
+      ["DEF", "Defending", clampScore(player.defending)],
+      ["PHY", "Physical", clampScore(player.physical)],
+    ];
+    const overall = Math.round(stats.reduce((sum, item) => sum + item[2], 0) / stats.length);
+    const points = radarPoints(stats.map(item => item[2]));
+    const pointString = points.map(point => `${point.x},${point.y}`).join(" ");
+    document.getElementById("radar-card").innerHTML = `
+      <div class="radar-content">
+        <div class="radar-head">
+          <div>
+            <div class="radar-title">Goalbazi Player Card</div>
+            <div class="radar-sub">Approved athlete attributes visible to every player.</div>
+          </div>
+          <div class="overall-score">${overall}</div>
+        </div>
+        <div class="radar-grid">
+          <svg class="radar-svg" viewBox="0 0 360 360" role="img" aria-label="Player polygon chart">
+            <polygon class="radar-grid-line" points="180,42 299.5,111 299.5,249 180,318 60.5,249 60.5,111"></polygon>
+            <polygon class="radar-grid-line" points="180,76.5 269.6,128.3 269.6,231.8 180,283.5 90.4,231.8 90.4,128.3"></polygon>
+            <polygon class="radar-grid-line" points="180,111 239.8,145.5 239.8,214.5 180,249 120.2,214.5 120.2,145.5"></polygon>
+            <line class="radar-axis" x1="180" y1="180" x2="180" y2="42"></line>
+            <line class="radar-axis" x1="180" y1="180" x2="299.5" y2="111"></line>
+            <line class="radar-axis" x1="180" y1="180" x2="299.5" y2="249"></line>
+            <line class="radar-axis" x1="180" y1="180" x2="180" y2="318"></line>
+            <line class="radar-axis" x1="180" y1="180" x2="60.5" y2="249"></line>
+            <line class="radar-axis" x1="180" y1="180" x2="60.5" y2="111"></line>
+            <polygon class="radar-shape" points="${pointString}"></polygon>
+            ${points.map(point => `<circle class="radar-point" cx="${point.x}" cy="${point.y}" r="5"></circle>`).join("")}
+            <text class="radar-label" x="180" y="25" text-anchor="middle">PAC</text>
+            <text class="radar-label" x="322" y="106" text-anchor="middle">SHO</text>
+            <text class="radar-label" x="323" y="263" text-anchor="middle">PAS</text>
+            <text class="radar-label" x="180" y="342" text-anchor="middle">DRI</text>
+            <text class="radar-label" x="37" y="263" text-anchor="middle">DEF</text>
+            <text class="radar-label" x="38" y="106" text-anchor="middle">PHY</text>
+          </svg>
+          <div class="radar-stat-list">
+            ${stats.map(([code, label, value]) => `
+              <div class="radar-stat">
+                <span class="radar-code">${code}</span>
+                <div class="radar-bar" title="${esc(label)}"><span class="radar-fill" style="width:${value}%"></span></div>
+                <span class="radar-value">${value}</span>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   async function loadProfile() {
     const data = await apiFetch("/api/dashboard");
     if (!data) return;
@@ -302,6 +441,7 @@
         <div id="rating-display"><div class="no-rating">No ratings yet — play games or collect community ratings.</div></div>
       </div>
     `;
+    renderRadarCard(p);
     document.getElementById("avatar-upload-btn").addEventListener("click", () => document.getElementById("avatar-file-input").click());
     if (hasPhoto) {
       document.getElementById("avatar-remove-btn").addEventListener("click", async (e) => {
