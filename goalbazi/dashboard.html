@@ -1,4 +1,10 @@
 <!DOCTYPE html>
+<!--
+  Athlete Dashboard
+  -----------------
+  Main signed-in athlete experience: stats, notifications, matches, arena search,
+  athlete discovery, friends, private messages, ratings, and Goalbazi AI popup.
+-->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -178,11 +184,90 @@
     .notify-list { display: grid; gap: 10px; }
     .notify-item { border: 1px solid var(--line); border-radius: 16px; background: rgba(255,255,255,.02); padding: 12px; }
     .notify-title { font-weight: 700; margin-bottom: 4px; }
+    .mobile-panel-close, .phone-nav, .phone-panel-backdrop { display: none; }
     @media (min-width: 860px) {
       .dash-shell { padding: 32px 24px 80px; }
       .stats-grid-local { grid-template-columns: repeat(4, minmax(0, 1fr)); }
       .quick-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .stack-grid { grid-template-columns: 1fr 1fr; align-items: start; }
+    }
+    @media (max-width: 859px) {
+      .dash-shell { padding-bottom: 118px; }
+      .mobile-side-panel {
+        position: fixed;
+        top: var(--nav-h);
+        right: 0;
+        bottom: 0;
+        width: min(92vw, 390px);
+        z-index: 245;
+        border-radius: 24px 0 0 24px;
+        border-right: 0;
+        box-shadow: -28px 0 70px rgba(0,0,0,.34);
+        overflow-y: auto;
+        transform: translateX(105%);
+        transition: transform .24s ease;
+      }
+      .mobile-side-panel.open { transform: translateX(0); }
+      .mobile-panel-close {
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        border: 1px solid var(--line);
+        background: var(--panel-2);
+        color: var(--text);
+        font-size: 1rem;
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+      .phone-panel-backdrop {
+        position: fixed;
+        inset: var(--nav-h) 0 0;
+        z-index: 240;
+        background: rgba(1,8,4,.54);
+        backdrop-filter: blur(7px);
+      }
+      .phone-panel-backdrop.open { display: block; }
+      .phone-nav {
+        position: fixed;
+        left: 12px;
+        right: 12px;
+        bottom: 12px;
+        z-index: 235;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+        padding: 9px;
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        background: color-mix(in srgb, var(--panel) 90%, transparent);
+        box-shadow: var(--shadow-sm);
+        backdrop-filter: blur(18px);
+      }
+      .phone-nav-btn {
+        border: 1px solid transparent;
+        border-radius: 18px;
+        background: transparent;
+        color: var(--muted);
+        padding: 9px 5px;
+        display: grid;
+        gap: 4px;
+        place-items: center;
+        font: inherit;
+        font-size: .7rem;
+        font-weight: 800;
+        cursor: pointer;
+      }
+      .phone-nav-btn svg { width: 20px; height: 20px; }
+      .phone-nav-btn.active {
+        color: var(--brand);
+        border-color: rgba(127,255,69,.22);
+        background: rgba(127,255,69,.09);
+      }
+      .assistant-fab { bottom: 102px; width: 52px; height: 52px; }
+      .chat-feed { max-height: min(48vh, 360px); }
+      body.phone-panel-open { overflow: hidden; }
     }
   </style>
 </head>
@@ -239,10 +324,11 @@
     </div>
 
     <div class="stack-grid" style="margin-top:16px">
-      <div class="community-card">
+      <div class="community-card mobile-side-panel" id="athletes-panel" aria-label="Athletes panel">
         <div class="section-head">
           <h2>Athletes</h2>
           <span class="meta-line" id="community-meta"></span>
+          <button class="mobile-panel-close" type="button" data-close-phone-panel aria-label="Close athletes panel">×</button>
         </div>
         <div class="athlete-shell">
           <div class="athlete-tabs">
@@ -276,10 +362,11 @@
         </div>
       </div>
 
-      <div class="community-card">
+      <div class="community-card mobile-side-panel" id="messages-panel" aria-label="Private messages panel">
         <div class="section-head">
           <h2>Private messages</h2>
           <span class="meta-line">Tap a conversation to chat</span>
+          <button class="mobile-panel-close" type="button" data-close-phone-panel aria-label="Close messages panel">×</button>
         </div>
         <div class="chat-results" id="chat-results"></div>
         <div id="chat-panel" style="display:none">
@@ -308,6 +395,26 @@
     </div>
   </div>
 </div>
+
+<div class="phone-panel-backdrop" id="phone-panel-backdrop"></div>
+<nav class="phone-nav" aria-label="Phone dashboard navigation">
+  <button class="phone-nav-btn" type="button" data-phone-target="top" aria-label="Go to dashboard top">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11.5 12 4l8 7.5"></path><path d="M6.5 10.5V20h11v-9.5"></path></svg>
+    Home
+  </button>
+  <button class="phone-nav-btn" type="button" data-phone-target="athletes" aria-label="Open athletes panel">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 11a4 4 0 1 0-8 0"></path><path d="M4.5 20a7.5 7.5 0 0 1 15 0"></path><path d="M19 8.5a3 3 0 0 1 2.5 3"></path><path d="M2.5 11.5a3 3 0 0 1 2.5-3"></path></svg>
+    Athletes
+  </button>
+  <button class="phone-nav-btn" type="button" data-phone-target="messages" aria-label="Open private messages panel">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H8l-4 4V5Z"></path><path d="M8 9h8"></path><path d="M8 12.5h5"></path></svg>
+    Messages
+  </button>
+  <button class="phone-nav-btn" type="button" data-phone-target="arenas" aria-label="Go to arena finder">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s7-5.1 7-11a7 7 0 1 0-14 0c0 5.9 7 11 7 11Z"></path><circle cx="12" cy="10" r="2.4"></circle></svg>
+    Arenas
+  </button>
+</nav>
 
 <button class="assistant-fab" id="assistant-fab" type="button" aria-label="Open Goalbazi AI">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -360,6 +467,11 @@
 <div class="toast" id="toast"></div>
 <script src="/nav.js"></script>
 <script>
+  // Dashboard script map:
+  // 1. Load /api/dashboard for profile, games, arenas, leagues, and notifications
+  // 2. Load community/friends/direct messages from their own API routes
+  // 3. Render Goalbazi AI popup with saved assistant memory
+  // 4. Enforce frontend rating UX: only rate allowed athletes
   initNav("dashboard");
 
   const state = {
@@ -411,6 +523,51 @@
   function setAssistantOpen(open) {
     state.assistantOpen = open;
     document.getElementById("assistant-modal").classList.toggle("open", open);
+  }
+
+  function isPhoneLayout() {
+    return window.matchMedia("(max-width: 859px)").matches;
+  }
+
+  function setPhoneNavActive(target = "") {
+    document.querySelectorAll("[data-phone-target]").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.phoneTarget === target);
+    });
+  }
+
+  function closePhonePanels() {
+    document.getElementById("athletes-panel").classList.remove("open");
+    document.getElementById("messages-panel").classList.remove("open");
+    document.getElementById("phone-panel-backdrop").classList.remove("open");
+    document.body.classList.remove("phone-panel-open");
+    setPhoneNavActive("");
+  }
+
+  function openPhonePanel(panel) {
+    if (!isPhoneLayout()) return;
+    const targetId = panel === "messages" ? "messages-panel" : "athletes-panel";
+    closePhonePanels();
+    document.getElementById(targetId).classList.add("open");
+    document.getElementById("phone-panel-backdrop").classList.add("open");
+    document.body.classList.add("phone-panel-open");
+    setPhoneNavActive(panel);
+  }
+
+  function handlePhoneNav(target) {
+    if (target === "athletes" || target === "messages") {
+      openPhonePanel(target);
+      return;
+    }
+    closePhonePanels();
+    if (target === "arenas") {
+      document.querySelector(".arena-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      setPhoneNavActive("arenas");
+      setTimeout(() => setPhoneNavActive(""), 900);
+      return;
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    setPhoneNavActive("top");
+    setTimeout(() => setPhoneNavActive(""), 900);
   }
 
   function setAthleteTab(tab) {
@@ -465,6 +622,7 @@
       document.getElementById("recent-games").scrollIntoView({ behavior: "smooth", block: "start" });
     } else if (item.action === "community_search") {
       const q = (state.dashboard?.profile?.location || "").trim();
+      openPhonePanel("athletes");
       document.getElementById("user-search").value = q;
       setAthleteTab("discover");
       await searchUsers();
@@ -754,6 +912,7 @@
 
   async function openChat(userId) {
     state.activeChatUserId = userId;
+    openPhonePanel("messages");
     document.getElementById("chat-panel").style.display = "block";
     const data = await apiFetch(`/api/direct-messages?user_id=${userId}`);
     if (!data) return;
@@ -795,6 +954,16 @@
   document.getElementById("assistant-close").addEventListener("click", () => setAssistantOpen(false));
   document.getElementById("assistant-modal").addEventListener("click", e => {
     if (e.target.id === "assistant-modal") setAssistantOpen(false);
+  });
+  document.querySelectorAll("[data-phone-target]").forEach(btn => {
+    btn.addEventListener("click", () => handlePhoneNav(btn.dataset.phoneTarget));
+  });
+  document.querySelectorAll("[data-close-phone-panel]").forEach(btn => {
+    btn.addEventListener("click", closePhonePanels);
+  });
+  document.getElementById("phone-panel-backdrop").addEventListener("click", closePhonePanels);
+  window.addEventListener("resize", () => {
+    if (!isPhoneLayout()) closePhonePanels();
   });
   document.getElementById("user-search").addEventListener("input", () => {
     setAthleteTab("discover");
