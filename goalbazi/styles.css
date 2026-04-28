@@ -79,8 +79,10 @@ body.goalbazi-app-bg,
 body.goalbazi-landing-bg,
 body.goalbazi-admin-bg {
   background:
+    radial-gradient(circle at var(--gbx, 18%) var(--gby, 12%), rgba(127,255,69,.10), transparent 24%),
     radial-gradient(circle at 50% -10%, rgba(127,255,69,.08), transparent 34%),
     linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 58%, var(--bg) 100%);
+  animation: goalbaziAmbientShift 18s ease-in-out infinite alternate;
 }
 
 /* Shared animated atmosphere.
@@ -114,12 +116,14 @@ body.goalbazi-admin-bg::before {
 
 body.goalbazi-app-bg::after {
   inset: 0;
-  opacity: .20;
+  opacity: .26;
   background:
+    radial-gradient(circle at 18% 78%, rgba(127,255,69,.08), transparent 24%),
+    radial-gradient(circle at 70% 22%, rgba(61,232,160,.09), transparent 28%),
     linear-gradient(115deg, transparent 0 34%, rgba(127,255,69,.10) 46%, transparent 58%),
     radial-gradient(circle at 82% 70%, rgba(61,232,160,.10), transparent 34%);
   filter: blur(14px);
-  animation: goalbaziSoftSweep 13s ease-in-out infinite alternate;
+  animation: goalbaziSoftSweep 11s ease-in-out infinite alternate;
 }
 
 body.goalbazi-landing-bg::before {
@@ -177,9 +181,15 @@ img { display: block; max-width: 100%; }
   to { background-position: 148px 74px, 148px 74px; }
 }
 
+@keyframes goalbaziAmbientShift {
+  0% { --gbx: 12%; --gby: 8%; }
+  50% { --gbx: 82%; --gby: 20%; }
+  100% { --gbx: 58%; --gby: 88%; }
+}
+
 @keyframes goalbaziSoftSweep {
-  from { transform: translateX(-4%) scale(1); opacity: .14; }
-  to { transform: translateX(4%) scale(1.06); opacity: .24; }
+  from { transform: translate3d(-4%, -1%, 0) scale(1); opacity: .16; }
+  to { transform: translate3d(4%, 2%, 0) scale(1.08); opacity: .28; }
 }
 
 @keyframes goalbaziElitePitch {

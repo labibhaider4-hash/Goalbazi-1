@@ -356,6 +356,15 @@ def seed_db():
     cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE")
     cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id TEXT")
     cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_provider TEXT NOT NULL DEFAULT 'password'")
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS secondary_position TEXT NOT NULL DEFAULT ''")
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS strong_foot TEXT NOT NULL DEFAULT ''")
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS availability TEXT NOT NULL DEFAULT ''")
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS pace INTEGER NOT NULL DEFAULT 50")
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS shooting INTEGER NOT NULL DEFAULT 50")
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS passing INTEGER NOT NULL DEFAULT 50")
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS dribbling INTEGER NOT NULL DEFAULT 50")
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS defending INTEGER NOT NULL DEFAULT 50")
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS physical INTEGER NOT NULL DEFAULT 50")
     cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS qr_base64 TEXT DEFAULT ''")
     cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS map_link TEXT DEFAULT ''")
     cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION")
@@ -579,6 +588,19 @@ def seed_db():
     cur.execute("ALTER TABLE player_open_ratings ADD CONSTRAINT player_open_ratings_rating_check CHECK (rating >= 1 AND rating <= 10)")
 
     cur.execute("""
+        CREATE TABLE IF NOT EXISTS profile_assessments (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            requested_payload TEXT NOT NULL DEFAULT '{}',
+            status TEXT NOT NULL DEFAULT 'pending',
+            admin_note TEXT NOT NULL DEFAULT '',
+            reviewed_by INTEGER REFERENCES users(id),
+            created_at TEXT NOT NULL,
+            reviewed_at TEXT
+        )
+    """)
+
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS app_settings (
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL,
@@ -728,7 +750,109 @@ def get_profile(user_id):
         one=True,
     )
     profile["team"] = dict(team) if team else None
+    profile["pending_assessment"] = get_pending_profile_assessment(user_id)
     return profile
+
+
+PROFILE_EDIT_FIELDS = [
+    "name",
+    "handle",
+    "location",
+    "position",
+    "secondary_position",
+    "preferred_format",
+    "skill",
+    "strong_foot",
+    "availability",
+    "bio",
+    "avatar_base64",
+    "pace",
+    "shooting",
+    "passing",
+    "dribbling",
+    "defending",
+    "physical",
+]
+
+PROFILE_TEXT_LIMITS = {
+    "name": 80,
+    "handle": 30,
+    "location": 80,
+    "position": 50,
+    "secondary_position": 50,
+    "preferred_format": 30,
+    "skill": 40,
+    "strong_foot": 20,
+    "availability": 80,
+    "bio": 500,
+}
+
+PROFILE_SCORE_FIELDS = {"pace", "shooting", "passing", "dribbling", "defending", "physical"}
+
+
+def clamp_profile_score(value) -> int:
+    try:
+        return max(1, min(100, int(value)))
+    except (TypeError, ValueError):
+        return 50
+
+
+def normalize_profile_request(data: dict) -> dict:
+    payload = {}
+    for field in PROFILE_EDIT_FIELDS:
+        if field in PROFILE_SCORE_FIELDS:
+            payload[field] = clamp_profile_score(data.get(field, 50))
+        elif field == "handle":
+            payload[field] = sanitize_handle(data.get(field, ""))
+        elif field == "avatar_base64":
+            payload[field] = str(data.get(field, "") or "")[:2_000_000]
+        else:
+            limit = PROFILE_TEXT_LIMITS.get(field, 120)
+            payload[field] = str(data.get(field, "") or "").strip()[:limit]
+    return payload
+
+
+def get_pending_profile_assessment(user_id):
+    row = query(
+        """SELECT id, requested_payload, status, admin_note, created_at, reviewed_at
+           FROM profile_assessments
+           WHERE user_id = %s AND status = 'pending'
+           ORDER BY id DESC
+           LIMIT 1""",
+        (user_id,),
+        one=True,
+    )
+    if not row:
+        return None
+    item = dict(row)
+    try:
+        item["requested_payload"] = json.loads(item.get("requested_payload") or "{}")
+    except Exception:
+        item["requested_payload"] = {}
+    return item
+
+
+def get_profile_assessments(status="pending", limit=40):
+    rows = query(
+        """SELECT pa.id, pa.user_id, pa.requested_payload, pa.status, pa.admin_note,
+                  pa.created_at, pa.reviewed_at, u.name, u.handle, u.email
+           FROM profile_assessments pa
+           JOIN users u ON u.id = pa.user_id
+           WHERE pa.status = %s
+           ORDER BY pa.id DESC
+           LIMIT %s""",
+        (status, limit),
+    )
+    items = []
+    for row in rows:
+        item = dict(row)
+        try:
+            item["requested_payload"] = json.loads(item.get("requested_payload") or "{}")
+        except Exception:
+            item["requested_payload"] = {}
+        item["handle_display"] = display_handle(item.get("handle", ""))
+        items.append(item)
+    return items
 
 
 def get_stats():
@@ -999,6 +1123,12 @@ def get_notifications():
                 "type": "match_reminder",
                 "title": "Match reminder",
                 "message": f"{row['title']} at {row['arena_name']} on {row['game_date']} {row['game_time']}.",
+            })
+        if get_pending_profile_assessment(uid):
+            items.append({
+                "type": "profile_assessment",
+                "title": "Profile under assessment",
+                "message": "Your requested profile changes are waiting for admin approval.",
             })
         my_team = get_user_team(uid)
         for challenge in get_team_challenges_for_user(uid)[:3]:
@@ -1557,8 +1687,12 @@ def api_dashboard():
 @app.route("/api/profile", methods=["PUT"])
 @login_required
 def api_profile_update():
-    data = request.get_json()
-    handle = sanitize_handle(data.get("handle", ""))
+    data = request.get_json() or {}
+    current_profile = get_profile(current_user_id()) or {}
+    if "avatar_base64" not in data:
+        data["avatar_base64"] = current_profile.get("avatar_base64", "")
+    payload = normalize_profile_request(data)
+    handle = payload["handle"]
     if not handle:
         return jsonify({"error": "Username can only contain lowercase letters and numbers"}), 400
     existing = query(
@@ -1568,13 +1702,28 @@ def api_profile_update():
     )
     if existing:
         return jsonify({"error": "Username already taken"}), 409
-    query(
-        "UPDATE users SET name=%s, handle=%s, location=%s, preferred_format=%s, bio=%s WHERE id=%s",
-        (data.get("name"), handle, data.get("location"), data.get("preferred_format"), data.get("bio"), current_user_id()),
-        commit=True,
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """UPDATE profile_assessments
+           SET status = 'superseded', reviewed_at = %s
+           WHERE user_id = %s AND status = 'pending'""",
+        (datetime.now().isoformat(), current_user_id()),
     )
-    log_event("profile_update", "/api/profile")
-    return jsonify(get_profile(current_user_id()))
+    cur.execute(
+        """INSERT INTO profile_assessments
+           (user_id, requested_payload, status, created_at)
+           VALUES (%s,%s,'pending',%s) RETURNING id""",
+        (current_user_id(), json.dumps(payload), datetime.now().isoformat()),
+    )
+    assessment_id = cur.fetchone()["id"]
+    conn.commit()
+    log_event("profile_assessment_request", "/api/profile", {"assessment_id": assessment_id})
+    return jsonify({
+        "ok": True,
+        "message": "Your profile is under assessment.",
+        "profile": get_profile(current_user_id()),
+    })
 
 
 @app.route("/api/games", methods=["POST"])
@@ -1780,7 +1929,9 @@ def api_admin_overview():
 @admin_required
 def api_admin_users():
     users = [dict(r) for r in query(
-        """SELECT u.id, u.name, u.handle, u.email, u.location, u.position, u.skill, u.preferred_format,
+        """SELECT u.id, u.name, u.handle, u.email, u.location, u.position, u.secondary_position,
+                  u.skill, u.preferred_format, u.strong_foot, u.availability,
+                  u.pace, u.shooting, u.passing, u.dribbling, u.defending, u.physical,
                   u.bio, u.avatar_base64, u.is_admin, t.name AS team_name
            FROM users u
            LEFT JOIN team_memberships tm ON tm.user_id = u.id
@@ -1788,6 +1939,15 @@ def api_admin_users():
            ORDER BY u.id DESC"""
     )]
     return jsonify({"users": users})
+
+
+@app.route("/api/admin/profile-assessments")
+@admin_required
+def api_admin_profile_assessments():
+    return jsonify({
+        "pending": get_profile_assessments("pending", 80),
+        "reviewed": get_profile_assessments("approved", 10) + get_profile_assessments("rejected", 10),
+    })
 
 
 @app.route("/api/admin/users", methods=["POST"])
@@ -1821,7 +1981,7 @@ def api_admin_create_user():
 @app.route("/api/admin/users/<int:user_id>", methods=["PUT"])
 @admin_required
 def api_admin_update_user(user_id):
-    data = request.get_json()
+    data = request.get_json() or {}
     handle = sanitize_handle(data.get("handle", ""))
     existing = query(
         "SELECT id FROM users WHERE handle = %s AND id != %s",
@@ -1833,7 +1993,9 @@ def api_admin_update_user(user_id):
     query(
         """UPDATE users
            SET name = %s, handle = %s, email = %s, location = %s, position = %s,
-               preferred_format = %s, skill = %s, bio = %s, avatar_base64 = %s, is_admin = %s
+               secondary_position = %s, preferred_format = %s, skill = %s, strong_foot = %s,
+               availability = %s, pace = %s, shooting = %s, passing = %s, dribbling = %s,
+               defending = %s, physical = %s, bio = %s, avatar_base64 = %s, is_admin = %s
            WHERE id = %s""",
         (
             data.get("name", "").strip(),
@@ -1841,8 +2003,17 @@ def api_admin_update_user(user_id):
             data.get("email", "").strip().lower(),
             data.get("location", "").strip(),
             data.get("position", "Midfielder").strip(),
+            data.get("secondary_position", "").strip(),
             data.get("preferred_format", "5v5").strip(),
             data.get("skill", "Intermediate").strip(),
+            data.get("strong_foot", "").strip(),
+            data.get("availability", "").strip(),
+            clamp_profile_score(data.get("pace", 50)),
+            clamp_profile_score(data.get("shooting", 50)),
+            clamp_profile_score(data.get("passing", 50)),
+            clamp_profile_score(data.get("dribbling", 50)),
+            clamp_profile_score(data.get("defending", 50)),
+            clamp_profile_score(data.get("physical", 50)),
             data.get("bio", ""),
             data.get("avatar_base64", ""),
             bool(data.get("is_admin")),
@@ -1851,6 +2022,98 @@ def api_admin_update_user(user_id):
         commit=True,
     )
     log_event("admin_update_user", f"/api/admin/users/{user_id}", {"user_id": user_id})
+    return jsonify({"ok": True})
+
+
+@app.route("/api/admin/profile-assessments/<int:assessment_id>/approve", methods=["POST"])
+@admin_required
+def api_admin_approve_profile_assessment(assessment_id):
+    assessment = query(
+        "SELECT * FROM profile_assessments WHERE id = %s AND status = 'pending'",
+        (assessment_id,),
+        one=True,
+    )
+    if not assessment:
+        return jsonify({"error": "Assessment request not found"}), 404
+    try:
+        payload = json.loads(assessment.get("requested_payload") or "{}")
+    except Exception:
+        payload = {}
+    payload = normalize_profile_request(payload)
+    handle = payload["handle"]
+    existing = query(
+        "SELECT id FROM users WHERE handle = %s AND id != %s",
+        (handle, assessment["user_id"]),
+        one=True,
+    )
+    if existing:
+        return jsonify({"error": "Username already taken by another athlete"}), 409
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """UPDATE users
+           SET name = %s, handle = %s, location = %s, position = %s,
+               secondary_position = %s, preferred_format = %s, skill = %s,
+               strong_foot = %s, availability = %s, bio = %s, avatar_base64 = %s,
+               pace = %s, shooting = %s, passing = %s, dribbling = %s,
+               defending = %s, physical = %s
+           WHERE id = %s""",
+        (
+            payload["name"],
+            handle,
+            payload["location"],
+            payload["position"],
+            payload["secondary_position"],
+            payload["preferred_format"],
+            payload["skill"],
+            payload["strong_foot"],
+            payload["availability"],
+            payload["bio"],
+            payload["avatar_base64"],
+            payload["pace"],
+            payload["shooting"],
+            payload["passing"],
+            payload["dribbling"],
+            payload["defending"],
+            payload["physical"],
+            assessment["user_id"],
+        ),
+    )
+    cur.execute(
+        """UPDATE profile_assessments
+           SET status = 'approved', reviewed_by = %s, reviewed_at = %s
+           WHERE id = %s""",
+        (current_user_id(), datetime.now().isoformat(), assessment_id),
+    )
+    conn.commit()
+    log_event("admin_profile_assessment_approve", f"/api/admin/profile-assessments/{assessment_id}/approve", {"assessment_id": assessment_id})
+    return jsonify({"ok": True})
+
+
+@app.route("/api/admin/profile-assessments/<int:assessment_id>/reject", methods=["POST"])
+@admin_required
+def api_admin_reject_profile_assessment(assessment_id):
+    data = request.get_json() or {}
+    assessment = query(
+        "SELECT id FROM profile_assessments WHERE id = %s AND status = 'pending'",
+        (assessment_id,),
+        one=True,
+    )
+    if not assessment:
+        return jsonify({"error": "Assessment request not found"}), 404
+    query(
+        """UPDATE profile_assessments
+           SET status = 'rejected', admin_note = %s, reviewed_by = %s, reviewed_at = %s
+           WHERE id = %s AND status = 'pending'""",
+        (
+            str(data.get("admin_note", "") or "").strip()[:300],
+            current_user_id(),
+            datetime.now().isoformat(),
+            assessment_id,
+        ),
+        commit=True,
+    )
+    log_event("admin_profile_assessment_reject", f"/api/admin/profile-assessments/{assessment_id}/reject", {"assessment_id": assessment_id})
     return jsonify({"ok": True})
 
 
@@ -2696,12 +2959,30 @@ def api_public_stats():
 @app.route("/api/profile/avatar", methods=["POST"])
 @login_required
 def api_upload_avatar():
-    data = request.get_json()
+    data = request.get_json() or {}
     b64 = data.get("avatar_base64", "")
     if len(b64) > 2_000_000:
         return jsonify({"error": "Image too large (max 1.5MB)"}), 400
-    query("UPDATE users SET avatar_base64 = %s WHERE id = %s", (b64, current_user_id()), commit=True)
-    return jsonify({"ok": True})
+    profile = get_profile(current_user_id()) or {}
+    payload = {field: profile.get(field, "") for field in PROFILE_EDIT_FIELDS}
+    payload["avatar_base64"] = b64
+    payload["handle"] = profile.get("handle", "")
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """UPDATE profile_assessments
+           SET status = 'superseded', reviewed_at = %s
+           WHERE user_id = %s AND status = 'pending'""",
+        (datetime.now().isoformat(), current_user_id()),
+    )
+    cur.execute(
+        """INSERT INTO profile_assessments
+           (user_id, requested_payload, status, created_at)
+           VALUES (%s,%s,'pending',%s)""",
+        (current_user_id(), json.dumps(normalize_profile_request(payload)), datetime.now().isoformat()),
+    )
+    conn.commit()
+    return jsonify({"ok": True, "message": "Profile photo sent for admin assessment"})
 
 
 @app.route("/api/profile/stats")

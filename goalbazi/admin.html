@@ -235,6 +235,11 @@
           <button class="btn primary" type="submit">Create athlete</button>
         </form>
       </div>
+      <div class="editor-card">
+        <div class="editor-title">Profile assessment requests</div>
+        <div class="section-sub" style="margin-bottom:12px">Athletes can request profile/stat edits. Nothing becomes public until you approve it.</div>
+        <div class="items-grid" id="profile-assessments-grid"></div>
+      </div>
       <div class="items-grid two-col" id="users-grid"></div>
     </section>
 
@@ -369,6 +374,7 @@
       arenas: [],
       archivedArenas: [],
       playersForTeams: [],
+      profileAssessments: [],
       activeTab: "overview",
       selectedUserId: null,
     };
@@ -435,6 +441,8 @@
       const data = await api("/api/admin/users");
       if (!data) return;
       state.users = data.users || [];
+      const assessmentData = await api("/api/admin/profile-assessments");
+      state.profileAssessments = assessmentData?.pending || [];
       if (!state.selectedUserId && state.users.length) state.selectedUserId = state.users[0].id;
       if (state.selectedUserId && !state.users.find(user => user.id === state.selectedUserId)) {
         state.selectedUserId = state.users.length ? state.users[0].id : null;
@@ -444,6 +452,7 @@
 
     function renderUsersPanel() {
       const selectedUser = state.users.find(user => user.id === state.selectedUserId);
+      renderProfileAssessments();
       document.getElementById("users-grid").innerHTML = `
         <div class="list-card">
           ${state.users.map(user => `
@@ -476,10 +485,29 @@
                 </div>
                 <div class="form-grid two">
                   <input name="position" value="${esc(selectedUser.position || "")}">
-                  <input name="preferred_format" value="${esc(selectedUser.preferred_format || "")}">
+                  <input name="secondary_position" value="${esc(selectedUser.secondary_position || "")}" placeholder="Secondary position">
                 </div>
                 <div class="form-grid two">
+                  <input name="preferred_format" value="${esc(selectedUser.preferred_format || "")}">
                   <input name="skill" value="${esc(selectedUser.skill || "")}">
+                </div>
+                <div class="form-grid two">
+                  <input name="strong_foot" value="${esc(selectedUser.strong_foot || "")}" placeholder="Strong foot">
+                  <input name="availability" value="${esc(selectedUser.availability || "")}" placeholder="Availability">
+                </div>
+                <div class="form-grid two">
+                  <input name="pace" type="number" min="1" max="100" value="${esc(selectedUser.pace || 50)}" placeholder="Pace">
+                  <input name="shooting" type="number" min="1" max="100" value="${esc(selectedUser.shooting || 50)}" placeholder="Shooting">
+                </div>
+                <div class="form-grid two">
+                  <input name="passing" type="number" min="1" max="100" value="${esc(selectedUser.passing || 50)}" placeholder="Passing">
+                  <input name="dribbling" type="number" min="1" max="100" value="${esc(selectedUser.dribbling || 50)}" placeholder="Dribbling">
+                </div>
+                <div class="form-grid two">
+                  <input name="defending" type="number" min="1" max="100" value="${esc(selectedUser.defending || 50)}" placeholder="Defending">
+                  <input name="physical" type="number" min="1" max="100" value="${esc(selectedUser.physical || 50)}" placeholder="Physical">
+                </div>
+                <div class="form-grid two">
                   <input name="avatar_base64" value="${esc(selectedUser.avatar_base64 || "")}" placeholder="Avatar image URL or base64">
                 </div>
                 <textarea name="bio">${esc(selectedUser.bio || "")}</textarea>
@@ -507,6 +535,49 @@
           await loadUsers();
         });
       }
+    }
+
+    function renderProfileAssessments() {
+      const target = document.getElementById("profile-assessments-grid");
+      if (!target) return;
+      const fields = ["position", "secondary_position", "skill", "strong_foot", "availability", "pace", "shooting", "passing", "dribbling", "defending", "physical"];
+      target.innerHTML = state.profileAssessments.length
+        ? state.profileAssessments.map(item => {
+            const payload = item.requested_payload || {};
+            const summary = fields
+              .filter(field => payload[field] !== undefined && payload[field] !== "")
+              .map(field => `${field.replace("_", " ")}: ${payload[field]}`)
+              .join(" · ");
+            return `
+              <div class="item-card">
+                <div class="item-top">
+                  <div>
+                    <div class="item-title">${esc(item.name)} wants profile approval</div>
+                    <div class="item-meta">${esc(item.handle_display || `@${item.handle}`)} · ${esc(item.email)}</div>
+                  </div>
+                </div>
+                <div class="item-meta" style="margin:8px 0">${esc(summary || "Basic profile details requested")}</div>
+                <div class="action-row">
+                  <button class="mini-btn primary" type="button" onclick="approveProfileAssessment(${item.id})">Approve</button>
+                  <button class="mini-btn danger" type="button" onclick="rejectProfileAssessment(${item.id})">Reject</button>
+                </div>
+              </div>
+            `;
+          }).join("")
+        : `<div class="item-card"><div class="item-meta">No profile requests waiting right now.</div></div>`;
+    }
+
+    async function approveProfileAssessment(id) {
+      await api(`/api/admin/profile-assessments/${id}/approve`, { method: "POST", body: JSON.stringify({}) });
+      toast("Profile request approved");
+      await loadUsers();
+    }
+
+    async function rejectProfileAssessment(id) {
+      const adminNote = prompt("Optional note for this rejection") || "";
+      await api(`/api/admin/profile-assessments/${id}/reject`, { method: "POST", body: JSON.stringify({ admin_note: adminNote }) });
+      toast("Profile request rejected");
+      await loadUsers();
     }
 
     function selectUser(userId) {
@@ -947,6 +1018,8 @@
     window.restoreArena = restoreArena;
     window.permanentlyDeleteArena = permanentlyDeleteArena;
     window.selectUser = selectUser;
+    window.approveProfileAssessment = approveProfileAssessment;
+    window.rejectProfileAssessment = rejectProfileAssessment;
   </script>
 </body>
 </html>

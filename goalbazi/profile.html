@@ -84,6 +84,22 @@
 
     .edit-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; }
     .edit-card h3 { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1rem; margin-bottom: 18px; }
+    .assessment-note {
+      border: 1px solid rgba(245,200,66,.25);
+      background: rgba(245,200,66,.09);
+      color: var(--warn);
+      border-radius: 16px;
+      padding: 12px 14px;
+      font-size: .9rem;
+      margin-bottom: 14px;
+    }
+    .assessment-note strong { color: var(--text); display: block; margin-bottom: 3px; }
+    .profile-score-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .score-input { display: grid; gap: 6px; }
+    .score-input input { text-align: center; font-weight: 800; color: var(--brand); }
+    @media (max-width: 620px) {
+      .profile-score-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
 
     .game-rate-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; margin-bottom: 14px; }
     .game-rate-title { font-weight: 700; margin-bottom: 4px; }
@@ -197,6 +213,7 @@
     <div class="tab-panel active" id="tab-edit">
       <div class="edit-card">
         <h3>Your athlete details</h3>
+        <div id="assessment-note"></div>
         <form id="profile-form" style="display:grid;gap:14px" autocomplete="off">
           <div class="form-grid form-grid-2">
             <div class="form-group"><label class="form-label">Full name</label><input name="name" id="f-name" class="form-input" required autocomplete="new-password" data-lpignore="true" data-form-type="other"></div>
@@ -206,8 +223,28 @@
             <div class="form-group"><label class="form-label">Location</label><input name="location" id="f-location" class="form-input" required autocomplete="new-password" data-lpignore="true" data-form-type="other"></div>
             <div class="form-group"><label class="form-label">Preferred format</label><input name="preferred_format" id="f-format" class="form-input" required autocomplete="new-password" data-lpignore="true" data-form-type="other"></div>
           </div>
+          <div class="form-grid form-grid-2">
+            <div class="form-group"><label class="form-label">Preferred position</label><input name="position" id="f-position" class="form-input" placeholder="Midfielder"></div>
+            <div class="form-group"><label class="form-label">Secondary position</label><input name="secondary_position" id="f-secondary-position" class="form-input" placeholder="Winger"></div>
+          </div>
+          <div class="form-grid form-grid-2">
+            <div class="form-group"><label class="form-label">Level</label><select name="skill" id="f-skill" class="form-input"><option>Beginner</option><option>Intermediate</option><option>Competitive</option><option>Elite</option></select></div>
+            <div class="form-group"><label class="form-label">Strong foot</label><select name="strong_foot" id="f-strong-foot" class="form-input"><option value="">Select foot</option><option>Right</option><option>Left</option><option>Both</option></select></div>
+          </div>
+          <div class="form-group"><label class="form-label">Availability</label><input name="availability" id="f-availability" class="form-input" placeholder="Weekends, evenings, weekdays"></div>
+          <div>
+            <label class="form-label">FIFA-style athlete scores</label>
+            <div class="profile-score-grid">
+              <div class="score-input"><span class="form-label">Pace</span><input name="pace" id="f-pace" class="form-input" type="number" min="1" max="100"></div>
+              <div class="score-input"><span class="form-label">Shooting</span><input name="shooting" id="f-shooting" class="form-input" type="number" min="1" max="100"></div>
+              <div class="score-input"><span class="form-label">Passing</span><input name="passing" id="f-passing" class="form-input" type="number" min="1" max="100"></div>
+              <div class="score-input"><span class="form-label">Dribbling</span><input name="dribbling" id="f-dribbling" class="form-input" type="number" min="1" max="100"></div>
+              <div class="score-input"><span class="form-label">Defending</span><input name="defending" id="f-defending" class="form-input" type="number" min="1" max="100"></div>
+              <div class="score-input"><span class="form-label">Physical</span><input name="physical" id="f-physical" class="form-input" type="number" min="1" max="100"></div>
+            </div>
+          </div>
           <div class="form-group"><label class="form-label">Bio</label><textarea name="bio" id="f-bio" class="form-input" rows="3" style="resize:vertical" autocomplete="off"></textarea></div>
-          <button class="btn btn-primary" type="submit" id="save-btn">Save changes</button>
+          <button class="btn btn-primary" type="submit" id="save-btn">Submit for assessment</button>
         </form>
       </div>
     </div>
@@ -250,6 +287,7 @@
     if (!data) return;
     const p = data.profile;
     const hasPhoto = !!p.avatar_base64;
+    const pending = p.pending_assessment;
     document.getElementById("profile-hero").innerHTML = `
       <div class="avatar-wrap" id="avatar-wrap">
         ${makeAvatar(p)}
@@ -259,7 +297,7 @@
       <div class="profile-info">
         <div class="profile-name">${p.name}</div>
         <div class="profile-handle">${p.handle_display || `@${p.handle}`} · ${p.location}</div>
-        <div class="profile-tags">${[p.position,p.preferred_format,p.skill].filter(Boolean).map(t=>`<span class="pill pill-green">${t}</span>`).join("")}${p.team ? `<span class="pill pill-muted">${p.team.name}</span>` : ""}</div>
+        <div class="profile-tags">${[p.position,p.preferred_format,p.skill].filter(Boolean).map(t=>`<span class="pill pill-green">${t}</span>`).join("")}${p.team ? `<span class="pill pill-muted">${p.team.name}</span>` : ""}${pending ? `<span class="pill pill-yellow">Under assessment</span>` : ""}</div>
         ${p.bio ? `<div class="profile-bio">${p.bio}</div>` : ""}
         <div id="rating-display"><div class="no-rating">No ratings yet — play games or collect community ratings.</div></div>
       </div>
@@ -280,7 +318,51 @@
     document.getElementById("f-handle").value = p.handle;
     document.getElementById("f-location").value = p.location;
     document.getElementById("f-format").value = p.preferred_format;
+    document.getElementById("f-position").value = p.position || "";
+    document.getElementById("f-secondary-position").value = p.secondary_position || "";
+    document.getElementById("f-skill").value = p.skill || "Intermediate";
+    document.getElementById("f-strong-foot").value = p.strong_foot || "";
+    document.getElementById("f-availability").value = p.availability || "";
+    ["pace","shooting","passing","dribbling","defending","physical"].forEach(key => {
+      document.getElementById(`f-${key}`).value = p[key] || 50;
+    });
     document.getElementById("f-bio").value = p.bio || "";
+    const note = document.getElementById("assessment-note");
+    if (pending) {
+      const requested = pending.requested_payload || {};
+      note.innerHTML = `
+        <div class="assessment-note">
+          <strong>Your profile is under assessment</strong>
+          Admin will review your requested changes before they become visible to other athletes.
+        </div>
+      `;
+      document.getElementById("save-btn").textContent = "Update assessment request";
+      Object.entries({
+        name: "f-name",
+        handle: "f-handle",
+        location: "f-location",
+        preferred_format: "f-format",
+        position: "f-position",
+        secondary_position: "f-secondary-position",
+        skill: "f-skill",
+        strong_foot: "f-strong-foot",
+        availability: "f-availability",
+        bio: "f-bio",
+        pace: "f-pace",
+        shooting: "f-shooting",
+        passing: "f-passing",
+        dribbling: "f-dribbling",
+        defending: "f-defending",
+        physical: "f-physical",
+      }).forEach(([field, id]) => {
+        if (requested[field] !== undefined && document.getElementById(id)) {
+          document.getElementById(id).value = requested[field];
+        }
+      });
+    } else {
+      note.innerHTML = "";
+      document.getElementById("save-btn").textContent = "Submit for assessment";
+    }
     loadStats();
   }
 
@@ -522,7 +604,7 @@
       showToast("Profile saved ✓");
       loadProfile();
     } catch (err) { showToast("Error: " + err.message); }
-    finally { btn.textContent = "Save changes"; btn.disabled = false; }
+    finally { btn.textContent = "Submit for assessment"; btn.disabled = false; }
   });
 
   loadProfile();
