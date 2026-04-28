@@ -1,5 +1,18 @@
 from __future__ import annotations
 
+"""
+Goalbazi backend
+================
+
+This single Flask file powers the public pages, athlete dashboard, admin panel,
+Arena Partner portal, PWA helpers, phone notifications, Google login, ratings,
+friends, private messages, leagues, games, bookings, and AI assistant memory.
+
+The project is intentionally kept simple for early-stage development: routes,
+database setup, and feature logic live together so the app can be copied to
+GitHub/Railway without a complicated framework structure.
+"""
+
 import hashlib
 import json
 import os
@@ -37,6 +50,7 @@ VAPID_CLAIMS_EMAIL = os.environ.get("VAPID_CLAIMS_EMAIL", "admin@goalbazi.app").
 
 
 def app_port() -> int:
+    """Return a safe app port for local/Railway startup."""
     raw_port = os.environ.get("PORT", "8000")
     try:
         return int(raw_port)
@@ -49,6 +63,7 @@ def app_port() -> int:
 # ---------------------------------------------------------------------------
 
 def get_db():
+    """Create one Postgres connection per request context."""
     if "db" not in g:
         url = DATABASE_URL
         # Railway/Heroku give postgres:// but psycopg2 needs postgresql://
@@ -244,6 +259,7 @@ def current_user_is_admin() -> bool:
 # ---------------------------------------------------------------------------
 
 def seed_db():
+    """Create/upgrade database tables and seed starter data if tables are empty."""
     conn = get_db()
     cur = conn.cursor()
 
@@ -422,6 +438,7 @@ def seed_db():
     cur.execute("ALTER TABLE leagues ADD COLUMN IF NOT EXISTS city TEXT NOT NULL DEFAULT 'Delhi NCR'")
     cur.execute("ALTER TABLE leagues ADD COLUMN IF NOT EXISTS season TEXT NOT NULL DEFAULT '2026'")
     cur.execute("ALTER TABLE leagues ADD COLUMN IF NOT EXISTS banner_url TEXT DEFAULT ''")
+    cur.execute("ALTER TABLE leagues ADD COLUMN IF NOT EXISTS archived_at TEXT")
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS teams (
@@ -526,12 +543,40 @@ def seed_db():
     cur.execute("ALTER TABLE player_open_ratings DROP CONSTRAINT IF EXISTS player_open_ratings_rating_check")
     cur.execute("ALTER TABLE player_open_ratings ADD CONSTRAINT player_open_ratings_rating_check CHECK (rating >= 1 AND rating <= 10)")
 
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+    """)
+
+    def mark_seed_done(key):
+        cur.execute(
+            """INSERT INTO app_settings (key, value, updated_at)
+               VALUES (%s, 'true', %s)
+               ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at""",
+            (key, datetime.now().isoformat()),
+        )
+
+    def seed_done(key):
+        cur.execute("SELECT value FROM app_settings WHERE key = %s", (key,))
+        row = cur.fetchone()
+        return bool(row and row["value"] == "true")
+
+    def should_seed_once(key, existing_count):
+        """Seed starter data only once, so admin deletions do not come back after restart."""
+        if existing_count > 0:
+            mark_seed_done(key)
+            return False
+        return not seed_done(key)
+
     if ADMIN_EMAIL:
         cur.execute("UPDATE users SET is_admin = TRUE WHERE LOWER(email) = %s", (ADMIN_EMAIL.lower(),))
 
     # Seed turfs
     turf_count = query("SELECT COUNT(*) FROM turfs", one=True)["count"]
-    if turf_count == 0:
+    if should_seed_once("seeded_default_turfs", turf_count):
         turfs = [
             ("Siri Fort Sports Complex", "South Delhi", 1.2, "Astroturf", 4.8, 600),
             ("Vasant Kunj Football Ground", "South West Delhi", 3.4, "Natural grass", 4.5, 400),
@@ -558,10 +603,11 @@ def seed_db():
                         "INSERT INTO turf_slots (turf_id, slot_date, slot_time, is_booked) VALUES (%s,%s,%s,0)",
                         (turf_id, slot_date, slot_time),
                     )
+        mark_seed_done("seeded_default_turfs")
 
     # Seed leagues
     league_count = query("SELECT COUNT(*) FROM leagues", one=True)["count"]
-    if league_count == 0:
+    if should_seed_once("seeded_default_leagues", league_count):
         leagues = [
             ("Delhi Premier 5v5", "Round robin with eight neighborhood teams.", "5v5", "Week 4 of 7", "Live"),
             ("South Delhi 7s Cup", "Knockout fixtures featuring amateur weekend squads.", "7v7", "Quarter-finals", "Live"),
@@ -583,9 +629,10 @@ def seed_db():
             "INSERT INTO standings (league_id, rank, team_name, played, won, points, form) VALUES (%s,%s,%s,%s,%s,%s,%s)",
             standings_rows,
         )
+        mark_seed_done("seeded_default_leagues")
 
     team_count = query("SELECT COUNT(*) FROM teams", one=True)["count"]
-    if team_count == 0:
+    if should_seed_once("seeded_default_teams", team_count):
         teams = [
             ("FC Malviya", "Delhi NCR", "FCM", "", "Competitive", "Fast-transition neighborhood side."),
             ("Yodha FC", "Delhi NCR", "YOD", "", "Competitive", "Press-heavy squad with strong wing play."),
@@ -598,9 +645,10 @@ def seed_db():
                VALUES (%s,%s,%s,%s,%s,%s,%s)""",
             [(name, city, short_name, logo, skill_level, description, datetime.now().isoformat()) for (name, city, short_name, logo, skill_level, description) in teams],
         )
+        mark_seed_done("seeded_default_teams")
 
     league_team_count = query("SELECT COUNT(*) FROM league_teams", one=True)["count"]
-    if league_team_count == 0:
+    if should_seed_once("seeded_default_league_teams", league_team_count):
         primary_league = query("SELECT id FROM leagues ORDER BY id ASC LIMIT 1", one=True)
         if primary_league:
             team_lookup = {row["name"]: row["id"] for row in query("SELECT id, name FROM teams ORDER BY id ASC")}
@@ -616,6 +664,7 @@ def seed_db():
                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
                 [row for row in league_rows if row[1]],
             )
+        mark_seed_done("seeded_default_league_teams")
 
     conn.commit()
 
@@ -645,11 +694,12 @@ def get_profile(user_id):
 
 
 def get_stats():
+    """Dashboard statistic cards for athletes."""
     return [
         {"value": query("SELECT COUNT(*) FROM users", one=True)["count"], "label": "Players"},
         {"value": query("SELECT COUNT(*) FROM games", one=True)["count"], "label": "Games"},
         {"value": query("SELECT COUNT(*) FROM turfs WHERE archived_at IS NULL", one=True)["count"], "label": "Arenas"},
-        {"value": query("SELECT COUNT(*) FROM leagues", one=True)["count"], "label": "Leagues"},
+        {"value": query("SELECT COUNT(*) FROM leagues WHERE archived_at IS NULL", one=True)["count"], "label": "Leagues"},
     ]
 
 
@@ -716,9 +766,11 @@ def get_rating_summary(user_id):
 
 
 def get_leagues_with_teams(include_empty=False):
+    """Return active leagues and their non-archived teams for dashboard/admin views."""
     leagues = [dict(r) for r in query(
         """SELECT * FROM leagues
-           WHERE LOWER(status) IN ('open', 'live')
+           WHERE archived_at IS NULL
+             AND LOWER(status) IN ('open', 'live')
            ORDER BY id ASC"""
     )]
     league_ids = [league["id"] for league in leagues]
@@ -760,6 +812,7 @@ def serialize_image_urls(raw_value):
 
 
 def get_notifications():
+    """Build lightweight in-app notifications for athletes, admins, and arena partners."""
     items = []
     if "user_id" in session:
         uid = current_user_id()
@@ -840,6 +893,7 @@ def get_assistant_messages(user_id, limit=16):
 
 
 def build_assistant_context(user_id):
+    """Collect a small user-aware context package for Goalbazi AI."""
     profile = get_profile(user_id) or {}
     user_location = profile.get("location", "")
     profile_team = profile.get("team", {})
@@ -892,6 +946,7 @@ def build_assistant_context(user_id):
         """SELECT l.id, l.name, l.season, COUNT(lt.id) AS team_count
            FROM leagues l
            LEFT JOIN league_teams lt ON lt.league_id = l.id
+           WHERE l.archived_at IS NULL
            GROUP BY l.id
            ORDER BY l.id DESC
            LIMIT 3"""
@@ -917,6 +972,7 @@ def build_assistant_context(user_id):
 
 
 def build_local_assistant_reply(user_id, message, context):
+    """Fallback assistant brain used when no OpenAI key is configured."""
     text = (message or "").strip()
     lowered = text.lower()
     profile = context["profile"]
@@ -1045,6 +1101,7 @@ def generate_assistant_reply(user_id, message):
 
 
 def get_turfs(date_value, search="", user_lat=None, user_lng=None):
+    """Return active arenas for dashboard search, including daily slot availability."""
     search = (search or "").strip().lower()
     like = f"%{search}%"
     turfs = [dict(r) for r in query(
@@ -1101,6 +1158,7 @@ def get_game_detail(game_id):
 
 
 def get_games():
+    """Return public games linked to active arenas only."""
     rows = query(
         """SELECT g.id
            FROM games g
@@ -1290,6 +1348,7 @@ def serve_assets(filename):
 @app.route("/api/dashboard")
 @login_required
 def api_dashboard():
+    """Main athlete dashboard payload: profile, games, arenas, leagues, community, notifications."""
     date_value = request.args.get("date", datetime.now().date().isoformat())
     search = request.args.get("search", "")
     user_lat = request.args.get("user_lat", type=float)
@@ -1347,6 +1406,7 @@ def api_profile_update():
 @app.route("/api/games", methods=["POST"])
 @login_required
 def api_create_game():
+    """Create a match and auto-add the creator as confirmed organizer."""
     data = request.get_json()
     turf_id = int(data["turf_id"])
     if not query("SELECT id FROM turfs WHERE id = %s AND archived_at IS NULL", (turf_id,), one=True):
@@ -1719,6 +1779,7 @@ def api_admin_delete_game(game_id):
 @app.route("/api/admin/turfs")
 @admin_required
 def api_admin_turfs():
+    """Admin arena manager data, split into active and archived arenas."""
     turfs = [dict(r) for r in query("SELECT * FROM turfs WHERE archived_at IS NULL ORDER BY id ASC")]
     for turf in turfs:
         turf["image_urls"] = parse_image_urls(turf.get("image_urls"))
@@ -1781,6 +1842,7 @@ def api_admin_ratings():
 @app.route("/api/admin/teams")
 @admin_required
 def api_admin_teams():
+    """Admin team manager data, split into active and archived teams."""
     teams = [dict(r) for r in query(
         """SELECT t.*,
                   COUNT(tm.id) AS member_count
@@ -1941,6 +2003,7 @@ def api_admin_delete_team_member(membership_id):
 @app.route("/api/admin/leagues")
 @admin_required
 def api_admin_leagues():
+    """Admin league manager keeps empty leagues visible so admins can add teams."""
     leagues, _ = get_leagues_with_teams(include_empty=True)
     teams = [dict(r) for r in query("SELECT id, name, city, logo_url, skill_level FROM teams WHERE archived_at IS NULL ORDER BY name ASC")]
     return jsonify({"leagues": leagues, "teams": teams})
@@ -2005,11 +2068,9 @@ def api_admin_delete_league(league_id):
     cur.execute("SELECT id FROM leagues WHERE id = %s", (league_id,))
     if not cur.fetchone():
         return jsonify({"error": "League not found"}), 404
-    cur.execute("DELETE FROM league_teams WHERE league_id = %s", (league_id,))
-    cur.execute("DELETE FROM standings WHERE league_id = %s", (league_id,))
-    cur.execute("DELETE FROM leagues WHERE id = %s", (league_id,))
+    cur.execute("UPDATE leagues SET archived_at = %s WHERE id = %s", (datetime.now().isoformat(), league_id))
     conn.commit()
-    log_event("admin_delete_league", f"/api/admin/leagues/{league_id}", {"league_id": league_id})
+    log_event("admin_archive_league", f"/api/admin/leagues/{league_id}", {"league_id": league_id})
     return jsonify({"ok": True})
 
 
@@ -2316,6 +2377,7 @@ def api_owner_slots():
 @app.route("/api/owner/settings", methods=["PUT"])
 @owner_required
 def api_owner_settings():
+    """Save Arena Partner settings and ensure the arena stays visible to athletes."""
     data = request.get_json()
     turf_name = (data.get("turf_name") or "").strip()
     area = (data.get("area") or "").strip()
@@ -2449,7 +2511,7 @@ def api_public_stats():
         "players": query("SELECT COUNT(*) FROM users", one=True)["count"],
         "games": query("SELECT COUNT(*) FROM games g JOIN turfs t ON t.id = g.turf_id WHERE t.archived_at IS NULL", one=True)["count"],
         "turfs": query("SELECT COUNT(*) FROM turfs WHERE archived_at IS NULL", one=True)["count"],
-        "leagues": query("SELECT COUNT(*) FROM leagues", one=True)["count"],
+        "leagues": query("SELECT COUNT(*) FROM leagues WHERE archived_at IS NULL", one=True)["count"],
     })
 
 
@@ -2839,6 +2901,7 @@ def api_assistant_messages():
 @app.route("/api/assistant/messages", methods=["POST"])
 @login_required
 def api_assistant_reply():
+    """Store user message, generate AI/fallback reply, and save assistant memory."""
     data = request.get_json() or {}
     message = (data.get("message") or "").strip()
     if not message:
@@ -2885,6 +2948,7 @@ def api_push_public_key():
 @app.route("/api/push/subscribe", methods=["POST"])
 @login_required
 def api_push_subscribe():
+    """Store a phone/browser push subscription for direct-message notifications."""
     data = request.get_json() or {}
     endpoint = (data.get("endpoint") or "").strip()
     keys = data.get("keys") or {}
