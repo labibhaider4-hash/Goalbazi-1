@@ -486,6 +486,22 @@ def seed_db():
     """)
 
     cur.execute("""
+        CREATE TABLE IF NOT EXISTS team_challenges (
+            id SERIAL PRIMARY KEY,
+            challenger_team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+            opponent_team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+            created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            format TEXT NOT NULL DEFAULT '5v5',
+            proposed_date TEXT NOT NULL DEFAULT '',
+            proposed_time TEXT NOT NULL DEFAULT '',
+            message TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'pending',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+    """)
+
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS league_teams (
             id SERIAL PRIMARY KEY,
             league_id INTEGER NOT NULL REFERENCES leagues(id) ON DELETE CASCADE,
@@ -725,6 +741,79 @@ def get_stats():
     ]
 
 
+def get_user_team(user_id: int):
+    """Return the active team connected to a user, including their team role."""
+    team = query(
+        """SELECT t.id, t.name, t.city, t.short_name, t.logo_url, t.skill_level, tm.role
+           FROM team_memberships tm
+           JOIN teams t ON t.id = tm.team_id
+           WHERE tm.user_id = %s AND t.archived_at IS NULL""",
+        (user_id,),
+        one=True,
+    )
+    return dict(team) if team else None
+
+
+def user_can_manage_team(user_id: int, team_id: int) -> bool:
+    """Allow captains/admin-style team roles to create or answer challenges."""
+    membership = query(
+        """SELECT role FROM team_memberships
+           WHERE user_id = %s AND team_id = %s""",
+        (user_id, team_id),
+        one=True,
+    )
+    if not membership:
+        return False
+    return (membership["role"] or "").strip().lower() in {"captain", "manager", "owner", "admin"}
+
+
+def get_founder_badge(user_id: int) -> dict:
+    """Early users get a permanent Founder Athlete badge to encourage identity and referrals."""
+    row = query("SELECT id FROM users WHERE id = %s", (user_id,), one=True)
+    is_founder = bool(row and row["id"] <= 50)
+    return {
+        "enabled": is_founder,
+        "label": "Founder Athlete" if is_founder else "",
+        "description": "Early Goalbazi member" if is_founder else "",
+    }
+
+
+def get_team_challenges_for_user(user_id: int) -> list[dict]:
+    """Return challenge activity relevant to the user's current team."""
+    team = get_user_team(user_id)
+    if not team:
+        return []
+    rows = query(
+        """SELECT tc.*,
+                  ct.name AS challenger_name,
+                  ot.name AS opponent_name,
+                  u.name AS creator_name
+           FROM team_challenges tc
+           JOIN teams ct ON ct.id = tc.challenger_team_id
+           JOIN teams ot ON ot.id = tc.opponent_team_id
+           JOIN users u ON u.id = tc.created_by
+           WHERE (tc.challenger_team_id = %s OR tc.opponent_team_id = %s)
+             AND ct.archived_at IS NULL
+             AND ot.archived_at IS NULL
+           ORDER BY tc.id DESC
+           LIMIT 12""",
+        (team["id"], team["id"]),
+    )
+    return [dict(row) for row in rows]
+
+
+def notify_team_members(team_id: int, title: str, body: str, url: str = "/dashboard", exclude_user_id: int | None = None) -> None:
+    """Send push notifications to all active users on a team."""
+    rows = query(
+        """SELECT user_id FROM team_memberships
+           WHERE team_id = %s
+             AND (%s IS NULL OR user_id != %s)""",
+        (team_id, exclude_user_id, exclude_user_id),
+    )
+    for row in rows:
+        send_push_to_user(row["user_id"], title, body, url)
+
+
 def normalize_friend_pair(user_a, user_b):
     return (min(int(user_a), int(user_b)), max(int(user_a), int(user_b)))
 
@@ -814,6 +903,24 @@ def get_leagues_with_teams(include_empty=False):
     return leagues, primary_standings
 
 
+def get_challenge_opponents(user_id: int) -> list[dict]:
+    """Return active teams the user's team can challenge."""
+    my_team = get_user_team(user_id)
+    if not my_team:
+        return []
+    rows = query(
+        """SELECT t.id, t.name, t.city, t.skill_level, COUNT(tm.id) AS member_count
+           FROM teams t
+           LEFT JOIN team_memberships tm ON tm.team_id = t.id
+           WHERE t.archived_at IS NULL AND t.id != %s
+           GROUP BY t.id
+           ORDER BY t.name ASC
+           LIMIT 40""",
+        (my_team["id"],),
+    )
+    return [dict(row) for row in rows]
+
+
 def parse_image_urls(raw_value):
     if not raw_value:
         return []
@@ -869,6 +976,43 @@ def get_notifications():
                 "type": "direct_message",
                 "title": "New message",
                 "message": f"{row['name']}: {row['message'][:60]}",
+            })
+        reminder_rows = [dict(r) for r in query(
+            """SELECT g.title, g.game_date, g.game_time, t.name AS arena_name
+               FROM game_players gp
+               JOIN games g ON g.id = gp.game_id
+               JOIN turfs t ON t.id = g.turf_id
+               WHERE gp.user_id = %s
+                 AND gp.confirmed = 1
+                 AND t.archived_at IS NULL
+                 AND g.game_date BETWEEN %s AND %s
+               ORDER BY g.game_date ASC, g.game_time ASC
+               LIMIT 3""",
+            (
+                uid,
+                datetime.now().date().isoformat(),
+                (datetime.now() + timedelta(days=1)).date().isoformat(),
+            ),
+        )]
+        for row in reminder_rows:
+            items.append({
+                "type": "match_reminder",
+                "title": "Match reminder",
+                "message": f"{row['title']} at {row['arena_name']} on {row['game_date']} {row['game_time']}.",
+            })
+        my_team = get_user_team(uid)
+        for challenge in get_team_challenges_for_user(uid)[:3]:
+            if challenge["status"] != "pending":
+                continue
+            incoming = bool(my_team and challenge["opponent_team_id"] == my_team["id"])
+            items.append({
+                "type": "team_challenge",
+                "title": "New team challenge" if incoming else "Challenge pending",
+                "message": (
+                    f"{challenge['challenger_name']} challenged {challenge['opponent_name']}."
+                    if incoming else
+                    f"Waiting for {challenge['opponent_name']} to respond."
+                ),
             })
     elif "owner_id" in session:
         pending_bookings = [dict(r) for r in query(
@@ -1387,13 +1531,21 @@ def api_dashboard():
         (current_user_id(),),
         one=True,
     )["count"]
+    my_team = get_user_team(current_user_id())
     return jsonify({
         "profile": get_profile(current_user_id()),
+        "founder_badge": get_founder_badge(current_user_id()),
         "stats": get_stats(),
         "games": get_games(),
         "turfs": get_turfs(date_value, search, user_lat, user_lng),
         "leagues": leagues,
         "standings": standings,
+        "team_hub": {
+            "my_team": my_team,
+            "can_manage_team": bool(my_team and user_can_manage_team(current_user_id(), my_team["id"])),
+            "opponents": get_challenge_opponents(current_user_id()),
+            "challenges": get_team_challenges_for_user(current_user_id()),
+        },
         "community": {
             "friend_count": friend_count,
             "message_count": unread_messages,
@@ -2895,6 +3047,82 @@ def api_send_direct_message():
     send_push_to_user(receiver_id, f"New message from {sender['name']}", preview, "/dashboard")
     log_event("direct_message", "/api/direct-messages", {"receiver_id": receiver_id})
     return jsonify({"ok": True}), 201
+
+
+@app.route("/api/team-challenges", methods=["POST"])
+@login_required
+def api_create_team_challenge():
+    data = request.get_json() or {}
+    my_team = get_user_team(current_user_id())
+    if not my_team:
+        return jsonify({"error": "Join a team before sending challenges."}), 400
+    if not user_can_manage_team(current_user_id(), my_team["id"]):
+        return jsonify({"error": "Only a team captain or manager can challenge another team."}), 403
+    opponent_team_id = int(data.get("opponent_team_id") or 0)
+    if opponent_team_id == my_team["id"]:
+        return jsonify({"error": "Choose another team to challenge."}), 400
+    opponent = query("SELECT id, name FROM teams WHERE id = %s AND archived_at IS NULL", (opponent_team_id,), one=True)
+    if not opponent:
+        return jsonify({"error": "Opponent team not found."}), 404
+    existing = query(
+        """SELECT id FROM team_challenges
+           WHERE challenger_team_id = %s AND opponent_team_id = %s AND status = 'pending'""",
+        (my_team["id"], opponent_team_id),
+        one=True,
+    )
+    if existing:
+        return jsonify({"error": "This challenge is already pending."}), 409
+    now = datetime.now().isoformat()
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """INSERT INTO team_challenges
+           (challenger_team_id, opponent_team_id, created_by, format, proposed_date, proposed_time, message, status, created_at, updated_at)
+           VALUES (%s,%s,%s,%s,%s,%s,%s,'pending',%s,%s)
+           RETURNING id""",
+        (
+            my_team["id"],
+            opponent_team_id,
+            current_user_id(),
+            (data.get("format") or "5v5").strip(),
+            (data.get("proposed_date") or "").strip(),
+            (data.get("proposed_time") or "").strip(),
+            (data.get("message") or "").strip()[:300],
+            now,
+            now,
+        ),
+    )
+    challenge_id = cur.fetchone()["id"]
+    conn.commit()
+    notify_team_members(opponent_team_id, "New team challenge", f"{my_team['name']} challenged your team.", "/dashboard")
+    log_event("team_challenge_create", "/api/team-challenges", {"challenge_id": challenge_id, "opponent_team_id": opponent_team_id})
+    return jsonify({"ok": True, "id": challenge_id}), 201
+
+
+@app.route("/api/team-challenges/<int:challenge_id>/<action>", methods=["POST"])
+@login_required
+def api_respond_team_challenge(challenge_id, action):
+    if action not in {"accept", "reject"}:
+        return jsonify({"error": "Invalid challenge action."}), 400
+    challenge = query("SELECT * FROM team_challenges WHERE id = %s", (challenge_id,), one=True)
+    if not challenge:
+        return jsonify({"error": "Challenge not found."}), 404
+    my_team = get_user_team(current_user_id())
+    if not my_team or challenge["opponent_team_id"] != my_team["id"]:
+        return jsonify({"error": "Only the challenged team can respond."}), 403
+    if not user_can_manage_team(current_user_id(), my_team["id"]):
+        return jsonify({"error": "Only a team captain or manager can respond."}), 403
+    if challenge["status"] != "pending":
+        return jsonify({"error": "This challenge is already closed."}), 409
+    status = "accepted" if action == "accept" else "rejected"
+    query(
+        "UPDATE team_challenges SET status = %s, updated_at = %s WHERE id = %s",
+        (status, datetime.now().isoformat(), challenge_id),
+        commit=True,
+    )
+    notify_team_members(challenge["challenger_team_id"], f"Challenge {status}", f"{my_team['name']} {status} your team challenge.", "/dashboard")
+    log_event("team_challenge_response", f"/api/team-challenges/{challenge_id}/{action}", {"challenge_id": challenge_id, "status": status})
+    return jsonify({"ok": True, "status": status})
 
 
 @app.route("/api/assistant/messages")

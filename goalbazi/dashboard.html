@@ -184,12 +184,21 @@
     .notify-list { display: grid; gap: 10px; }
     .notify-item { border: 1px solid var(--line); border-radius: 16px; background: rgba(255,255,255,.02); padding: 12px; }
     .notify-title { font-weight: 700; margin-bottom: 4px; }
+    .growth-card { padding: 16px; background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%); border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: 16px; }
+    .badge-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .founder-badge { display: inline-flex; align-items: center; gap: 8px; border: 1px solid rgba(245,200,66,.26); background: rgba(245,200,66,.10); color: var(--warn); border-radius: 999px; padding: 7px 11px; font-weight: 800; font-size: .78rem; }
+    .challenge-form { display: grid; gap: 10px; margin-top: 12px; }
+    .challenge-grid { display: grid; gap: 8px; grid-template-columns: 1fr; }
+    .challenge-card { border: 1px solid var(--line); border-radius: 16px; padding: 12px; background: rgba(255,255,255,.02); }
+    .challenge-title { font-weight: 800; margin-bottom: 4px; }
+    .share-link { border-color: rgba(61,232,160,.25); color: var(--accent); }
     .mobile-panel-close, .phone-nav, .phone-panel-backdrop { display: none; }
     @media (min-width: 860px) {
       .dash-shell { padding: 32px 24px 80px; }
       .stats-grid-local { grid-template-columns: repeat(4, minmax(0, 1fr)); }
       .quick-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .stack-grid { grid-template-columns: 1fr 1fr; align-items: start; }
+      .challenge-grid { grid-template-columns: 1fr 1fr 1fr; }
     }
     @media (max-width: 859px) {
       .dash-shell { padding-bottom: 118px; }
@@ -299,6 +308,7 @@
     </div>
 
     <div class="stats-grid-local" id="dash-stats"></div>
+    <div class="growth-card" id="growth-card"></div>
 
     <div class="quick-actions">
       <a href="/games" class="quick-card">
@@ -333,6 +343,8 @@
       </div>
       <div id="profile-snap" style="display:none"></div>
     </div>
+
+    <div class="growth-card" id="team-challenge-card" style="margin-top:16px"></div>
 
     <div class="stack-grid" style="margin-top:16px">
       <div class="community-card mobile-side-panel" id="athletes-panel" aria-label="Athletes panel">
@@ -519,6 +531,105 @@
       : `<div class="${cls}">${esc(initials)}</div>`;
   }
 
+  function appUrl(path = "/dashboard") {
+    return `${window.location.origin}${path}`;
+  }
+
+  function whatsappUrl(text) {
+    return `https://wa.me/?text=${encodeURIComponent(text)}`;
+  }
+
+  function renderGrowthCard(data) {
+    const badge = data.founder_badge || {};
+    const profile = data.profile || {};
+    const teamName = profile.team?.name || "No team yet";
+    document.getElementById("growth-card").innerHTML = `
+      <div class="section-head">
+        <div>
+          <h2>Growth hub</h2>
+          <div class="meta-line">Invite players, keep your squad active, and build early momentum.</div>
+        </div>
+      </div>
+      <div class="badge-row">
+        ${badge.enabled ? `<span class="founder-badge">${esc(badge.label)}</span>` : ""}
+        <span class="pill pill-muted">${esc(teamName)}</span>
+        <a class="mini-btn share-link" target="_blank" rel="noopener" href="${whatsappUrl(`Join me on Goalbazi and find football matches near you: ${appUrl("/")}`)}">Share Goalbazi</a>
+      </div>
+    `;
+  }
+
+  function renderTeamChallengeCard(data) {
+    const hub = data.team_hub || {};
+    const myTeam = hub.my_team;
+    const challenges = hub.challenges || [];
+    if (!myTeam) {
+      document.getElementById("team-challenge-card").innerHTML = `
+        <div class="section-head">
+          <h2>Team challenges</h2>
+          <span class="meta-line">Join a team first</span>
+        </div>
+        <div class="empty-note">Once admin adds you to a team, your team can challenge other squads from here.</div>
+      `;
+      return;
+    }
+    const opponentOptions = (hub.opponents || []).map(team => `<option value="${team.id}">${esc(team.name)} · ${esc(team.city || "City")}</option>`).join("");
+    const canManage = Boolean(hub.can_manage_team);
+    const challengeRows = challenges.length ? challenges.map(challenge => {
+      const incoming = challenge.opponent_team_id === myTeam.id;
+      const shareText = `${challenge.challenger_name} challenged ${challenge.opponent_name} on Goalbazi. Follow the action: ${appUrl("/dashboard")}`;
+      return `
+        <div class="challenge-card">
+          <div class="challenge-title">${esc(challenge.challenger_name)} vs ${esc(challenge.opponent_name)}</div>
+          <div class="meta-line">${esc(challenge.format)} ${challenge.proposed_date ? `· ${esc(challenge.proposed_date)}` : ""} ${challenge.proposed_time ? `· ${esc(challenge.proposed_time)}` : ""}</div>
+          ${challenge.message ? `<div class="helper-note">${esc(challenge.message)}</div>` : ""}
+          <div class="action-row">
+            <span class="pill ${challenge.status === "accepted" ? "pill-green" : challenge.status === "rejected" ? "pill-red" : "pill-yellow"}">${esc(challenge.status)}</span>
+            <a class="mini-btn share-link" target="_blank" rel="noopener" href="${whatsappUrl(shareText)}">Share</a>
+            ${incoming && canManage && challenge.status === "pending" ? `
+              <button class="mini-btn primary" type="button" onclick="respondChallenge(${challenge.id}, 'accept')">Accept</button>
+              <button class="mini-btn danger" type="button" onclick="respondChallenge(${challenge.id}, 'reject')">Reject</button>
+            ` : ""}
+          </div>
+        </div>
+      `;
+    }).join("") : `<div class="empty-note">No challenges yet. Start one and share it on WhatsApp.</div>`;
+    document.getElementById("team-challenge-card").innerHTML = `
+      <div class="section-head">
+        <div>
+          <h2>Team challenges</h2>
+          <span class="meta-line">${esc(myTeam.name)} challenge board</span>
+        </div>
+        <a class="mini-btn share-link" target="_blank" rel="noopener" href="${whatsappUrl(`${myTeam.name} is active on Goalbazi. Join the football network: ${appUrl("/")}`)}">Share team</a>
+      </div>
+      ${canManage ? `
+        <form class="challenge-form" id="challenge-form">
+          <div class="challenge-grid">
+            <select class="mini-select" name="opponent_team_id" required>
+              <option value="">Choose opponent</option>
+              ${opponentOptions}
+            </select>
+            <select class="mini-select" name="format">
+              <option>5v5</option>
+              <option>7v7</option>
+              <option>11v11</option>
+            </select>
+            <input class="mini-input" name="proposed_date" type="date">
+          </div>
+          <div class="challenge-grid">
+            <input class="mini-input" name="proposed_time" type="time">
+            <input class="mini-input" name="message" placeholder="Optional message, e.g. Sunday evening?">
+            <button class="mini-btn primary" type="submit">Send challenge</button>
+          </div>
+        </form>
+      ` : `<div class="helper-note">Ask your captain/manager to send or answer team challenges.</div>`}
+      <div class="challenge-grid" style="margin-top:12px">${challengeRows}</div>
+    `;
+    const form = document.getElementById("challenge-form");
+    if (form) {
+      form.addEventListener("submit", sendTeamChallenge);
+    }
+  }
+
   function renderAssistant() {
     const feed = document.getElementById("assistant-feed");
     feed.innerHTML = state.assistantMessages.length ? state.assistantMessages.map(item => `
@@ -669,13 +780,16 @@
 
     const gamesEl = document.getElementById("recent-games");
     gamesEl.innerHTML = data.games.length ? data.games.slice(0, 5).map(game => `
-      <a href="/lobby?id=${game.id}" class="game-item">
+      <div class="game-item">
         <div>
-          <div class="game-item-title">${esc(game.title)}</div>
+          <a href="/lobby?id=${game.id}" class="game-item-title">${esc(game.title)}</a>
           <div class="game-item-meta">${esc(game.game_date)} · ${esc(game.game_time)} · ${esc(game.location)}</div>
         </div>
-        <span class="pill pill-green">${esc(game.status)}</span>
-      </a>
+        <div class="action-row" style="margin-top:0;justify-content:flex-end">
+          <span class="pill pill-green">${esc(game.status)}</span>
+          <a class="mini-btn share-link" target="_blank" rel="noopener" href="${whatsappUrl(`Join my Goalbazi match: ${game.title} on ${game.game_date} at ${game.game_time}. ${appUrl(`/lobby?id=${game.id}`)}`)}">WhatsApp</a>
+        </div>
+      </div>
     `).join("") : `<div class="empty-note">No matches yet. Create one and bring athletes in.</div>`;
 
     const p = data.profile;
@@ -695,6 +809,8 @@
     `;
 
     renderArenaResults(data.turfs);
+    renderGrowthCard(data);
+    renderTeamChallengeCard(data);
     document.getElementById("community-meta").textContent = `${data.community.friend_count} friends · ${data.community.message_count} messages`;
     document.getElementById("notifications-list").innerHTML = (data.notifications || []).length
       ? data.notifications.map(item => `
@@ -898,6 +1014,30 @@
     await Promise.all([searchUsers(), loadFriends(), loadDashboard()]);
   }
 
+  async function sendTeamChallenge(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = Object.fromEntries(new FormData(form).entries());
+    try {
+      await apiFetch("/api/team-challenges", { method: "POST", body: JSON.stringify(data) });
+      form.reset();
+      showToast("Team challenge sent");
+      await loadDashboard();
+    } catch (err) {
+      showToast(errorMessage(err, "Challenge could not be sent"));
+    }
+  }
+
+  async function respondChallenge(challengeId, action) {
+    try {
+      await apiFetch(`/api/team-challenges/${challengeId}/${action}`, { method: "POST" });
+      showToast(action === "accept" ? "Challenge accepted" : "Challenge rejected");
+      await loadDashboard();
+    } catch (err) {
+      showToast(errorMessage(err, "Challenge response failed"));
+    }
+  }
+
   async function acceptFriendshipId(friendshipId) {
     await apiFetch(`/api/friends/${friendshipId}/accept`, { method: "POST" });
     showToast("Friend request accepted");
@@ -1008,6 +1148,7 @@
   window.acceptFriend = acceptFriend;
   window.acceptFriendshipId = acceptFriendshipId;
   window.openChat = openChat;
+  window.respondChallenge = respondChallenge;
   window.runAssistantSuggestion = runAssistantSuggestion;
   window.submitOpenRating = submitOpenRating;
 </script>
