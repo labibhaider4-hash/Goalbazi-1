@@ -591,6 +591,85 @@ img { display: block; max-width: 100%; }
   }
 }
 
+.pull-refresh-indicator {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  left: 50%;
+  z-index: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-width: 138px;
+  height: 54px;
+  padding: 0 14px 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(127,255,69,.24);
+  background:
+    radial-gradient(circle at 35% 20%, rgba(255,255,255,.14), transparent 24%),
+    linear-gradient(145deg, rgba(127,255,69,.16), rgba(16,28,22,.94) 46%, rgba(61,232,160,.14));
+  box-shadow: 0 14px 36px rgba(0,0,0,.28), 0 0 24px rgba(127,255,69,.16);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -78px) scale(.94);
+  transition: opacity .16s ease, transform .16s ease;
+}
+
+.pull-refresh-indicator.visible {
+  opacity: 1;
+}
+
+.pull-refresh-indicator.ready {
+  box-shadow: 0 16px 42px rgba(0,0,0,.32), 0 0 30px rgba(127,255,69,.24);
+}
+
+.pull-refresh-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #161616;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  animation: pullLogoTurn 1.05s cubic-bezier(.55,.05,.2,1) infinite;
+}
+
+.pull-refresh-logo img {
+  width: 34px;
+  height: 34px;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
+}
+
+.pull-refresh-copy {
+  color: var(--brand);
+  font-size: .82rem;
+  font-weight: 900;
+  letter-spacing: .16em;
+  text-shadow: 0 0 14px rgba(127,255,69,.18);
+  animation: pullSiuPop 1.05s ease-in-out infinite;
+}
+
+body.pull-refreshing {
+  overscroll-behavior-y: contain;
+}
+
+@keyframes pullLogoTurn {
+  0% { transform: rotate(0deg) scale(.94); }
+  55% { transform: rotate(220deg) scale(1.05); }
+  100% { transform: rotate(360deg) scale(.94); }
+}
+
+@keyframes pullSiuPop {
+  0%, 100% { transform: translateY(1px); opacity: .72; }
+  50% { transform: translateY(-1px); opacity: 1; }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .pull-refresh-indicator { display: none; }
+}
+
 /* ============================================================
    LOADING SPINNER
    ============================================================ */

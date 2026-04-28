@@ -1,6 +1,15 @@
 /* nav.js — shared navbar logic for all pages */
 
+/* Feature map:
+   - dark/light theme toggle
+   - installable PWA prompt
+   - installed-app update banner
+   - phone push notification opt-in
+   - shared navbar, profile avatar menu, admin shortcut, logout, toast, and API helper
+*/
+
 const GoalbaziTheme = {
+  // Keeps the user's light/dark preference in localStorage and updates all theme buttons.
   storageKey: "goalbazi-theme",
   apply(theme) {
     const next = theme === "light" ? "light" : "dark";
@@ -49,6 +58,7 @@ GoalbaziTheme.init();
 window.GoalbaziTheme = GoalbaziTheme;
 
 const GoalbaziInstall = {
+  // Shows the "Install Goalbazi" banner when the browser says the app can be installed.
   promptEvent: null,
   dismissedKey: "goalbazi-install-dismissed",
   isInstalled() {
@@ -127,6 +137,7 @@ window.addEventListener("appinstalled", () => {
 window.GoalbaziInstall = GoalbaziInstall;
 
 const GoalbaziUpdates = {
+  // Displays "Update available" when a newly deployed service worker is waiting.
   refreshing: false,
   waitingWorker: null,
   ensureBanner() {
@@ -191,6 +202,7 @@ const GoalbaziUpdates = {
 window.GoalbaziUpdates = GoalbaziUpdates;
 
 const GoalbaziPush = {
+  // Handles phone notification permission and sends browser subscriptions to Flask.
   async publicKey() {
     const res = await fetch("/api/push/public-key");
     if (!res.ok) return null;
@@ -252,7 +264,100 @@ const GoalbaziPush = {
 
 window.GoalbaziPush = GoalbaziPush;
 
+const GoalbaziPullRefresh = {
+  // Mobile-only branded pull-to-refresh. It appears only when pulling from page top.
+  threshold: 78,
+  maxPull: 112,
+  startY: 0,
+  pulling: false,
+  refreshing: false,
+  bound: false,
+  ensure() {
+    if (document.getElementById("pull-refresh-indicator")) return;
+    const indicator = document.createElement("div");
+    indicator.id = "pull-refresh-indicator";
+    indicator.className = "pull-refresh-indicator";
+    indicator.setAttribute("aria-hidden", "true");
+    indicator.innerHTML = `
+      <span class="pull-refresh-logo"><img src="/assets/goalbazi-logo.svg" alt=""></span>
+      <span class="pull-refresh-copy">SIUUUUU</span>
+    `;
+    document.body.appendChild(indicator);
+  },
+  canStart(event) {
+    return (
+      event.touches &&
+      event.touches.length === 1 &&
+      window.scrollY <= 0 &&
+      !this.refreshing &&
+      !document.body.classList.contains("modal-open")
+    );
+  },
+  setPull(distance) {
+    const indicator = document.getElementById("pull-refresh-indicator");
+    if (!indicator) return;
+    const clamped = Math.max(0, Math.min(this.maxPull, distance));
+    const eased = Math.round(clamped * 0.72);
+    indicator.classList.toggle("visible", clamped > 8);
+    indicator.classList.toggle("ready", clamped >= this.threshold);
+    indicator.style.transform = `translate(-50%, ${-78 + eased}px) scale(${0.94 + Math.min(clamped / 420, .16)})`;
+  },
+  reset() {
+    const indicator = document.getElementById("pull-refresh-indicator");
+    if (!indicator) return;
+    indicator.classList.remove("visible", "ready");
+    indicator.style.transform = "translate(-50%, -78px) scale(.94)";
+    document.body.classList.remove("pull-refreshing");
+  },
+  refresh() {
+    const indicator = document.getElementById("pull-refresh-indicator");
+    this.refreshing = true;
+    document.body.classList.add("pull-refreshing");
+    if (indicator) {
+      indicator.classList.add("visible", "ready");
+      indicator.style.transform = "translate(-50%, 10px) scale(1.04)";
+    }
+    setTimeout(() => window.location.reload(), 420);
+  },
+  bind() {
+    if (this.bound || !("ontouchstart" in window)) return;
+    this.bound = true;
+    this.ensure();
+    document.addEventListener("touchstart", event => {
+      if (!this.canStart(event)) return;
+      this.startY = event.touches[0].clientY;
+      this.pulling = true;
+    }, { passive: true });
+    document.addEventListener("touchmove", event => {
+      if (!this.pulling) return;
+      const distance = event.touches[0].clientY - this.startY;
+      if (distance <= 0 || window.scrollY > 0) {
+        this.pulling = false;
+        this.reset();
+        return;
+      }
+      if (distance > 12) event.preventDefault();
+      this.setPull(distance);
+    }, { passive: false });
+    document.addEventListener("touchend", event => {
+      if (!this.pulling) return;
+      const changedTouch = event.changedTouches && event.changedTouches[0];
+      const distance = changedTouch ? changedTouch.clientY - this.startY : 0;
+      this.pulling = false;
+      if (distance >= this.threshold) this.refresh();
+      else this.reset();
+    }, { passive: true });
+    document.addEventListener("touchcancel", () => {
+      this.pulling = false;
+      this.reset();
+    }, { passive: true });
+  }
+};
+
+window.GoalbaziPullRefresh = GoalbaziPullRefresh;
+
 function initNav(activePage) {
+  // Renders the same navigation on every authenticated athlete page.
   const pages = [
     { id: "dashboard", label: "Dashboard", href: "/dashboard" },
     { id: "games",     label: "Games",     href: "/games" },
@@ -315,6 +420,7 @@ function initNav(activePage) {
   GoalbaziTheme.attachButton(document.getElementById("nav-theme-toggle-mobile"));
   GoalbaziInstall.bind();
   GoalbaziPush.bind();
+  GoalbaziPullRefresh.bind();
 
   // Load avatar initials
   fetch("/api/auth/me").then(r => r.ok ? r.json() : null).then(user => {
@@ -378,6 +484,7 @@ function initNav(activePage) {
 }
 
 function showToast(message, duration = 2400) {
+  // Small shared notification helper for success/error messages.
   const toast = document.getElementById("toast");
   if (!toast) return;
   toast.textContent = message;
@@ -387,6 +494,7 @@ function showToast(message, duration = 2400) {
 }
 
 async function apiFetch(path, options = {}) {
+  // Shared fetch wrapper. Redirects to login if the session is expired.
   const res = await fetch(path, {
     headers: { "Content-Type": "application/json" },
     ...options,
@@ -400,7 +508,9 @@ async function apiFetch(path, options = {}) {
 }
 
 if ("serviceWorker" in navigator) {
+  // Registers the PWA worker and wires app-update detection after page load.
   window.addEventListener("load", () => {
+    GoalbaziPullRefresh.bind();
     GoalbaziUpdates.bindControllerChange();
     navigator.serviceWorker.register("/service-worker.js").then(registration => {
       GoalbaziUpdates.bindRegistration(registration);
