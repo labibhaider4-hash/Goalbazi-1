@@ -47,6 +47,9 @@ GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "").strip()
 VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "").strip()
 VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "").strip()
 VAPID_CLAIMS_EMAIL = os.environ.get("VAPID_CLAIMS_EMAIL", "admin@goalbazi.app").strip()
+# Production should not recreate sample arenas/leagues/teams after admin deletes
+# them. Set SEED_STARTER_DATA=true only when you intentionally want demo data.
+SEED_STARTER_DATA = os.environ.get("SEED_STARTER_DATA", "").strip().lower() in {"1", "true", "yes"}
 
 
 def app_port() -> int:
@@ -566,6 +569,9 @@ def seed_db():
 
     def should_seed_once(key, existing_count):
         """Seed starter data only once, so admin deletions do not come back after restart."""
+        if not SEED_STARTER_DATA:
+            mark_seed_done(key)
+            return False
         if existing_count > 0:
             mark_seed_done(key)
             return False
