@@ -838,6 +838,26 @@ html[data-theme="light"] .ambient-b { background: radial-gradient(circle, rgba(3
   z-index: 1;
 }
 
+.auth-theme-corner {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+}
+
+.auth-theme-corner .theme-toggle {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  box-shadow: none;
+  background: var(--surface-soft);
+}
+
+.auth-theme-corner .theme-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+
 .auth-logo {
   display: flex;
   align-items: center;
