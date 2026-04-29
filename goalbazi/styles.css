@@ -386,6 +386,25 @@ img { display: block; max-width: 100%; }
   gap: 10px;
 }
 
+.drawer-theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.drawer-theme-toggle [data-theme-icon] {
+  width: 18px;
+  height: 18px;
+  display: inline-grid;
+  place-items: center;
+}
+
+.drawer-theme-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+
 .install-app-btn[hidden] { display: none !important; }
 
 @media (min-width: 768px) {
