@@ -855,6 +855,54 @@ def get_profile_assessments(status="pending", limit=40):
     return items
 
 
+def profile_completion(profile: dict) -> dict:
+    checks = [
+        ("Photo", bool(profile.get("avatar_base64"))),
+        ("Position", bool(profile.get("position"))),
+        ("Level", bool(profile.get("skill"))),
+        ("City", bool(profile.get("location"))),
+        ("Format", bool(profile.get("preferred_format"))),
+        ("Bio", bool((profile.get("bio") or "").strip())),
+        ("Radar stats", all(clamp_profile_score(profile.get(field, 0)) > 50 for field in PROFILE_SCORE_FIELDS)),
+    ]
+    done = [label for label, ok in checks if ok]
+    missing = [label for label, ok in checks if not ok]
+    percent = round((len(done) / len(checks)) * 100)
+    return {"percent": percent, "done": done, "missing": missing}
+
+
+def get_player_scores(user_id: int, profile: dict | None = None, rating_summary: dict | None = None) -> dict:
+    profile = profile or get_profile(user_id) or {}
+    rating_summary = rating_summary or get_rating_summary(user_id)
+    radar_score = round(sum(clamp_profile_score(profile.get(field, 50)) for field in PROFILE_SCORE_FIELDS) / len(PROFILE_SCORE_FIELDS))
+    games_played = query("SELECT COUNT(*) AS count FROM game_players WHERE user_id = %s AND confirmed = 1", (user_id,), one=True)["count"]
+    games_joined = query("SELECT COUNT(*) AS count FROM game_players WHERE user_id = %s", (user_id,), one=True)["count"]
+    games_created = query("SELECT COUNT(*) AS count FROM games WHERE created_by = %s", (user_id,), one=True)["count"]
+    confirmed_ratio = games_played / games_joined if games_joined else 0
+    reliability = round(min(100, (confirmed_ratio * 70) + min(games_played, 10) * 3))
+    completion = profile_completion(profile)
+    rating_value = rating_summary.get("avg_rating") or 0
+    rating_score = round((float(rating_value) / 10) * 100) if rating_value else 0
+    activity_score = min(100, games_played * 8 + games_created * 5)
+    overall = round(
+        radar_score * 0.35 +
+        rating_score * 0.25 +
+        reliability * 0.20 +
+        completion["percent"] * 0.15 +
+        activity_score * 0.05
+    )
+    return {
+        "profile_completion": completion,
+        "radar_score": radar_score,
+        "rating_score": rating_score,
+        "reliability_score": reliability,
+        "activity_score": activity_score,
+        "overall_score": overall,
+        "games_played": games_played,
+        "games_created": games_created,
+    }
+
+
 def get_stats():
     """Dashboard statistic cards for athletes."""
     return [
@@ -1123,6 +1171,22 @@ def get_notifications():
                 "type": "match_reminder",
                 "title": "Match reminder",
                 "message": f"{row['title']} at {row['arena_name']} on {row['game_date']} {row['game_time']}.",
+            })
+        reviewed_profile = query(
+            """SELECT status, admin_note, reviewed_at
+               FROM profile_assessments
+               WHERE user_id = %s AND status IN ('approved', 'rejected')
+               ORDER BY reviewed_at DESC NULLS LAST, id DESC
+               LIMIT 1""",
+            (uid,),
+            one=True,
+        )
+        if reviewed_profile:
+            approved = reviewed_profile["status"] == "approved"
+            items.append({
+                "type": "profile_reviewed",
+                "title": "Profile approved" if approved else "Profile needs changes",
+                "message": "Your profile changes are now live." if approved else (reviewed_profile.get("admin_note") or "Admin reviewed your profile request."),
             })
         if get_pending_profile_assessment(uid):
             items.append({
@@ -1662,8 +1726,21 @@ def api_dashboard():
         one=True,
     )["count"]
     my_team = get_user_team(current_user_id())
+    profile = get_profile(current_user_id())
+    scores = get_player_scores(current_user_id(), profile)
     return jsonify({
-        "profile": get_profile(current_user_id()),
+        "profile": profile,
+        "player_scores": scores,
+        "onboarding": {
+            "complete": scores["profile_completion"]["percent"] >= 100 and friend_count > 0 and bool(my_team),
+            "items": [
+                {"label": "Complete profile", "done": scores["profile_completion"]["percent"] >= 100, "href": "/profile"},
+                {"label": "Add first friend", "done": friend_count > 0, "href": "/dashboard"},
+                {"label": "Join or create match", "done": scores["games_played"] > 0 or scores["games_created"] > 0, "href": "/games"},
+                {"label": "Join a team", "done": bool(my_team), "href": "/dashboard"},
+                {"label": "Install/update app", "done": False, "href": "/dashboard"},
+            ],
+        },
         "founder_badge": get_founder_badge(current_user_id()),
         "stats": get_stats(),
         "games": get_games(),
@@ -2993,6 +3070,7 @@ def api_profile_stats():
     games_created = query("SELECT COUNT(*) FROM games WHERE created_by = %s", (uid,), one=True)["count"]
     turfs_booked = query("SELECT COUNT(*) FROM bookings WHERE user_id = %s AND status = 'confirmed'", (uid,), one=True)["count"]
     rating_summary = get_rating_summary(uid)
+    scores = get_player_scores(uid, get_profile(uid), rating_summary)
 
     # Games played with — players who shared a game
     teammates = [dict(r) for r in query(
@@ -3053,6 +3131,7 @@ def api_profile_stats():
             "games_played": games_played,
             "games_created": games_created,
             "turfs_booked": turfs_booked,
+            **scores,
             **rating_summary,
         },
         "teammates": teammates,
@@ -3068,11 +3147,11 @@ def api_player_profile(player_id):
     if not user:
         return jsonify({"error": "Not found"}), 404
     rating_summary = get_rating_summary(player_id)
-    games_played = query("SELECT COUNT(*) FROM game_players WHERE user_id = %s AND confirmed = 1", (player_id,), one=True)["count"]
+    scores = get_player_scores(player_id, user, rating_summary)
     return jsonify({
         **dict(user),
         **rating_summary,
-        "games_played": games_played,
+        **scores,
     })
 
 

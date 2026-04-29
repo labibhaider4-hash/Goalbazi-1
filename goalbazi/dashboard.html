@@ -153,7 +153,22 @@
     .mini-radar-bar { height:8px; border-radius:999px; background:rgba(255,255,255,.07); overflow:hidden; }
     .mini-radar-fill { display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg,var(--brand),var(--accent)); }
     .mini-radar-value { text-align:right; color:var(--brand); font-weight:900; font-size:.88rem; }
-    @media (max-width: 620px) { .mini-radar-grid { grid-template-columns:1fr; } }
+    @media (max-width: 620px) {
+      .player-modal { padding: 10px; }
+      .player-card-modal { padding: 14px; border-radius: 22px; max-height: min(82vh, 720px); }
+      .mini-radar-head { gap: 10px; margin: 10px 0; }
+      .mini-overall {
+        width: 48px;
+        height: 48px;
+        border-radius: 15px;
+        font-size: 1.18rem;
+        flex-shrink: 0;
+      }
+      .mini-radar-grid { grid-template-columns:1fr; gap: 10px; }
+      .mini-radar-svg { width: min(100%, 238px); max-width: 238px; }
+      .mini-radar-label { font-size: 10px; letter-spacing: .04em; }
+      .mini-radar-stat { grid-template-columns: 38px 1fr 30px; gap: 8px; }
+    }
     .community-tools, .arena-tools { display: grid; gap: 10px; margin-bottom: 14px; }
     .community-results, .friends-results, .chat-results, .arena-results { display: grid; gap: 10px; }
     .user-card, .chat-card, .arena-result {
@@ -206,6 +221,33 @@
     .notify-item { border: 1px solid var(--line); border-radius: 16px; background: rgba(255,255,255,.02); padding: 12px; }
     .notify-title { font-weight: 700; margin-bottom: 4px; }
     .growth-card { padding: 16px; background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%); border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: 16px; }
+    .score-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+    .score-chip {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 11px;
+      background: rgba(255,255,255,.025);
+    }
+    .score-chip strong { display: block; color: var(--brand); font-family: 'Syne', sans-serif; font-size: 1.15rem; line-height: 1; }
+    .score-chip span { display: block; color: var(--muted); font-size: .72rem; margin-top: 5px; }
+    .onboarding-list { display: grid; gap: 8px; margin-top: 12px; }
+    .onboarding-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 10px 11px;
+      background: rgba(255,255,255,.02);
+      color: var(--text);
+      text-decoration: none;
+      font-size: .82rem;
+      font-weight: 700;
+    }
+    .onboarding-state { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: .74rem; font-weight: 800; }
+    .onboarding-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--muted); }
+    .onboarding-dot.done { background: var(--brand); box-shadow: 0 0 16px rgba(127,255,69,.35); }
     .badge-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
     .founder-badge { display: inline-flex; align-items: center; gap: 8px; border: 1px solid rgba(245,200,66,.26); background: rgba(245,200,66,.10); color: var(--warn); border-radius: 999px; padding: 7px 11px; font-weight: 800; font-size: .78rem; }
     .challenge-form { display: grid; gap: 10px; margin-top: 12px; }
@@ -295,7 +337,14 @@
         border-color: rgba(127,255,69,.22);
         background: rgba(127,255,69,.09);
       }
-      .assistant-fab { bottom: 102px; width: 52px; height: 52px; }
+      .assistant-fab {
+        right: calc(18px + env(safe-area-inset-right));
+        bottom: calc(98px + env(safe-area-inset-bottom));
+        width: 48px;
+        height: 48px;
+        box-shadow: 0 12px 34px rgba(0,0,0,.34);
+      }
+      .assistant-fab svg { width: 24px; height: 24px; }
       .assistant-modal {
         z-index: 360;
         align-items: flex-end;
@@ -308,6 +357,7 @@
       }
       .assistant-feed { max-height: none; min-height: 120px; }
       .chat-feed { max-height: min(48vh, 360px); }
+      .score-strip { grid-template-columns: 1fr; }
       body.phone-panel-open { overflow: hidden; }
     }
   </style>
@@ -585,7 +635,7 @@
       ["DEF", "Defending", clampScore(player.defending)],
       ["PHY", "Physical", clampScore(player.physical)],
     ];
-    const overall = Math.round(stats.reduce((sum, item) => sum + item[2], 0) / stats.length);
+    const overall = player.overall_score ?? Math.round(stats.reduce((sum, item) => sum + item[2], 0) / stats.length);
     const points = radarPoints(stats.map(item => item[2]));
     const pointString = points.map(point => `${point.x},${point.y}`).join(" ");
     return `
@@ -653,6 +703,8 @@
         ${player.bio ? `<div class="meta-line">${esc(player.bio)}</div>` : ""}
         ${playerRadarHtml(player)}
         <div class="stats-grid-local" style="margin-top:16px;margin-bottom:0">
+          <div class="stat-card"><div class="stat-value">${esc(player.overall_score ?? "-")}</div><div class="stat-label">Goalbazi score</div></div>
+          <div class="stat-card"><div class="stat-value">${esc(player.reliability_score ?? 0)}%</div><div class="stat-label">Reliability</div></div>
           <div class="stat-card"><div class="stat-value">${esc(player.games_played || 0)}</div><div class="stat-label">Games played</div></div>
           <div class="stat-card"><div class="stat-value">${esc(player.avg_rating || "-")}</div><div class="stat-label">Rating</div></div>
         </div>
@@ -677,13 +729,33 @@
   function renderGrowthCard(data) {
     const badge = data.founder_badge || {};
     const profile = data.profile || {};
+    const scores = data.player_scores || {};
+    const completion = scores.profile_completion || { percent: 0, missing: [] };
+    const onboarding = data.onboarding || { items: [] };
     const teamName = profile.team?.name || "No team yet";
+    const nextStep = completion.missing?.length
+      ? `Next: ${completion.missing.slice(0, 2).join(", ")}`
+      : "Profile is complete and ready to be discovered.";
     document.getElementById("growth-card").innerHTML = `
       <div class="section-head">
         <div>
-          <h2>Growth hub</h2>
-          <div class="meta-line">Invite players, keep your squad active, and build early momentum.</div>
+          <h2>Player growth</h2>
+          <div class="meta-line">Your score improves with profile quality, ratings, reliability, and match activity.</div>
         </div>
+      </div>
+      <div class="score-strip">
+        <div class="score-chip"><strong>${esc(scores.overall_score ?? 0)}</strong><span>Goalbazi score</span></div>
+        <div class="score-chip"><strong>${esc(scores.reliability_score ?? 0)}%</strong><span>Reliability</span></div>
+        <div class="score-chip"><strong>${esc(completion.percent ?? 0)}%</strong><span>Profile complete</span></div>
+      </div>
+      <div class="helper-note">${esc(nextStep)}</div>
+      <div class="onboarding-list">
+        ${(onboarding.items || []).map(item => `
+          <a class="onboarding-item" href="${esc(item.href || "/dashboard")}">
+            <span>${esc(item.label)}</span>
+            <span class="onboarding-state"><span class="onboarding-dot ${item.done ? "done" : ""}"></span>${item.done ? "Done" : "To do"}</span>
+          </a>
+        `).join("")}
       </div>
       <div class="badge-row">
         ${badge.enabled ? `<span class="founder-badge">${esc(badge.label)}</span>` : ""}
@@ -925,7 +997,7 @@
           <a class="mini-btn share-link" target="_blank" rel="noopener" href="${whatsappUrl(`Join my Goalbazi match: ${game.title} on ${game.game_date} at ${game.game_time}. ${appUrl(`/lobby?id=${game.id}`)}`)}">WhatsApp</a>
         </div>
       </div>
-    `).join("") : `<div class="empty-note">No matches yet. Create one and bring athletes in.</div>`;
+    `).join("") : `<div class="empty-note">No matches yet. Create your first match or invite athletes from the Athletes tab.</div>`;
 
     const p = data.profile;
     document.getElementById("profile-snap").innerHTML = `
@@ -954,7 +1026,7 @@
           <div class="meta-line">${esc(item.message)}</div>
         </div>
       `).join("")
-      : `<div class="empty-note">No new notifications right now.</div>`;
+      : `<div class="empty-note">No new notifications. Match reminders, messages, approvals, and challenges will appear here.</div>`;
   }
 
   function rateControls(userId, currentRating = "") {
@@ -1003,7 +1075,7 @@
         </div>
         ${ratingControlsForUser(user)}
       </div>
-    `).join("") : `<div class="empty-note">Search for an athlete by name, handle, city, or team to see results.</div>`;
+    `).join("") : `<div class="empty-note">Search for an athlete by name, handle, city, or team. Results appear only when you search.</div>`;
   }
 
   function renderSuggestedAthletes() {
@@ -1033,7 +1105,7 @@
         </div>
         ${ratingControlsForUser(user)}
       </div>
-    `).join("") : `<div class="empty-note">We’ll suggest athletes here based on your location, level, format, and team links.</div>`;
+    `).join("") : `<div class="empty-note">Complete your profile to improve athlete suggestions based on location, level, format, and team links.</div>`;
   }
 
   function renderFriends() {
@@ -1073,7 +1145,7 @@
         </div>
       `));
     }
-    document.getElementById("friends-results").innerHTML = rows.length ? rows.join("") : `<div class="empty-note">Your friend list will appear here after you connect with other athletes.</div>`;
+    document.getElementById("friends-results").innerHTML = rows.length ? rows.join("") : `<div class="empty-note">Your friend list will appear here after you search athletes and send your first request.</div>`;
   }
 
   function renderConversations() {
@@ -1090,7 +1162,7 @@
           <div class="user-sub">${esc((conv.created_at || "").slice(0, 16))}</div>
         </div>
       </button>
-    `).join("") : `<div class="empty-note">Private conversations will show up here.</div>`;
+    `).join("") : `<div class="empty-note">Private conversations appear after you start a chat with a friend or athlete.</div>`;
   }
 
   function renderArenaResults(arenas) {
@@ -1108,7 +1180,7 @@
           ${(arena.slots || []).slice(0, 6).map(slot => `<span class="slot-pill">${esc(slot.slot_time)} · ${esc(slot.status)}</span>`).join("")}
         </div>
       </div>
-    `).join("") : `<div class="empty-note">No arenas matched that search yet.</div>`;
+    `).join("") : `<div class="empty-note">No arenas matched. Try another city, area name, or the nearby option.</div>`;
   }
 
   async function loadFriends() {
@@ -1136,7 +1208,7 @@
   async function searchUsers() {
     const q = document.getElementById("user-search").value.trim();
     if (!q) {
-      document.getElementById("community-results").innerHTML = `<div class="empty-note">Search for an athlete by name, handle, city, or team to see results.</div>`;
+      document.getElementById("community-results").innerHTML = `<div class="empty-note">Search for an athlete by name, handle, city, or team. Results appear only when you search.</div>`;
       return;
     }
     const data = await apiFetch(`/api/community/users?q=${encodeURIComponent(q)}`);
