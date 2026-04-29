@@ -4,7 +4,7 @@ builder = "NIXPACKS"
 
 [deploy]
 # Railway starts from the repository root, so enter the app folder first.
-startCommand = "cd goalbazi && gunicorn server:app --bind 0.0.0.0:$PORT --workers 2 --timeout 60"
+startCommand = "gunicorn --chdir goalbazi server:app --bind 0.0.0.0:$PORT --workers 2 --timeout 60"
 healthcheckPath = "/health"
 healthcheckTimeout = 120
 restartPolicyType = "ON_FAILURE"
