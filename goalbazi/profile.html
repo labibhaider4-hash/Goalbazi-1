@@ -152,9 +152,6 @@
     }
 
     .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
-    .stat-card.score-card { background: linear-gradient(180deg, rgba(127,255,69,.09), rgba(255,255,255,.02)); }
-    .completion-note { color: var(--muted); font-size: .8rem; margin-top: 10px; line-height: 1.5; }
-
     .tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--line); }
     .tab-btn { padding: 10px 16px; background: none; border: none; color: var(--muted); font-weight: 600; font-size: .88rem; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; font-family: inherit; }
     .tab-btn.active { color: var(--brand); border-bottom-color: var(--brand); }
@@ -239,7 +236,7 @@
       border-radius: 50%; background: var(--brand); cursor: pointer;
     }
     .crop-actions { display: flex; gap: 10px; }
-    @media (max-width: 620px) { .stats-row { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 400px) { .stats-row { grid-template-columns: 1fr 1fr; } }
   </style>
 </head>
 <body class="goalbazi-app-bg">
@@ -396,7 +393,7 @@
       ["DEF", "Defending", clampScore(player.defending)],
       ["PHY", "Physical", clampScore(player.physical)],
     ];
-    const overall = player.overall_score ?? Math.round(stats.reduce((sum, item) => sum + item[2], 0) / stats.length);
+    const overall = Math.round(stats.reduce((sum, item) => sum + item[2], 0) / stats.length);
     const points = radarPoints(stats.map(item => item[2]));
     const pointString = points.map(point => `${point.x},${point.y}`).join(" ");
     document.getElementById("radar-card").innerHTML = `
@@ -445,7 +442,7 @@
   async function loadProfile() {
     const data = await apiFetch("/api/dashboard");
     if (!data) return;
-    const p = { ...data.profile, ...(data.player_scores || {}) };
+    const p = data.profile;
     const hasPhoto = !!p.avatar_base64;
     const pending = p.pending_assessment;
     document.getElementById("profile-hero").innerHTML = `
@@ -459,7 +456,6 @@
         <div class="profile-handle">${p.handle_display || `@${p.handle}`} · ${p.location}</div>
         <div class="profile-tags">${[p.position,p.preferred_format,p.skill].filter(Boolean).map(t=>`<span class="pill pill-green">${t}</span>`).join("")}${p.team ? `<span class="pill pill-muted">${p.team.name}</span>` : ""}${pending ? `<span class="pill pill-yellow">Under assessment</span>` : ""}</div>
         ${p.bio ? `<div class="profile-bio">${p.bio}</div>` : ""}
-        ${p.profile_completion ? `<div class="completion-note">Profile completion: ${p.profile_completion.percent}%${p.profile_completion.missing?.length ? ` - Next: ${p.profile_completion.missing.slice(0, 2).join(", ")}` : " - All key details complete"}</div>` : ""}
         <div id="rating-display"><div class="no-rating">No ratings yet — play games or collect community ratings.</div></div>
       </div>
     `;
@@ -534,15 +530,11 @@
     if (!data) return;
     const s = data.stats;
 
-    const completion = s.profile_completion || { percent: 0 };
     document.getElementById("stats-row").innerHTML = [
-      { value: s.overall_score ?? 0, label: "Goalbazi score", featured: true },
-      { value: `${completion.percent ?? 0}%`, label: "Profile complete", featured: true },
-      { value: `${s.reliability_score ?? 0}%`, label: "Reliability", featured: true },
       { value: s.games_played, label: "Games played" },
       { value: s.games_created, label: "Games created" },
       { value: s.turfs_booked, label: "Arenas booked" },
-    ].map(x=>`<div class="stat-card ${x.featured ? "score-card" : ""}"><div class="stat-value">${x.value}</div><div class="stat-label">${x.label}</div></div>`).join("");
+    ].map(x=>`<div class="stat-card"><div class="stat-value">${x.value}</div><div class="stat-label">${x.label}</div></div>`).join("");
 
     const rEl = document.getElementById("rating-display");
     if (rEl) {
