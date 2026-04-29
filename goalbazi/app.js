@@ -1,3 +1,11 @@
+/* app.js
+   Legacy single-page dashboard script.
+   Most newer pages now use their own inline page scripts plus nav.js, but this file
+   still documents the original dashboard flow: profile, games, lobby, arenas,
+   leagues, and basic API calls. Keep comments here high-level so future changes
+   are easy to follow without turning the file into a wall of notes. */
+
+// Central in-memory state used by the older dashboard renderer.
 const state = {
   profile: null,
   stats: [],
@@ -12,6 +20,7 @@ const state = {
 const gameFormats = ["5v5", "7v7", "11v11"];
 const skillLevels = ["Beginner", "Intermediate", "Competitive"];
 
+// Small wrapper around fetch so API failures show a useful message.
 async function request(path, options = {}) {
   const response = await fetch(path, {
     headers: { "Content-Type": "application/json" },
@@ -51,6 +60,7 @@ function formatCountdown(isoDateTime) {
   return `${hours}:${minutes}:${seconds}`;
 }
 
+// Renders the numeric overview cards on the dashboard.
 function renderStats() {
   document.getElementById("stats-grid").innerHTML = state.stats.map(item => `
     <div class="stat-card">
@@ -60,6 +70,7 @@ function renderStats() {
   `).join("");
 }
 
+// Renders the signed-in athlete profile and fills the editable profile form.
 function renderProfile() {
   if (!state.profile) return;
   document.getElementById("profile-avatar").textContent = initialsFromName(state.profile.name);
@@ -78,6 +89,7 @@ function renderProfile() {
   document.getElementById("profile-bio-input").value = state.profile.bio ?? "";
 }
 
+// Renders upcoming/open games from the API response.
 function renderGames() {
   document.getElementById("games-region").textContent = state.profile ? state.profile.location : "";
   document.getElementById("games-list").innerHTML = state.games.map(game => `
@@ -92,6 +104,7 @@ function renderGames() {
   `).join("");
 }
 
+// Renders the selected match lobby, including teams and the active countdown.
 function renderLobby() {
   const game = state.games.find(item => item.id === state.selectedGameId);
   if (!game) {
@@ -127,6 +140,7 @@ function renderLobby() {
   }).join("");
 }
 
+// Converts player arrays into fixed team slots so empty spaces are visible.
 function renderTeamSlots(players, maxPlayers) {
   const cards = [...players];
   while (cards.length < maxPlayers) {
@@ -150,6 +164,7 @@ function renderTeamSlots(players, maxPlayers) {
   }).join("");
 }
 
+// Renders arenas/turfs available for booking.
 function renderTurfs() {
   document.getElementById("turf-summary").textContent = `${state.turfs.length} turfs available`;
   document.getElementById("game-turf-select").innerHTML = state.turfs.map(turf => `
@@ -178,6 +193,7 @@ function renderTurfs() {
   `).join("");
 }
 
+// Renders active league summaries and standings.
 function renderLeagues() {
   document.getElementById("league-grid").innerHTML = state.leagues.map(league => `
     <div class="league-card">
@@ -207,6 +223,7 @@ function renderLeagues() {
   `).join("");
 }
 
+// Loads the dashboard payload once and fans it out into each renderer.
 async function loadDashboard() {
   const date = document.getElementById("turf-date").value;
   const search = document.getElementById("turf-search").value.trim();
@@ -236,6 +253,7 @@ async function loadDashboard() {
   renderLobby();
 }
 
+// Refreshes the lobby data after actions like join, leave, or chat.
 async function updateLobbyGame(gameId) {
   const game = await request(`/api/games/${gameId}`);
   state.selectedGameId = game.id;
@@ -249,6 +267,7 @@ async function updateLobbyGame(gameId) {
   renderLobby();
 }
 
+// Populates static dropdown values used by the create-game form.
 function setupStaticInputs() {
   document.getElementById("game-format-select").innerHTML = gameFormats.map(item => `<option value="${item}">${item}</option>`).join("");
   document.getElementById("game-skill-select").innerHTML = skillLevels.map(item => `<option value="${item}">${item}</option>`).join("");
@@ -258,6 +277,7 @@ function setupStaticInputs() {
   document.getElementById("turf-date").value = iso;
 }
 
+// Wires all form submits and button clicks for the legacy dashboard.
 function attachEvents() {
   document.addEventListener("click", async event => {
     const jump = event.target.closest("[data-jump]");
@@ -339,6 +359,7 @@ function attachEvents() {
   document.getElementById("refresh-profile-btn").addEventListener("click", loadDashboard);
 }
 
+// Keeps the visible match countdown ticking without reloading the whole page.
 function startLobbyTimer() {
   setInterval(() => {
     if (!state.selectedGameId) return;
@@ -349,6 +370,7 @@ function startLobbyTimer() {
   }, 1000);
 }
 
+// Page entry point: set dropdowns, attach handlers, load data, and start timers.
 async function init() {
   setupStaticInputs();
   attachEvents();

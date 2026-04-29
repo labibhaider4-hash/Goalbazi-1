@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Goalbazi Elite Background Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #010504;
+      --ink: #f6fff8;
+      --muted: #a2d5ba;
+      --brand: #80ff46;
+      --mint: #32eda0;
+      --gold: #ffd96a;
+      --glass: rgba(6, 23, 15, .72);
+      --line: rgba(183, 255, 205, .16);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "DM Sans", sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      overflow-x: hidden;
+    }
+
+    .elite-scene {
+      position: fixed;
+      inset: 0;
+      z-index: -10;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 115%, rgba(128,255,70,.18), transparent 36%),
+        radial-gradient(circle at 50% -24%, rgba(50,237,160,.20), transparent 35%),
+        linear-gradient(180deg, #030b07 0%, #06170f 48%, #000302 100%);
+      animation: sceneMood 5.5s ease-in-out infinite alternate;
+    }
+
+    .elite-scene::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        repeating-linear-gradient(90deg, rgba(255,255,255,.03) 0 1px, transparent 1px 68px),
+        repeating-linear-gradient(0deg, rgba(255,255,255,.018) 0 1px, transparent 1px 68px);
+      opacity: .18;
+      mask-image: radial-gradient(circle at 50% 40%, black 0%, transparent 72%);
+      animation: dataDrift 9s linear infinite;
+    }
+
+    .crowd {
+      position: absolute;
+      left: 50%;
+      top: 6%;
+      width: min(1180px, 126vw);
+      height: 170px;
+      transform: translateX(-50%);
+      opacity: .44;
+      background:
+        radial-gradient(circle at 4% 62%, rgba(128,255,70,.75) 0 2px, transparent 3px),
+        radial-gradient(circle at 13% 36%, rgba(255,255,255,.55) 0 1px, transparent 3px),
+        radial-gradient(circle at 24% 58%, rgba(50,237,160,.65) 0 2px, transparent 4px),
+        radial-gradient(circle at 38% 30%, rgba(255,217,106,.45) 0 1px, transparent 3px),
+        radial-gradient(circle at 52% 48%, rgba(255,255,255,.55) 0 1px, transparent 3px),
+        radial-gradient(circle at 68% 32%, rgba(128,255,70,.65) 0 2px, transparent 4px),
+        radial-gradient(circle at 82% 60%, rgba(50,237,160,.6) 0 2px, transparent 4px),
+        radial-gradient(circle at 96% 42%, rgba(255,255,255,.42) 0 1px, transparent 3px);
+      background-size: 90px 80px;
+      filter: blur(.2px);
+      animation: crowdFlicker 1.8s steps(3, end) infinite;
+    }
+
+    .floodlight {
+      position: absolute;
+      top: -18%;
+      width: 56vw;
+      height: 92vh;
+      opacity: .62;
+      filter: blur(18px);
+      mix-blend-mode: screen;
+      transform-origin: top center;
+    }
+
+    .floodlight.left {
+      left: -16%;
+      background: conic-gradient(from 18deg at 50% 0%, transparent, rgba(128,255,70,.16), transparent 29%);
+      animation: floodLeft 4.4s ease-in-out infinite alternate;
+    }
+
+    .floodlight.right {
+      right: -16%;
+      background: conic-gradient(from -18deg at 50% 0%, transparent, rgba(50,237,160,.14), transparent 29%);
+      animation: floodRight 4.9s ease-in-out infinite alternate;
+    }
+
+    .pitch {
+      position: absolute;
+      left: 50%;
+      bottom: -23vh;
+      width: min(1260px, 145vw);
+      height: min(760px, 84vh);
+      transform: translateX(-50%) perspective(850px) rotateX(62deg);
+      transform-origin: bottom center;
+      border: 2px solid rgba(190,255,208,.14);
+      border-radius: 54px;
+      background:
+        repeating-linear-gradient(90deg, rgba(128,255,70,.055) 0 90px, rgba(50,237,160,.035) 90px 180px),
+        linear-gradient(180deg, rgba(2,28,16,.58), rgba(1,9,6,.86));
+      box-shadow:
+        inset 0 0 90px rgba(128,255,70,.08),
+        inset 0 -80px 120px rgba(0,0,0,.28),
+        0 -36px 160px rgba(50,237,160,.10);
+      overflow: hidden;
+    }
+
+    .pitch::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(90deg, transparent 49.8%, rgba(208,255,219,.16) 50%, transparent 50.2%),
+        linear-gradient(rgba(208,255,219,.10) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(208,255,219,.07) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 86px, 92px 100%;
+      animation: pitchFlow 3.2s linear infinite;
+    }
+
+    .pitch::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 48%;
+      width: 230px;
+      height: 230px;
+      transform: translate(-50%, -50%);
+      border: 2px solid rgba(208,255,219,.13);
+      border-radius: 50%;
+    }
+
+    .box {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 38%;
+      height: 18%;
+      border: 2px solid rgba(208,255,219,.12);
+      z-index: 2;
+    }
+
+    .box.top { top: 0; border-top: 0; }
+    .box.bottom { bottom: 0; border-bottom: 0; }
+
+    .runner {
+      position: absolute;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--brand);
+      box-shadow: 0 0 18px rgba(128,255,70,.9), 0 0 44px rgba(128,255,70,.32);
+      z-index: 4;
+      animation: runnerMove 7s cubic-bezier(.55,.02,.3,1) infinite;
+    }
+
+    .runner.one { left: 26%; top: 38%; }
+    .runner.two {
+      left: 70%;
+      top: 60%;
+      background: var(--mint);
+      box-shadow: 0 0 18px rgba(50,237,160,.9), 0 0 44px rgba(50,237,160,.32);
+      animation-delay: -2.4s;
+    }
+
+    .runner.three {
+      left: 44%;
+      top: 68%;
+      background: var(--gold);
+      box-shadow: 0 0 18px rgba(255,217,106,.85), 0 0 44px rgba(255,217,106,.26);
+      animation: runnerMoveAlt 6.2s cubic-bezier(.5,.02,.28,1) infinite;
+      animation-delay: -1.2s;
+    }
+
+    .ball-line {
+      position: absolute;
+      left: 26%;
+      top: 40%;
+      width: 44%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.38), transparent);
+      transform: rotate(18deg);
+      opacity: .42;
+      z-index: 3;
+      animation: passFlash 7s ease-in-out infinite;
+    }
+
+    .pulse-wave {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 70px;
+      height: 70px;
+      transform: translate(-50%, -50%);
+      border: 2px solid rgba(128,255,70,.18);
+      border-radius: 50%;
+      z-index: 5;
+      animation: tacticalPulse 2.6s ease-out infinite;
+    }
+
+    .energy-ribbon {
+      position: absolute;
+      left: -20%;
+      top: 42%;
+      width: 140%;
+      height: 90px;
+      background: linear-gradient(90deg, transparent, rgba(128,255,70,.10), rgba(50,237,160,.12), transparent);
+      filter: blur(18px);
+      transform: rotate(-8deg);
+      opacity: .55;
+      animation: ribbonMove 4.2s ease-in-out infinite;
+      z-index: 1;
+    }
+
+    .hud-ring {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: min(620px, 92vw);
+      height: min(620px, 92vw);
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      border: 1px solid rgba(128,255,70,.10);
+      opacity: .54;
+      animation: ringSpin 10s linear infinite;
+    }
+
+    .hud-ring::before,
+    .hud-ring::after {
+      content: "";
+      position: absolute;
+      inset: 34px;
+      border-radius: 50%;
+      border: 1px dashed rgba(50,237,160,.12);
+    }
+
+    .hud-ring::after {
+      inset: 96px;
+      border-style: solid;
+      border-color: rgba(255,217,106,.09);
+    }
+
+    .grain {
+      position: absolute;
+      inset: 0;
+      opacity: .14;
+      background-image:
+        radial-gradient(circle at 24% 32%, rgba(255,255,255,.16) 0 1px, transparent 1px),
+        radial-gradient(circle at 72% 68%, rgba(255,255,255,.11) 0 1px, transparent 1px);
+      background-size: 19px 19px, 33px 33px;
+      pointer-events: none;
+    }
+
+    .shell {
+      width: min(1160px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 30px 0 40px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-family: "Syne", sans-serif;
+      font-weight: 900;
+      letter-spacing: -.06em;
+      font-size: 1.15rem;
+    }
+
+    .logo {
+      width: 42px;
+      height: 42px;
+      border-radius: 15px;
+      display: grid;
+      place-items: center;
+      color: #041008;
+      background: linear-gradient(135deg, var(--brand), var(--mint));
+      box-shadow: 0 0 34px rgba(128,255,70,.25);
+    }
+
+    .status {
+      color: var(--muted);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 10px 14px;
+      background: rgba(7,28,18,.52);
+      backdrop-filter: blur(18px);
+      font-size: .84rem;
+      font-weight: 800;
+    }
+
+    .hero {
+      min-height: 62vh;
+      display: grid;
+      place-items: center;
+      text-align: center;
+    }
+
+    .hero-card {
+      width: min(850px, 100%);
+      position: relative;
+      overflow: hidden;
+      padding: clamp(28px, 7vw, 78px);
+      border: 1px solid var(--line);
+      border-radius: 42px;
+      background:
+        linear-gradient(180deg, rgba(7,28,18,.78), rgba(3,11,7,.74)),
+        radial-gradient(circle at 50% 0%, rgba(128,255,70,.13), transparent 46%);
+      box-shadow:
+        0 40px 120px rgba(0,0,0,.46),
+        inset 0 1px 0 rgba(255,255,255,.06);
+      backdrop-filter: blur(24px);
+    }
+
+    .hero-card::before {
+      content: "";
+      position: absolute;
+      inset: -1px;
+      background: linear-gradient(115deg, transparent 0 35%, rgba(255,255,255,.08) 49%, transparent 62%);
+      transform: translateX(-100%);
+      animation: heroSheen 4.2s ease-in-out infinite;
+    }
+
+    .hero-card > * { position: relative; }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--brand);
+      font-weight: 900;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      font-size: .78rem;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--brand);
+      box-shadow: 0 0 20px rgba(128,255,70,.85);
+      animation: livePulse 1.5s ease-in-out infinite;
+    }
+
+    h1 {
+      margin: 14px 0 16px;
+      font-family: "Syne", sans-serif;
+      font-size: clamp(2.55rem, 10.8vw, 7.1rem);
+      line-height: .82;
+      letter-spacing: -.1em;
+      text-shadow: 0 0 30px rgba(128,255,70,.12);
+    }
+
+    p {
+      max-width: 620px;
+      margin: 0 auto;
+      color: var(--muted);
+      line-height: 1.75;
+      font-size: 1rem;
+    }
+
+    .actions {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 26px;
+    }
+
+    .btn {
+      border: 1px solid rgba(128,255,70,.30);
+      border-radius: 999px;
+      padding: 13px 19px;
+      background: linear-gradient(135deg, rgba(128,255,70,.18), rgba(50,237,160,.10));
+      color: var(--brand);
+      font-weight: 900;
+      box-shadow: 0 0 28px rgba(128,255,70,.08);
+    }
+
+    .btn.secondary {
+      color: var(--ink);
+      border-color: var(--line);
+      background: rgba(255,255,255,.035);
+    }
+
+    .dock {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .dock-card {
+      border: 1px solid var(--line);
+      border-radius: 26px;
+      padding: 18px;
+      background: rgba(6,23,15,.68);
+      backdrop-filter: blur(20px);
+      min-height: 118px;
+    }
+
+    .dock-card strong {
+      display: block;
+      font-family: "Syne", sans-serif;
+      margin-bottom: 8px;
+    }
+
+    .dock-card span {
+      color: var(--muted);
+      font-size: .88rem;
+      line-height: 1.52;
+    }
+
+    @keyframes sceneMood {
+      from { filter: saturate(1) brightness(1); }
+      to { filter: saturate(1.25) brightness(1.09); }
+    }
+
+    @keyframes dataDrift {
+      from { background-position: 0 0, 0 0; }
+      to { background-position: 136px 0, 0 136px; }
+    }
+
+    @keyframes crowdFlicker {
+      0%, 100% { opacity: .32; }
+      45% { opacity: .52; }
+      70% { opacity: .42; }
+    }
+
+    @keyframes floodLeft {
+      from { transform: rotate(-8deg) translateX(-4%); opacity: .42; }
+      to { transform: rotate(6deg) translateX(8%); opacity: .72; }
+    }
+
+    @keyframes floodRight {
+      from { transform: rotate(8deg) translateX(4%); opacity: .38; }
+      to { transform: rotate(-7deg) translateX(-8%); opacity: .68; }
+    }
+
+    @keyframes pitchFlow {
+      from { background-position: 0 0, 0 0, 0 0; }
+      to { background-position: 0 0, 0 172px, 184px 0; }
+    }
+
+    @keyframes runnerMove {
+      0%, 100% { transform: translate3d(0, 0, 0) scale(.9); opacity: .5; }
+      40% { transform: translate3d(110px, -52px, 0) scale(1.15); opacity: 1; }
+      70% { transform: translate3d(210px, 30px, 0) scale(.95); opacity: .72; }
+    }
+
+    @keyframes runnerMoveAlt {
+      0%, 100% { transform: translate3d(0, 0, 0) scale(.82); opacity: .42; }
+      36% { transform: translate3d(-120px, -62px, 0) scale(1.18); opacity: .95; }
+      76% { transform: translate3d(72px, -118px, 0) scale(.96); opacity: .72; }
+    }
+
+    @keyframes passFlash {
+      0%, 35%, 100% { opacity: 0; transform: rotate(18deg) scaleX(.3); }
+      48% { opacity: .55; transform: rotate(18deg) scaleX(1); }
+    }
+
+    @keyframes tacticalPulse {
+      0% { opacity: .58; transform: translate(-50%, -50%) scale(.5); }
+      100% { opacity: 0; transform: translate(-50%, -50%) scale(5.8); }
+    }
+
+    @keyframes ribbonMove {
+      0%, 100% { transform: translateX(-10%) rotate(-8deg); opacity: .22; }
+      50% { transform: translateX(10%) rotate(-8deg); opacity: .68; }
+    }
+
+    @keyframes ringSpin {
+      from { transform: translate(-50%, -50%) rotate(0deg); }
+      to { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    @keyframes heroSheen {
+      0%, 50% { transform: translateX(-120%); }
+      76%, 100% { transform: translateX(120%); }
+    }
+
+    @keyframes livePulse {
+      0%, 100% { transform: scale(.82); opacity: .65; }
+      50% { transform: scale(1.2); opacity: 1; }
+    }
+
+    @media (max-width: 800px) {
+      .shell { padding: 22px 0 30px; }
+      .status { display: none; }
+      .hero { min-height: 64vh; }
+      .hero-card { border-radius: 32px; }
+      .dock { grid-template-columns: 1fr 1fr; }
+      .pitch {
+        width: 166vw;
+        height: 64vh;
+        bottom: -12vh;
+      }
+      .hud-ring {
+        width: 92vw;
+        height: 92vw;
+        opacity: .34;
+      }
+      .floodlight { width: 82vw; }
+      .runner, .ball-line { display: none; }
+      .pulse-wave { display: none; }
+    }
+
+    @media (max-width: 520px) {
+      .dock { grid-template-columns: 1fr; }
+      .hero { min-height: 68vh; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .elite-scene,
+      .elite-scene::before,
+      .crowd,
+      .floodlight,
+      .pitch::before,
+      .runner,
+      .ball-line,
+      .pulse-wave,
+      .energy-ribbon,
+      .hud-ring,
+      .hero-card::before,
+      .eyebrow::before {
+        animation: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="elite-scene">
+    <div class="crowd"></div>
+    <div class="floodlight left"></div>
+    <div class="floodlight right"></div>
+    <div class="hud-ring"></div>
+    <div class="pitch">
+      <div class="energy-ribbon"></div>
+      <div class="box top"></div>
+      <div class="box bottom"></div>
+      <div class="runner one"></div>
+      <div class="runner two"></div>
+      <div class="runner three"></div>
+      <div class="ball-line"></div>
+      <div class="pulse-wave"></div>
+    </div>
+    <div class="grain"></div>
+  </div>
+
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo">G</div>
+        Goalbazi
+      </div>
+      <div class="status">Elite match-night background</div>
+    </header>
+
+    <section class="hero">
+      <div class="hero-card">
+        <div class="eyebrow">Live football network</div>
+        <h1>Own the next match.</h1>
+        <p>This version feels more like a real sports-tech app: floodlights, a living pitch, player-motion dots, crowd shimmer, and premium glass depth.</p>
+        <div class="actions">
+          <div class="btn">Create match</div>
+          <div class="btn secondary">Find arenas</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="dock">
+      <div class="dock-card">
+        <strong>Match night</strong>
+        <span>Floodlights and crowd shimmer create a stronger stadium atmosphere.</span>
+      </div>
+      <div class="dock-card">
+        <strong>Living pitch</strong>
+        <span>The field surface moves gently, so the page never feels frozen.</span>
+      </div>
+      <div class="dock-card">
+        <strong>Player motion</strong>
+        <span>Small tactical dots suggest real football movement without clutter.</span>
+      </div>
+      <div class="dock-card">
+        <strong>Mobile safe</strong>
+        <span>Animations are visual-only and can be reduced automatically.</span>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

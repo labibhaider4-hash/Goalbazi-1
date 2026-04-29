@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Goalbazi Background Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #020806;
+      --panel: rgba(10, 29, 20, .78);
+      --line: rgba(157, 255, 186, .13);
+      --text: #f4fff7;
+      --muted: #93c9ad;
+      --brand: #7fff45;
+      --accent: #31e88f;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "DM Sans", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      overflow-x: hidden;
+    }
+
+    .goalbazi-bg {
+      position: fixed;
+      inset: 0;
+      z-index: -4;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% -10%, rgba(127,255,69,.14), transparent 38%),
+        linear-gradient(135deg, #020806 0%, #04140d 52%, #010302 100%);
+      animation: bgBreath 10s ease-in-out infinite alternate;
+    }
+
+    .pitch-lines {
+      position: absolute;
+      inset: -8%;
+      opacity: .22;
+      transform: rotate(-7deg);
+      background:
+        linear-gradient(rgba(148,255,177,.10) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148,255,177,.08) 1px, transparent 1px);
+      background-size: 72px 72px;
+      animation: pitchDrift 9s linear infinite;
+      mask-image: radial-gradient(circle at 50% 45%, black 0%, transparent 72%);
+    }
+
+    .sweep-light {
+      position: absolute;
+      inset: -40%;
+      background: conic-gradient(
+        from 180deg at 50% 50%,
+        transparent 0deg,
+        rgba(127,255,69,.10) 22deg,
+        transparent 48deg,
+        transparent 360deg
+      );
+      opacity: .55;
+      filter: blur(18px);
+      animation: sweepRotate 14s linear infinite;
+      transform-origin: center;
+    }
+
+    .pitch-mark {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: min(72vw, 720px);
+      height: min(48vw, 420px);
+      transform: translate(-50%, -50%) rotate(-7deg);
+      border: 1px solid rgba(160,255,190,.10);
+      border-radius: 24px;
+      opacity: .62;
+    }
+
+    .pitch-mark::before {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 0;
+      bottom: 0;
+      border-left: 1px solid rgba(160,255,190,.10);
+    }
+
+    .pitch-mark::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 130px;
+      height: 130px;
+      transform: translate(-50%, -50%);
+      border: 1px solid rgba(160,255,190,.10);
+      border-radius: 50%;
+    }
+
+    .glow {
+      position: absolute;
+      width: 420px;
+      height: 420px;
+      border-radius: 50%;
+      filter: blur(72px);
+      opacity: .45;
+      mix-blend-mode: screen;
+      animation: stadiumGlow 16s ease-in-out infinite alternate;
+    }
+
+    .glow.one {
+      left: -120px;
+      top: 10%;
+      background: rgba(127,255,69,.20);
+    }
+
+    .glow.two {
+      right: -160px;
+      bottom: 8%;
+      background: rgba(49,232,143,.18);
+      animation-delay: -6s;
+    }
+
+    .particle-field span {
+      position: absolute;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: rgba(127,255,69,.72);
+      box-shadow: 0 0 18px rgba(127,255,69,.45);
+      opacity: .36;
+      animation: floatParticle 8s ease-in-out infinite;
+    }
+
+    .particle-field span:nth-child(1) { left: 12%; top: 22%; animation-delay: 0s; }
+    .particle-field span:nth-child(2) { left: 28%; top: 72%; animation-delay: -2s; }
+    .particle-field span:nth-child(3) { left: 52%; top: 18%; animation-delay: -4s; }
+    .particle-field span:nth-child(4) { left: 74%; top: 62%; animation-delay: -1s; }
+    .particle-field span:nth-child(5) { left: 88%; top: 32%; animation-delay: -5s; }
+    .particle-field span:nth-child(6) { left: 44%; top: 88%; animation-delay: -3s; }
+
+    .grain {
+      position: absolute;
+      inset: 0;
+      opacity: .12;
+      background-image:
+        radial-gradient(circle at 25% 30%, rgba(255,255,255,.18) 0 1px, transparent 1px),
+        radial-gradient(circle at 75% 60%, rgba(255,255,255,.12) 0 1px, transparent 1px);
+      background-size: 22px 22px, 31px 31px;
+      pointer-events: none;
+    }
+
+    .preview-shell {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 42px 0;
+    }
+
+    .hero {
+      min-height: 54vh;
+      display: grid;
+      place-items: center;
+      text-align: center;
+    }
+
+    .hero-card {
+      width: min(760px, 100%);
+      padding: clamp(24px, 7vw, 62px);
+      border: 1px solid var(--line);
+      border-radius: 34px;
+      background: linear-gradient(180deg, rgba(9,30,20,.84), rgba(7,18,13,.72));
+      box-shadow: 0 32px 90px rgba(0,0,0,.34);
+      backdrop-filter: blur(18px);
+    }
+
+    .eyebrow {
+      color: var(--brand);
+      font-weight: 800;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      font-size: .78rem;
+    }
+
+    h1 {
+      margin: 12px 0;
+      font-family: "Syne", sans-serif;
+      font-size: clamp(2.2rem, 10vw, 5.8rem);
+      line-height: .86;
+      letter-spacing: -.08em;
+    }
+
+    p {
+      margin: 0 auto;
+      max-width: 560px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 20px;
+    }
+
+    .card {
+      padding: 18px;
+      border-radius: 22px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      backdrop-filter: blur(14px);
+    }
+
+    .card strong {
+      display: block;
+      font-family: "Syne", sans-serif;
+      margin-bottom: 8px;
+    }
+
+    .card span {
+      color: var(--muted);
+      font-size: .9rem;
+      line-height: 1.5;
+    }
+
+    @keyframes pitchDrift {
+      from { background-position: 0 0, 0 0; }
+      to { background-position: 216px 144px, 216px 144px; }
+    }
+
+    @keyframes bgBreath {
+      from { filter: saturate(1) brightness(1); }
+      to { filter: saturate(1.18) brightness(1.08); }
+    }
+
+    @keyframes sweepRotate {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes stadiumGlow {
+      from { transform: translate3d(0, 0, 0) scale(1); }
+      to { transform: translate3d(80px, 36px, 0) scale(1.18); }
+    }
+
+    @keyframes floatParticle {
+      0%, 100% { transform: translate3d(0, 0, 0) scale(.75); opacity: .22; }
+      45% { transform: translate3d(28px, -44px, 0) scale(1.2); opacity: .58; }
+    }
+
+    @media (max-width: 720px) {
+      .preview-shell { padding: 24px 0; }
+      .hero { min-height: 62vh; }
+      .cards { grid-template-columns: 1fr; }
+      .pitch-lines { background-size: 52px 52px; }
+      .pitch-mark { width: 96vw; height: 62vw; }
+      .glow { width: 300px; height: 300px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .pitch-lines, .glow, .goalbazi-bg, .sweep-light, .particle-field span { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="goalbazi-bg">
+    <div class="sweep-light"></div>
+    <div class="pitch-lines"></div>
+    <div class="pitch-mark"></div>
+    <div class="glow one"></div>
+    <div class="glow two"></div>
+    <div class="particle-field" aria-hidden="true">
+      <span></span>
+      <span></span>
+      <span></span>
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
+    <div class="grain"></div>
+  </div>
+
+  <main class="preview-shell">
+    <section class="hero">
+      <div class="hero-card">
+        <div class="eyebrow">Background concept</div>
+        <h1>Goalbazi feels alive.</h1>
+        <p>Subtle pitch lines, stadium glow, and texture make the app feel premium without distracting players on mobile.</p>
+      </div>
+    </section>
+
+    <section class="cards">
+      <div class="card">
+        <strong>Pitch grid</strong>
+        <span>Football identity without using loud football icons everywhere.</span>
+      </div>
+      <div class="card">
+        <strong>Moving glow</strong>
+        <span>Soft stadium-light energy that keeps pages from feeling static.</span>
+      </div>
+      <div class="card">
+        <strong>Light texture</strong>
+        <span>A little grain makes the dark UI feel more designed and less flat.</span>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

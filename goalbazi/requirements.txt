@@ -1,4 +1,11 @@
+# Flask web framework for routes, sessions, templates, and API endpoints.
 flask==3.0.3
+
+# PostgreSQL driver used by server.py through DATABASE_URL.
 psycopg2-binary==2.9.9
+
+# Production web server used by Railway.
 gunicorn==22.0.0
+
+# Web Push/VAPID support for phone notification subscriptions.
 pywebpush==2.0.3

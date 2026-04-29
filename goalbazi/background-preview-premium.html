@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Goalbazi Premium Background Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #010604;
+      --panel: rgba(8, 28, 18, .76);
+      --panel-2: rgba(5, 18, 12, .82);
+      --line: rgba(170, 255, 194, .15);
+      --text: #f4fff7;
+      --muted: #9fd0b6;
+      --brand: #7fff45;
+      --accent: #31e88f;
+      --amber: #f5c85a;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "DM Sans", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      overflow-x: hidden;
+    }
+
+    .stadium-bg {
+      position: fixed;
+      inset: 0;
+      z-index: -5;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 110%, rgba(127,255,69,.16), transparent 32%),
+        radial-gradient(circle at 50% -18%, rgba(31,232,143,.18), transparent 34%),
+        linear-gradient(180deg, #020806 0%, #03130c 54%, #000302 100%);
+      animation: scenePulse 9s ease-in-out infinite alternate;
+    }
+
+    .stadium-bg::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(115deg, transparent 0 34%, rgba(127,255,69,.085) 43%, transparent 54%),
+        linear-gradient(245deg, transparent 0 37%, rgba(49,232,143,.075) 46%, transparent 58%);
+      filter: blur(14px);
+      opacity: .88;
+      animation: beamSweep 7s ease-in-out infinite alternate;
+    }
+
+    .stadium-bg::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 18% 18%, rgba(255,255,255,.16) 0 1px, transparent 2px),
+        radial-gradient(circle at 82% 24%, rgba(255,255,255,.12) 0 1px, transparent 2px),
+        radial-gradient(circle at 52% 8%, rgba(127,255,69,.22) 0 1px, transparent 2px);
+      background-size: 95px 95px, 132px 132px, 165px 165px;
+      opacity: .18;
+      animation: crowdTwinkle 3.8s steps(2, end) infinite;
+    }
+
+    .pitch-perspective {
+      position: absolute;
+      left: 50%;
+      bottom: -18vh;
+      width: min(1180px, 130vw);
+      height: min(660px, 78vh);
+      transform: translateX(-50%) perspective(720px) rotateX(58deg);
+      transform-origin: bottom center;
+      border: 2px solid rgba(172,255,194,.13);
+      border-radius: 44px;
+      opacity: .85;
+      box-shadow:
+        inset 0 0 80px rgba(127,255,69,.06),
+        0 -24px 120px rgba(49,232,143,.09);
+    }
+
+    .pitch-perspective::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(90deg, transparent 49.8%, rgba(172,255,194,.15) 50%, transparent 50.2%),
+        linear-gradient(rgba(172,255,194,.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(172,255,194,.055) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 72px, 86px 100%;
+      animation: pitchRun 6s linear infinite;
+    }
+
+    .pitch-perspective::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 48%;
+      width: 210px;
+      height: 210px;
+      transform: translate(-50%, -50%);
+      border: 2px solid rgba(172,255,194,.12);
+      border-radius: 50%;
+      box-shadow: 0 0 50px rgba(127,255,69,.05);
+    }
+
+    .goal-box {
+      position: absolute;
+      left: 50%;
+      width: 34%;
+      height: 18%;
+      transform: translateX(-50%);
+      border: 2px solid rgba(172,255,194,.11);
+    }
+
+    .goal-box.top { top: 0; border-top: 0; }
+    .goal-box.bottom { bottom: 0; border-bottom: 0; }
+
+    .scan-line {
+      position: absolute;
+      left: -20%;
+      right: -20%;
+      top: 54%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(127,255,69,.72), rgba(49,232,143,.56), transparent);
+      box-shadow: 0 0 22px rgba(127,255,69,.42);
+      opacity: .55;
+      animation: scanMove 4.8s ease-in-out infinite;
+    }
+
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(58px);
+      opacity: .5;
+      mix-blend-mode: screen;
+      animation: orbFloat 11s ease-in-out infinite alternate;
+    }
+
+    .orb.a {
+      width: 340px;
+      height: 340px;
+      left: -90px;
+      top: 18%;
+      background: rgba(127,255,69,.20);
+    }
+
+    .orb.b {
+      width: 420px;
+      height: 420px;
+      right: -130px;
+      top: 38%;
+      background: rgba(49,232,143,.16);
+      animation-delay: -5s;
+    }
+
+    .orb.c {
+      width: 260px;
+      height: 260px;
+      left: 44%;
+      top: -90px;
+      background: rgba(245,200,90,.10);
+      animation-delay: -2s;
+    }
+
+    .grain {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: .12;
+      background-image:
+        radial-gradient(circle at 12% 22%, rgba(255,255,255,.20) 0 1px, transparent 1px),
+        radial-gradient(circle at 72% 68%, rgba(255,255,255,.12) 0 1px, transparent 1px);
+      background-size: 21px 21px, 35px 35px;
+    }
+
+    .preview-shell {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 42px 0;
+    }
+
+    .nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 44px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-family: "Syne", sans-serif;
+      font-weight: 800;
+      letter-spacing: -.05em;
+    }
+
+    .brand-mark {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--brand), var(--accent));
+      color: #061008;
+      box-shadow: 0 0 30px rgba(127,255,69,.26);
+    }
+
+    .pill {
+      border: 1px solid var(--line);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 10px 14px;
+      background: rgba(8, 28, 18, .52);
+      backdrop-filter: blur(14px);
+      font-size: .86rem;
+      font-weight: 700;
+    }
+
+    .hero {
+      min-height: 58vh;
+      display: grid;
+      place-items: center;
+      text-align: center;
+    }
+
+    .hero-card {
+      width: min(820px, 100%);
+      padding: clamp(26px, 7vw, 70px);
+      border: 1px solid var(--line);
+      border-radius: 38px;
+      background:
+        linear-gradient(180deg, rgba(9,30,20,.82), rgba(4,12,8,.74)),
+        radial-gradient(circle at 50% 0%, rgba(127,255,69,.11), transparent 44%);
+      box-shadow:
+        0 34px 100px rgba(0,0,0,.42),
+        inset 0 1px 0 rgba(255,255,255,.05);
+      backdrop-filter: blur(22px);
+    }
+
+    .eyebrow {
+      color: var(--brand);
+      font-weight: 900;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      font-size: .78rem;
+    }
+
+    h1 {
+      margin: 14px 0 16px;
+      font-family: "Syne", sans-serif;
+      font-size: clamp(2.4rem, 10.5vw, 6.5rem);
+      line-height: .84;
+      letter-spacing: -.09em;
+      text-shadow: 0 0 28px rgba(127,255,69,.10);
+    }
+
+    p {
+      margin: 0 auto;
+      max-width: 600px;
+      color: var(--muted);
+      line-height: 1.75;
+      font-size: 1rem;
+    }
+
+    .actions {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 24px;
+    }
+
+    .btn {
+      border: 1px solid rgba(127,255,69,.24);
+      border-radius: 999px;
+      padding: 12px 18px;
+      background: rgba(127,255,69,.10);
+      color: var(--brand);
+      font-weight: 900;
+    }
+
+    .btn.secondary {
+      border-color: var(--line);
+      background: rgba(255,255,255,.03);
+      color: var(--text);
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 26px;
+    }
+
+    .card {
+      position: relative;
+      overflow: hidden;
+      padding: 20px;
+      border-radius: 24px;
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      backdrop-filter: blur(18px);
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(120deg, transparent, rgba(127,255,69,.08), transparent);
+      transform: translateX(-100%);
+      animation: cardSheen 5s ease-in-out infinite;
+    }
+
+    .card strong {
+      position: relative;
+      display: block;
+      font-family: "Syne", sans-serif;
+      margin-bottom: 8px;
+    }
+
+    .card span {
+      position: relative;
+      color: var(--muted);
+      font-size: .9rem;
+      line-height: 1.55;
+    }
+
+    @keyframes scenePulse {
+      from { filter: saturate(1) brightness(1); }
+      to { filter: saturate(1.22) brightness(1.08); }
+    }
+
+    @keyframes beamSweep {
+      from { transform: translateX(-5%) scale(1.03); opacity: .58; }
+      to { transform: translateX(5%) scale(1.08); opacity: .95; }
+    }
+
+    @keyframes crowdTwinkle {
+      0%, 100% { opacity: .13; }
+      50% { opacity: .24; }
+    }
+
+    @keyframes pitchRun {
+      from { background-position: 0 0, 0 0, 0 0; }
+      to { background-position: 0 0, 0 144px, 172px 0; }
+    }
+
+    @keyframes scanMove {
+      0%, 100% { transform: translateY(-180px); opacity: .18; }
+      48% { transform: translateY(160px); opacity: .7; }
+    }
+
+    @keyframes orbFloat {
+      from { transform: translate3d(0, 0, 0) scale(1); }
+      to { transform: translate3d(80px, 36px, 0) scale(1.18); }
+    }
+
+    @keyframes cardSheen {
+      0%, 45% { transform: translateX(-120%); }
+      70%, 100% { transform: translateX(120%); }
+    }
+
+    @media (max-width: 760px) {
+      .preview-shell { padding: 24px 0 34px; }
+      .nav { margin-bottom: 24px; }
+      .pill { display: none; }
+      .hero { min-height: 62vh; }
+      .hero-card { border-radius: 30px; }
+      .cards { grid-template-columns: 1fr; }
+      .pitch-perspective {
+        width: 150vw;
+        height: 58vh;
+        bottom: -10vh;
+      }
+      .scan-line { top: 62%; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .stadium-bg,
+      .stadium-bg::before,
+      .stadium-bg::after,
+      .pitch-perspective::before,
+      .scan-line,
+      .orb,
+      .card::before {
+        animation: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="stadium-bg">
+    <div class="orb a"></div>
+    <div class="orb b"></div>
+    <div class="orb c"></div>
+    <div class="pitch-perspective">
+      <div class="goal-box top"></div>
+      <div class="goal-box bottom"></div>
+      <div class="scan-line"></div>
+    </div>
+    <div class="grain"></div>
+  </div>
+
+  <main class="preview-shell">
+    <header class="nav">
+      <div class="brand">
+        <div class="brand-mark">G</div>
+        Goalbazi
+      </div>
+      <div class="pill">Premium motion background concept</div>
+    </header>
+
+    <section class="hero">
+      <div class="hero-card">
+        <div class="eyebrow">Cinematic football UI</div>
+        <h1>The city plays here.</h1>
+        <p>A deeper animated stadium background with pitch perspective, moving beams, scanning light, and glass cards. More premium, more alive, still clean enough for a real app.</p>
+        <div class="actions">
+          <div class="btn">Find matches</div>
+          <div class="btn secondary">Explore arenas</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="cards">
+      <div class="card">
+        <strong>Stadium beams</strong>
+        <span>Light moves across the scene like a match-night arena.</span>
+      </div>
+      <div class="card">
+        <strong>Perspective pitch</strong>
+        <span>Football identity feels built into the world, not pasted on top.</span>
+      </div>
+      <div class="card">
+        <strong>Premium depth</strong>
+        <span>Glass panels, scan lines, glow, and grain give the UI atmosphere.</span>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

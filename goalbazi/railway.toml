@@ -1,7 +1,10 @@
 [build]
+# Railway should build this project with Nixpacks.
+# Do not switch this to Docker unless you intentionally add a Dockerfile again.
 builder = "NIXPACKS"
 
 [deploy]
+# Railway provides $PORT at runtime; Gunicorn must bind to it for healthchecks.
 startCommand = "gunicorn server:app --bind 0.0.0.0:$PORT --workers 2 --timeout 60"
 healthcheckPath = "/health"
 healthcheckTimeout = 120
