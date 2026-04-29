@@ -173,6 +173,39 @@ const GoalbaziUpdates = {
     }
     this.waitingWorker.postMessage({ type: "SKIP_WAITING" });
   },
+  async checkNow() {
+    if (!("serviceWorker" in navigator)) {
+      showToast("Updates are checked when you refresh this browser.");
+      return;
+    }
+    showToast("Checking for updates...");
+    try {
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (!registration) {
+        showToast("Update checker is not ready yet. Reopen the app once.");
+        return;
+      }
+      await registration.update();
+      if (registration.waiting) {
+        this.show(registration.waiting);
+        showToast("Update ready");
+        return;
+      }
+      const installing = registration.installing;
+      if (installing) {
+        installing.addEventListener("statechange", () => {
+          if (installing.state === "installed" && navigator.serviceWorker.controller) {
+            this.show(installing);
+          }
+        });
+        showToast("Preparing update...");
+        return;
+      }
+      showToast("Goalbazi is already up to date");
+    } catch {
+      showToast("Could not check updates. Try again later.");
+    }
+  },
   bindRegistration(registration) {
     if (!registration) return;
     if (registration.waiting && navigator.serviceWorker.controller) {
@@ -391,6 +424,7 @@ function initNav(activePage) {
           <a href="/profile">Profile</a>
           <a href="/admin" id="nav-admin-link" hidden>Admin Panel</a>
           <button type="button" data-enable-push hidden>Enable phone notifications</button>
+          <button type="button" data-check-updates>Check for updates</button>
           <button type="button" id="nav-menu-logout">Log out</button>
         </div>
       </div>
@@ -409,6 +443,7 @@ function initNav(activePage) {
       <div class="nav-drawer-bottom">
         <a href="/admin" class="btn btn-ghost btn-sm btn-full" id="nav-admin-link-mobile" hidden>Admin Panel</a>
         <button class="btn btn-ghost btn-sm btn-full" type="button" data-enable-push hidden>Enable phone notifications</button>
+        <button class="btn btn-ghost btn-sm btn-full" type="button" data-check-updates>Check for updates</button>
         <button class="btn btn-primary btn-sm btn-full install-app-btn" id="nav-install-mobile" type="button" data-install-app hidden>Install app</button>
         <button class="theme-toggle btn-full" id="nav-theme-toggle-mobile" type="button" data-theme-toggle></button>
         <button class="btn btn-ghost btn-sm btn-full" id="nav-logout-mobile">Log out</button>
@@ -421,6 +456,11 @@ function initNav(activePage) {
   GoalbaziInstall.bind();
   GoalbaziPush.bind();
   GoalbaziPullRefresh.bind();
+  document.querySelectorAll("[data-check-updates]").forEach(btn => {
+    if (btn.dataset.updateBound === "1") return;
+    btn.dataset.updateBound = "1";
+    btn.addEventListener("click", () => GoalbaziUpdates.checkNow());
+  });
 
   // Load avatar initials
   fetch("/api/auth/me").then(r => r.ok ? r.json() : null).then(user => {
