@@ -1661,6 +1661,8 @@ def api_dashboard():
         (current_user_id(),),
         one=True,
     )["count"]
+    # Team hub needs the logged-in athlete's team before building the dashboard JSON.
+    my_team = get_user_team(current_user_id())
     return jsonify({
         "profile": get_profile(current_user_id()),
         "founder_badge": get_founder_badge(current_user_id()),
