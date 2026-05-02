@@ -38,6 +38,13 @@ except Exception:
 
 app = Flask(__name__, static_folder="static", template_folder=".")
 app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
+# Keep users signed in after closing the browser/PWA. If SECRET_KEY changes on deploy,
+# old cookies still become invalid, so Railway should use a fixed SECRET_KEY variable.
+app.permanent_session_lifetime = timedelta(days=int(os.environ.get("SESSION_DAYS", "30")))
+app.config.update(
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=os.environ.get("PUBLIC_BASE_URL", "").startswith("https://"),
+)
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
@@ -114,6 +121,39 @@ def verify_password(password: str, stored: str) -> bool:
         return False
 
 
+def activity_status(last_seen_at: str | None) -> dict:
+    """Convert last_seen_at into a friendly activity label for athlete cards."""
+    if not last_seen_at:
+        return {"label": "Offline", "kind": "offline"}
+    try:
+        seen = datetime.fromisoformat(str(last_seen_at))
+    except Exception:
+        return {"label": "Offline", "kind": "offline"}
+    minutes = (datetime.now() - seen).total_seconds() / 60
+    if minutes <= 5:
+        return {"label": "Online now", "kind": "online"}
+    if minutes <= 60:
+        return {"label": f"Active {int(minutes)}m ago", "kind": "recent"}
+    if minutes <= 1440:
+        return {"label": f"Active {int(minutes // 60)}h ago", "kind": "recent"}
+    return {"label": "Offline", "kind": "offline"}
+
+
+def touch_user_activity() -> None:
+    """Throttle last-seen writes so activity status is useful without hammering Postgres."""
+    if "user_id" not in session:
+        return
+    now = datetime.now()
+    try:
+        last_touch = datetime.fromisoformat(session.get("last_seen_touch", ""))
+        if (now - last_touch).total_seconds() < 180:
+            return
+    except Exception:
+        pass
+    query("UPDATE users SET last_seen_at = %s WHERE id = %s", (now.isoformat(), session["user_id"]), commit=True)
+    session["last_seen_touch"] = now.isoformat()
+
+
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -121,6 +161,7 @@ def login_required(f):
             if request.path.startswith("/api/"):
                 return jsonify({"error": "Unauthorized"}), 401
             return redirect("/login")
+        touch_user_activity()
         return f(*args, **kwargs)
     return decorated
 
@@ -201,6 +242,7 @@ def push_is_configured() -> bool:
 
 
 def send_push_to_user(user_id: int, title: str, body: str, url: str = "/dashboard") -> None:
+    """Send one high-priority phone/browser notification to a subscribed user."""
     if not push_is_configured():
         return
     subscriptions = [dict(r) for r in query(
@@ -365,6 +407,7 @@ def seed_db():
     cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS dribbling INTEGER NOT NULL DEFAULT 50")
     cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS defending INTEGER NOT NULL DEFAULT 50")
     cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS physical INTEGER NOT NULL DEFAULT 50")
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen_at TEXT DEFAULT ''")
     cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS qr_base64 TEXT DEFAULT ''")
     cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS map_link TEXT DEFAULT ''")
     cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION")
@@ -892,12 +935,12 @@ def user_can_manage_team(user_id: int, team_id: int) -> bool:
 
 
 def get_founder_badge(user_id: int) -> dict:
-    """Early users get a permanent Founder Athlete badge to encourage identity and referrals."""
+    """Early users get a First XI badge; no public 'founder' wording is shown."""
     row = query("SELECT id FROM users WHERE id = %s", (user_id,), one=True)
     is_founder = bool(row and row["id"] <= 50)
     return {
         "enabled": is_founder,
-        "label": "Founder Athlete" if is_founder else "",
+        "label": "First XI" if is_founder else "",
         "description": "Early Goalbazi member" if is_founder else "",
     }
 
@@ -1086,6 +1129,22 @@ def get_notifications():
                 "title": "Friend request",
                 "message": f"{row['name']} sent you a friend request.",
             })
+        accepted_friends = [dict(r) for r in query(
+            """SELECT u.name
+               FROM friendships f
+               JOIN users u ON u.id = CASE WHEN f.user_one_id = %s THEN f.user_two_id ELSE f.user_one_id END
+               WHERE (f.user_one_id = %s OR f.user_two_id = %s)
+                 AND f.status = 'accepted'
+               ORDER BY f.id DESC
+               LIMIT 3""",
+            (uid, uid, uid),
+        )]
+        for row in accepted_friends:
+            items.append({
+                "type": "friend_accepted",
+                "title": "New connection",
+                "message": f"You are now connected with {row['name']}.",
+            })
         recent_messages = [dict(r) for r in query(
             """SELECT u.name, dm.message
                FROM direct_messages dm
@@ -1132,9 +1191,14 @@ def get_notifications():
             })
         my_team = get_user_team(uid)
         for challenge in get_team_challenges_for_user(uid)[:3]:
-            if challenge["status"] != "pending":
-                continue
             incoming = bool(my_team and challenge["opponent_team_id"] == my_team["id"])
+            if challenge["status"] != "pending":
+                items.append({
+                    "type": "team_challenge_status",
+                    "title": f"Challenge {challenge['status']}",
+                    "message": f"{challenge['challenger_name']} vs {challenge['opponent_name']} was {challenge['status']}.",
+                })
+                continue
             items.append({
                 "type": "team_challenge",
                 "title": "New team challenge" if incoming else "Challenge pending",
@@ -1507,6 +1571,7 @@ def api_register():
     )
     user_id = cur.fetchone()["id"]
     conn.commit()
+    session.permanent = True
     session["user_id"] = user_id
     log_event("auth_register", "/api/auth/register", {"user_id": user_id})
     return jsonify({"ok": True}), 201
@@ -1520,6 +1585,7 @@ def api_login():
     user = query("SELECT id, password_hash FROM users WHERE email = %s", (email,), one=True)
     if not user or not verify_password(password, user["password_hash"]):
         return jsonify({"error": "Invalid email or password"}), 401
+    session.permanent = True
     session["user_id"] = user["id"]
     log_event("auth_login", "/api/auth/login", {"user_id": user["id"]})
     return jsonify({"ok": True})
@@ -1588,6 +1654,7 @@ def google_callback():
         user_id = cur.fetchone()["id"]
     conn.commit()
     session.clear()
+    session.permanent = True
     session["user_id"] = user_id
     log_event("google_login", "/auth/google/callback", {"user_id": user_id})
     return redirect("/dashboard")
@@ -1933,12 +2000,15 @@ def api_admin_users():
         """SELECT u.id, u.name, u.handle, u.email, u.location, u.position, u.secondary_position,
                   u.skill, u.preferred_format, u.strong_foot, u.availability,
                   u.pace, u.shooting, u.passing, u.dribbling, u.defending, u.physical,
-                  u.bio, u.avatar_base64, u.is_admin, t.name AS team_name
+                  u.bio, u.avatar_base64, u.is_admin, u.last_seen_at, t.name AS team_name
            FROM users u
            LEFT JOIN team_memberships tm ON tm.user_id = u.id
            LEFT JOIN teams t ON t.id = tm.team_id AND t.archived_at IS NULL
            ORDER BY u.id DESC"""
     )]
+    for user in users:
+        # Admin can quickly see which athletes are active without opening each profile.
+        user["activity_status"] = activity_status(user.get("last_seen_at"))
     return jsonify({"users": users})
 
 
@@ -2705,6 +2775,7 @@ def api_owner_login():
     owner = query("SELECT id, password_hash FROM turf_owners WHERE email = %s", (email,), one=True)
     if not owner or not verify_password(password, owner["password_hash"]):
         return jsonify({"error": "Invalid email or password"}), 401
+    session.permanent = True
     session["owner_id"] = owner["id"]
     log_event("owner_login", "/api/owner/login", {"owner_id": owner["id"]})
     return jsonify({"ok": True})
@@ -2939,6 +3010,11 @@ def leagues_page():
 def profile_page():
     return send_from_directory(".", "profile.html")
 
+@app.route("/about")
+@login_required
+def about_page():
+    return send_from_directory(".", "about.html")
+
 @app.route("/nav.js")
 def serve_nav_js():
     return send_from_directory(".", "nav.js")
@@ -3156,7 +3232,7 @@ def api_community_users():
     like = f"%{search}%"
     my_profile = get_profile(current_user_id()) or {}
     rows = [dict(r) for r in query(
-        """SELECT u.id, u.name, u.handle, u.location, u.position, u.preferred_format, u.skill, u.avatar_base64,
+        """SELECT u.id, u.name, u.handle, u.location, u.position, u.preferred_format, u.skill, u.avatar_base64, u.last_seen_at,
                   t.name AS team_name
            FROM users u
            LEFT JOIN team_memberships tm ON tm.user_id = u.id
@@ -3169,15 +3245,20 @@ def api_community_users():
         (current_user_id(), search, like, like, like, like),
     )]
     for row in rows:
+        # Activity status helps athletes decide who is likely to reply quickly.
+        row["activity_status"] = activity_status(row.get("last_seen_at"))
         one_id, two_id = normalize_friend_pair(current_user_id(), row["id"])
         friendship = query(
-            """SELECT status, requested_by
+            """SELECT id, status, requested_by
                FROM friendships
                WHERE user_one_id = %s AND user_two_id = %s""",
             (one_id, two_id),
             one=True,
         )
+        # Frontend needs the friendship id to safely retract only the sender's pending request.
+        row["friendship_id"] = friendship["id"] if friendship else None
         row["friendship_status"] = friendship["status"] if friendship else "none"
+        row["is_outgoing"] = bool(friendship and friendship["requested_by"] == current_user_id())
         row["can_accept"] = bool(friendship and friendship["status"] == "pending" and friendship["requested_by"] != current_user_id())
         can_rate, reason = can_rate_athlete(current_user_id(), row["id"])
         row["can_rate"] = can_rate
@@ -3200,7 +3281,7 @@ def api_community_users():
 @login_required
 def api_friends():
     accepted = [dict(r) for r in query(
-        """SELECT f.id, u.id AS user_id, u.name, u.handle, u.avatar_base64, u.location,
+        """SELECT f.id, u.id AS user_id, u.name, u.handle, u.avatar_base64, u.location, u.last_seen_at,
                   t.name AS team_name
            FROM friendships f
            JOIN users u ON u.id = CASE WHEN f.user_one_id = %s THEN f.user_two_id ELSE f.user_one_id END
@@ -3211,7 +3292,7 @@ def api_friends():
         (current_user_id(), current_user_id(), current_user_id()),
     )]
     pending = [dict(r) for r in query(
-        """SELECT f.id, f.status, f.requested_by, u.id AS user_id, u.name, u.handle, u.avatar_base64
+        """SELECT f.id, f.status, f.requested_by, u.id AS user_id, u.name, u.handle, u.avatar_base64, u.last_seen_at
            FROM friendships f
            JOIN users u ON u.id = CASE WHEN f.user_one_id = %s THEN f.user_two_id ELSE f.user_one_id END
            WHERE (f.user_one_id = %s OR f.user_two_id = %s) AND f.status = 'pending'
@@ -3219,10 +3300,12 @@ def api_friends():
         (current_user_id(), current_user_id(), current_user_id()),
     )]
     for row in accepted:
+        row["activity_status"] = activity_status(row.get("last_seen_at"))
         can_rate, reason = can_rate_athlete(current_user_id(), row["user_id"])
         row["can_rate"] = can_rate
         row["rating_rule"] = reason
     for row in pending:
+        row["activity_status"] = activity_status(row.get("last_seen_at"))
         row["is_outgoing"] = row["requested_by"] == current_user_id()
         can_rate, reason = can_rate_athlete(current_user_id(), row["user_id"])
         row["can_rate"] = can_rate
@@ -3249,6 +3332,9 @@ def api_friend_request():
         (one_id, two_id, current_user_id(), datetime.now().isoformat()),
         commit=True,
     )
+    sender = get_profile(current_user_id()) or {"name": "A Goalbazi athlete"}
+    # Friend requests are important social actions, so they also trigger phone push when enabled.
+    send_push_to_user(target_id, "New friend request", f"{sender['name']} wants to connect on Goalbazi.", "/dashboard")
     log_event("friend_request", "/api/friends/request", {"target_id": target_id})
     return jsonify({"ok": True}), 201
 
@@ -3264,7 +3350,24 @@ def api_accept_friendship(friendship_id):
     if current_user_id() not in (friendship["user_one_id"], friendship["user_two_id"]):
         return jsonify({"error": "Forbidden"}), 403
     query("UPDATE friendships SET status = 'accepted' WHERE id = %s", (friendship_id,), commit=True)
+    accepter = get_profile(current_user_id()) or {"name": "A Goalbazi athlete"}
+    # Let the original sender know the connection is now active without needing to refresh.
+    send_push_to_user(friendship["requested_by"], "Friend request accepted", f"{accepter['name']} accepted your Goalbazi request.", "/dashboard")
     log_event("friend_accept", f"/api/friends/{friendship_id}/accept", {"friendship_id": friendship_id})
+    return jsonify({"ok": True})
+
+
+@app.route("/api/friends/<int:friendship_id>/cancel", methods=["POST"])
+@login_required
+def api_cancel_friendship(friendship_id):
+    friendship = query("SELECT * FROM friendships WHERE id = %s", (friendship_id,), one=True)
+    if not friendship:
+        return jsonify({"error": "Request not found"}), 404
+    # Only the athlete who sent a still-pending request can retract it.
+    if friendship["status"] != "pending" or friendship["requested_by"] != current_user_id():
+        return jsonify({"error": "Only your own pending request can be cancelled"}), 403
+    query("DELETE FROM friendships WHERE id = %s", (friendship_id,), commit=True)
+    log_event("friend_cancel", f"/api/friends/{friendship_id}/cancel", {"friendship_id": friendship_id})
     return jsonify({"ok": True})
 
 

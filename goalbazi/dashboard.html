@@ -196,24 +196,93 @@
     .mini-btn.primary { border-color: rgba(127,255,69,.25); color: var(--brand); }
     .mini-btn.danger { color: var(--danger); }
     .mini-btn[disabled], .mini-select[disabled] { opacity: .55; cursor: not-allowed; }
+    .dm-thread-head {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin:12px 0;
+      padding:12px;
+      border:1px solid var(--line);
+      border-radius:20px;
+      background:linear-gradient(135deg, rgba(127,255,69,.08), rgba(61,232,160,.035));
+    }
+    .dm-thread-action { color:var(--brand); font-size:.76rem; font-weight:900; text-decoration:none; }
+    .dm-card {
+      position:relative;
+      overflow:hidden;
+      transition:transform .18s ease, border-color .18s ease, background .18s ease;
+    }
+    .dm-card:hover { transform:translateY(-1px); border-color:rgba(127,255,69,.22); }
+    .dm-card::after {
+      content:"";
+      position:absolute;
+      right:12px;
+      top:50%;
+      width:7px;
+      height:7px;
+      border-right:2px solid var(--muted);
+      border-bottom:2px solid var(--muted);
+      opacity:.65;
+      transform:translateY(-50%) rotate(-45deg);
+    }
+    .dm-preview { padding-right:22px; }
+    .dm-time { color:var(--muted); font-size:.72rem; white-space:nowrap; }
     .chat-feed {
       display: grid;
-      gap: 8px;
-      max-height: 260px;
+      gap: 10px;
+      max-height: 330px;
       overflow: auto;
       margin-top: 12px;
-      padding-right: 4px;
+      border: 1px solid rgba(127,255,69,.12);
+      border-radius: 22px;
+      padding: 14px;
+      background:
+        linear-gradient(rgba(127,255,69,.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(127,255,69,.025) 1px, transparent 1px),
+        rgba(255,255,255,.015);
+      background-size: 42px 42px;
     }
     .bubble {
       padding: 10px 12px;
-      border-radius: 14px;
-      max-width: 88%;
+      border-radius: 18px;
+      max-width: 80%;
       font-size: .84rem;
       line-height: 1.5;
+      box-shadow:0 8px 22px rgba(0,0,0,.14);
     }
-    .bubble.me { background: rgba(127,255,69,.12); justify-self: end; }
-    .bubble.them { background: rgba(255,255,255,.05); }
-    .chat-compose { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 12px; }
+    .bubble.me {
+      background:linear-gradient(135deg, rgba(127,255,69,.95), rgba(61,232,160,.9));
+      color:#06110b;
+      justify-self:end;
+      border-top-right-radius:6px;
+      font-weight:700;
+    }
+    .bubble.them {
+      background:rgba(255,255,255,.065);
+      border:1px solid rgba(255,255,255,.06);
+      border-top-left-radius:6px;
+    }
+    .chat-compose {
+      display:grid;
+      grid-template-columns:1fr auto;
+      gap:8px;
+      margin-top:12px;
+      padding:8px;
+      border:1px solid var(--line);
+      border-radius:999px;
+      background:rgba(255,255,255,.025);
+    }
+    .chat-compose .form-input { border:0; background:transparent; padding:9px 12px; }
+    .dm-send {
+      width:40px;
+      height:40px;
+      border-radius:50%;
+      padding:0;
+      display:grid;
+      place-items:center;
+      font-size:1rem;
+    }
     .arena-result .slots { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
     .slot-pill { padding: 5px 8px; border-radius: 999px; font-size: .75rem; border: 1px solid var(--line); color: var(--muted); }
     .empty-note { color: var(--muted); font-size: .84rem; }
@@ -222,7 +291,10 @@
     .notify-title { font-weight: 700; margin-bottom: 4px; }
     .growth-card { padding: 16px; background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%); border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: 16px; }
     .badge-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-    .founder-badge { display: inline-flex; align-items: center; gap: 8px; border: 1px solid rgba(245,200,66,.26); background: rgba(245,200,66,.10); color: var(--warn); border-radius: 999px; padding: 7px 11px; font-weight: 800; font-size: .78rem; }
+    .first-xi-badge { display: inline-flex; align-items: center; gap: 8px; border: 1px solid rgba(245,200,66,.26); background: rgba(245,200,66,.10); color: var(--warn); border-radius: 999px; padding: 7px 11px; font-weight: 800; font-size: .78rem; }
+    .activity-dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:6px; background:var(--muted); box-shadow:0 0 0 3px rgba(255,255,255,.04); }
+    .activity-online { background:var(--brand); box-shadow:0 0 0 3px rgba(127,255,69,.12); }
+    .activity-recent { background:var(--warn); }
     .challenge-form { display: grid; gap: 10px; margin-top: 12px; }
     .challenge-grid { display: grid; gap: 8px; grid-template-columns: 1fr; }
     .challenge-card { border: 1px solid var(--line); border-radius: 16px; padding: 12px; background: rgba(255,255,255,.02); }
@@ -436,10 +508,11 @@
         </div>
         <div class="chat-results" id="chat-results"></div>
         <div id="chat-panel" style="display:none">
+          <div class="dm-thread-head" id="chat-thread-head"></div>
           <div class="chat-feed" id="chat-feed"></div>
           <div class="chat-compose">
-            <input id="chat-input" class="form-input" placeholder="Write a private message">
-            <button id="chat-send" class="btn btn-primary btn-sm" type="button">Send</button>
+            <input id="chat-input" class="form-input" placeholder="Message athlete...">
+            <button id="chat-send" class="btn btn-primary btn-sm dm-send" type="button" aria-label="Send message">&#8599;</button>
           </div>
         </div>
       </div>
@@ -553,6 +626,8 @@
     suggestedAthletes: [],
     conversations: [],
     activeChatUserId: null,
+    chatPollTimer: null,
+    lastConversationSignature: "",
     assistantMessages: [],
     assistantSuggestions: [],
     activeAthleteTab: "suggested",
@@ -684,6 +759,23 @@
     }
   }
 
+  // Silent fetch is used by background message refreshes so the page does not flash loaders every few seconds.
+  async function silentApiFetch(path) {
+    try {
+      const res = await fetch(path, { headers: { "Content-Type": "application/json" } });
+      if (res.status === 401 || !res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }
+
+  // A tiny signature lets the app know when a new latest message arrived without storing extra state.
+  function conversationSignature(conversations = []) {
+    const latest = conversations[0];
+    return latest ? `${latest.partner_id}:${latest.created_at}:${latest.message}` : "";
+  }
+
   function closePlayerCard() {
     document.getElementById("player-modal").classList.remove("open");
   }
@@ -708,7 +800,7 @@
         </div>
       </div>
       <div class="badge-row">
-        ${badge.enabled ? `<span class="founder-badge">${esc(badge.label)}</span>` : ""}
+        ${badge.enabled ? `<span class="first-xi-badge">${esc(badge.label)}</span>` : ""}
         <span class="pill pill-muted">${esc(teamName)}</span>
         <a class="mini-btn share-link" target="_blank" rel="noopener" href="${whatsappUrl(`Join me on Goalbazi and find football matches near you: ${appUrl("/")}`)}">Share Goalbazi</a>
       </div>
@@ -998,6 +1090,32 @@
     return `<div class="helper-note">${esc(user.rating_rule || "You can rate only athletes who are friends or have played with you.")}</div>`;
   }
 
+  function activityHtml(user) {
+    // v3.0: activity status comes from the server's throttled last_seen_at updates.
+    const status = user.activity_status || { label: "Offline", kind: "offline" };
+    return `<div class="user-sub"><span class="activity-dot activity-${esc(status.kind)}"></span>${esc(status.label)}</div>`;
+  }
+
+  function friendshipActionHtml(user) {
+    // One source of truth keeps Discover and Suggested friend-request buttons consistent.
+    if (user.friendship_status === "accepted") {
+      return `<button class="mini-btn primary" type="button" onclick="openChat(${user.id})">Message</button>`;
+    }
+    if (user.can_accept) {
+      return `<button class="mini-btn primary" type="button" onclick="acceptFriend(${user.id})">Accept request</button>`;
+    }
+    if (user.friendship_status === "pending" && user.is_outgoing && user.friendship_id) {
+      return `
+        <button class="mini-btn" type="button" disabled>Request sent</button>
+        <button class="mini-btn danger" type="button" onclick="cancelFriendRequest(${user.friendship_id})">Cancel request</button>
+      `;
+    }
+    if (user.friendship_status === "pending") {
+      return `<button class="mini-btn" type="button" disabled>Waiting</button>`;
+    }
+    return `<button class="mini-btn primary" type="button" onclick="sendFriendRequest(${user.id})">Add friend</button>`;
+  }
+
   function renderCommunity(users) {
     document.getElementById("community-results").innerHTML = users.length ? users.map(user => `
       <div class="user-card">
@@ -1008,18 +1126,12 @@
               <div class="user-name">${esc(user.name)}</div>
               <div class="user-sub">${esc(`@${user.handle}`)} · ${esc(user.location)}</div>
               <div class="user-sub">${esc([user.position, user.skill, user.team_name].filter(Boolean).join(" · "))}</div>
+              ${activityHtml(user)}
             </div>
           </div>
         </div>
         <div class="user-actions">
-          ${user.friendship_status === "accepted"
-            ? `<button class="mini-btn primary" type="button" onclick="openChat(${user.id})">Message</button>`
-            : user.can_accept
-              ? `<button class="mini-btn primary" type="button" onclick="acceptFriend(${user.id})">Accept request</button>`
-              : user.friendship_status === "pending"
-                ? `<button class="mini-btn" type="button" disabled>Waiting</button>`
-                : `<button class="mini-btn primary" type="button" onclick="sendFriendRequest(${user.id})">Add friend</button>`
-          }
+          ${friendshipActionHtml(user)}
           <button class="mini-btn" type="button" onclick="openPlayerCard(${user.id})">View card</button>
           <button class="mini-btn" type="button" onclick="openChat(${user.id})">Private chat</button>
         </div>
@@ -1039,18 +1151,12 @@
               <div class="user-name">${esc(user.name)}</div>
               <div class="user-sub">${esc(`@${user.handle}`)} · ${esc(user.location)}</div>
               <div class="user-sub">${esc([user.position, user.skill, user.team_name].filter(Boolean).join(" · "))}</div>
+              ${activityHtml(user)}
             </div>
           </div>
         </div>
         <div class="user-actions">
-          ${user.friendship_status === "accepted"
-            ? `<button class="mini-btn primary" type="button" onclick="openChat(${user.id})">Message</button>`
-            : user.can_accept
-              ? `<button class="mini-btn primary" type="button" onclick="acceptFriend(${user.id})">Accept request</button>`
-              : user.friendship_status === "pending"
-                ? `<button class="mini-btn" type="button" disabled>Waiting</button>`
-                : `<button class="mini-btn primary" type="button" onclick="sendFriendRequest(${user.id})">Add friend</button>`
-          }
+          ${friendshipActionHtml(user)}
           <button class="mini-btn" type="button" onclick="openPlayerCard(${user.id})">View card</button>
         </div>
         ${ratingControlsForUser(user)}
@@ -1068,10 +1174,14 @@
             <div class="user-main-body">
               <div class="user-name">${esc(item.name)}</div>
               <div class="user-sub">${item.is_outgoing ? "Sent request" : "Incoming request"}</div>
+              ${activityHtml(item)}
             </div>
           </div>
           <div class="user-actions">
-            ${item.is_outgoing ? `<button class="mini-btn" type="button" disabled>Waiting</button>` : `<button class="mini-btn primary" type="button" onclick="acceptFriendshipId(${item.id})">Accept</button>`}
+            ${item.is_outgoing ? `
+              <button class="mini-btn" type="button" disabled>Request sent</button>
+              <button class="mini-btn danger" type="button" onclick="cancelFriendRequest(${item.id})">Cancel request</button>
+            ` : `<button class="mini-btn primary" type="button" onclick="acceptFriendshipId(${item.id})">Accept</button>`}
           </div>
         </div>
       `));
@@ -1085,6 +1195,7 @@
               <div class="user-name">${esc(friend.name)}</div>
               <div class="user-sub">${esc(`@${friend.handle}`)} · ${esc(friend.location)}</div>
               <div class="user-sub">${esc(friend.team_name || "No team yet")}</div>
+              ${activityHtml(friend)}
             </div>
           </div>
           <div class="user-actions">
@@ -1100,16 +1211,16 @@
 
   function renderConversations() {
     document.getElementById("chat-results").innerHTML = state.conversations.length ? state.conversations.map(conv => `
-      <button class="chat-card" type="button" onclick="openChat(${conv.partner_id})" style="text-align:left">
+      <button class="chat-card dm-card" type="button" onclick="openChat(${conv.partner_id})" style="text-align:left">
         <div class="chat-top">
           <div class="user-main">
             ${avatarHtml(conv)}
             <div class="user-main-body">
               <div class="user-name">${esc(conv.name)}</div>
-              <div class="user-sub">${esc(conv.message)}</div>
+              <div class="user-sub dm-preview">${esc(conv.message)}</div>
             </div>
           </div>
-          <div class="user-sub">${esc((conv.created_at || "").slice(0, 16))}</div>
+          <div class="dm-time">${esc((conv.created_at || "").slice(0, 16))}</div>
         </div>
       </button>
     `).join("") : `<div class="empty-note">Private conversations will show up here.</div>`;
@@ -1141,11 +1252,17 @@
     renderFriends();
   }
 
-  async function loadConversations() {
-    const data = await apiFetch("/api/direct-messages");
+  async function loadConversations({ silent = false } = {}) {
+    const data = silent ? await silentApiFetch("/api/direct-messages") : await apiFetch("/api/direct-messages");
     if (!data) return;
+    const previousSignature = state.lastConversationSignature;
     state.conversations = data.conversations || [];
     renderConversations();
+    const nextSignature = conversationSignature(state.conversations);
+    if (silent && previousSignature && nextSignature && nextSignature !== previousSignature) {
+      showToast("New private message");
+    }
+    state.lastConversationSignature = nextSignature;
   }
 
   async function loadSuggestedAthletes() {
@@ -1172,6 +1289,17 @@
     await apiFetch("/api/friends/request", { method: "POST", body: JSON.stringify({ user_id: userId }) });
     showToast("Friend request sent");
     await Promise.all([searchUsers(), loadFriends(), loadDashboard()]);
+  }
+
+  async function cancelFriendRequest(friendshipId) {
+    // Retracting a request deletes only the pending request owned by the current athlete.
+    try {
+      await apiFetch(`/api/friends/${friendshipId}/cancel`, { method: "POST" });
+      showToast("Friend request cancelled");
+      await Promise.all([searchUsers(), loadSuggestedAthletes(), loadFriends(), loadDashboard()]);
+    } catch (err) {
+      showToast(errorMessage(err, "Request could not be cancelled"));
+    }
   }
 
   async function sendTeamChallenge(event) {
@@ -1221,15 +1349,50 @@
     }
   }
 
+  function chatPartner(userId = state.activeChatUserId) {
+    // The thread header reuses already-loaded athlete/conversation data instead of calling another API.
+    return state.conversations.find(conv => conv.partner_id === userId)
+      || state.friends.find(friend => friend.user_id === userId)
+      || state.suggestedAthletes.find(user => user.id === userId)
+      || { id: userId, name: "Athlete", handle: "goalbazi", location: "Goalbazi" };
+  }
+
+  function renderChatHeader(userId = state.activeChatUserId) {
+    const partner = chatPartner(userId);
+    document.getElementById("chat-thread-head").innerHTML = `
+      <div class="user-main">
+        ${avatarHtml(partner)}
+        <div class="user-main-body">
+          <div class="user-name">${esc(partner.name)}</div>
+          <div class="user-sub">${esc([partner.handle ? `@${partner.handle}` : "", partner.location, partner.team_name].filter(Boolean).join(" - "))}</div>
+        </div>
+      </div>
+      <button class="mini-btn" type="button" onclick="openPlayerCard(${userId})">View card</button>
+    `;
+  }
+
+  function renderChatMessages(messages = [], userId = state.activeChatUserId) {
+    const feed = document.getElementById("chat-feed");
+    feed.innerHTML = messages.length ? messages.map(msg => `
+      <div class="bubble ${msg.sender_id === userId ? "them" : "me"}">${esc(msg.message)}</div>
+    `).join("") : `<div class="empty-note">Start the conversation.</div>`;
+    feed.scrollTop = feed.scrollHeight;
+  }
+
+  async function refreshActiveChat({ silent = false } = {}) {
+    if (!state.activeChatUserId) return;
+    const path = `/api/direct-messages?user_id=${state.activeChatUserId}`;
+    const data = silent ? await silentApiFetch(path) : await apiFetch(path);
+    if (!data) return;
+    renderChatMessages(data.messages || [], state.activeChatUserId);
+  }
+
   async function openChat(userId) {
     state.activeChatUserId = userId;
     openPhonePanel("messages");
     document.getElementById("chat-panel").style.display = "block";
-    const data = await apiFetch(`/api/direct-messages?user_id=${userId}`);
-    if (!data) return;
-    document.getElementById("chat-feed").innerHTML = (data.messages || []).length ? data.messages.map(msg => `
-      <div class="bubble ${msg.sender_id === userId ? "them" : "me"}">${esc(msg.message)}</div>
-    `).join("") : `<div class="empty-note">Start the conversation.</div>`;
+    renderChatHeader(userId);
+    await refreshActiveChat();
   }
 
   async function sendChat() {
@@ -1238,7 +1401,21 @@
     if (!message || !state.activeChatUserId) return;
     await apiFetch("/api/direct-messages", { method: "POST", body: JSON.stringify({ receiver_id: state.activeChatUserId, message }) });
     input.value = "";
-    await Promise.all([openChat(state.activeChatUserId), loadConversations(), loadDashboard()]);
+    await Promise.all([refreshActiveChat(), loadConversations(), loadDashboard()]);
+  }
+
+  function startMessagePolling() {
+    // Lightweight polling keeps private messages fresh while the app is open; WebSockets can replace this later.
+    if (state.chatPollTimer) clearInterval(state.chatPollTimer);
+    const refreshMessages = async () => {
+      if (document.hidden) return;
+      await loadConversations({ silent: true });
+      await refreshActiveChat({ silent: true });
+    };
+    state.chatPollTimer = setInterval(refreshMessages, 8000);
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) refreshMessages();
+    });
   }
 
   async function searchArenasWithQuery() {
@@ -1305,9 +1482,11 @@
   loadSuggestedAthletes();
   loadFriends();
   loadConversations();
+  startMessagePolling();
   searchUsers();
 
   window.sendFriendRequest = sendFriendRequest;
+  window.cancelFriendRequest = cancelFriendRequest;
   window.acceptFriend = acceptFriend;
   window.acceptFriendshipId = acceptFriendshipId;
   window.openChat = openChat;

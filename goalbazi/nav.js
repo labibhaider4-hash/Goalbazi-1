@@ -305,11 +305,12 @@ window.GoalbaziPush = GoalbaziPush;
 const GoalbaziPullRefresh = {
   // Mobile-only branded pull-to-refresh. It appears only when pulling from page top.
   threshold: 78,
-  maxPull: 112,
+  maxPull: 104,
   startY: 0,
   pulling: false,
   refreshing: false,
   bound: false,
+  frame: null,
   ensure() {
     if (document.getElementById("pull-refresh-indicator")) return;
     const indicator = document.createElement("div");
@@ -335,16 +336,21 @@ const GoalbaziPullRefresh = {
     const indicator = document.getElementById("pull-refresh-indicator");
     if (!indicator) return;
     const clamped = Math.max(0, Math.min(this.maxPull, distance));
-    const eased = Math.round(clamped * 0.72);
-    indicator.classList.toggle("visible", clamped > 8);
-    indicator.classList.toggle("ready", clamped >= this.threshold);
-    indicator.style.transform = `translate(-50%, ${-68 + eased}px) scale(${0.96 + Math.min(clamped / 560, .10)})`;
+    // v3.0: requestAnimationFrame keeps the SIUU pull animation smooth on phones.
+    if (this.frame) cancelAnimationFrame(this.frame);
+    this.frame = requestAnimationFrame(() => {
+      const eased = Math.round(clamped * 0.64);
+      indicator.classList.toggle("visible", clamped > 8);
+      indicator.classList.toggle("ready", clamped >= this.threshold);
+      indicator.style.transform = `translate3d(-50%, ${-62 + eased}px, 0) scale(${0.96 + Math.min(clamped / 760, .06)})`;
+    });
   },
   reset() {
     const indicator = document.getElementById("pull-refresh-indicator");
     if (!indicator) return;
+    if (this.frame) cancelAnimationFrame(this.frame);
     indicator.classList.remove("visible", "ready");
-    indicator.style.transform = "translate(-50%, -68px) scale(.96)";
+    indicator.style.transform = "translate3d(-50%, -62px, 0) scale(.96)";
     document.body.classList.remove("pull-refreshing");
   },
   refresh() {
@@ -353,7 +359,7 @@ const GoalbaziPullRefresh = {
     document.body.classList.add("pull-refreshing");
     if (indicator) {
       indicator.classList.add("visible", "ready");
-      indicator.style.transform = "translate(-50%, 8px) scale(1.02)";
+      indicator.style.transform = "translate3d(-50%, 8px, 0) scale(1)";
     }
     setTimeout(() => window.location.reload(), 420);
   },
@@ -394,6 +400,36 @@ const GoalbaziPullRefresh = {
 
 window.GoalbaziPullRefresh = GoalbaziPullRefresh;
 
+const GoalbaziLoading = {
+  // Shared top progress bar for API/page transitions; it stays subtle so pages never feel blocked.
+  activeRequests: 0,
+  hideTimer: null,
+  ensure() {
+    if (document.getElementById("goalbazi-top-loader")) return;
+    const loader = document.createElement("div");
+    loader.id = "goalbazi-top-loader";
+    loader.className = "top-page-loader";
+    loader.setAttribute("aria-hidden", "true");
+    loader.innerHTML = `<span></span>`;
+    document.body.appendChild(loader);
+  },
+  show() {
+    this.ensure();
+    clearTimeout(this.hideTimer);
+    this.activeRequests += 1;
+    document.getElementById("goalbazi-top-loader")?.classList.add("active");
+  },
+  hide() {
+    this.activeRequests = Math.max(0, this.activeRequests - 1);
+    if (this.activeRequests > 0) return;
+    this.hideTimer = setTimeout(() => {
+      document.getElementById("goalbazi-top-loader")?.classList.remove("active");
+    }, 180);
+  },
+};
+
+window.GoalbaziLoading = GoalbaziLoading;
+
 function initNav(activePage) {
   // Renders the same navigation on every authenticated athlete page.
   const pages = [
@@ -402,6 +438,7 @@ function initNav(activePage) {
     { id: "turfs",     label: "Arenas",    href: "/turfs" },
     { id: "leagues",   label: "Leagues",   href: "/leagues" },
     { id: "profile",   label: "Profile",   href: "/profile" },
+    { id: "about",     label: "About",     href: "/about" },
   ];
 
   const navbar = document.getElementById("navbar");
@@ -529,6 +566,16 @@ function initNav(activePage) {
   if (logoutBtn) logoutBtn.addEventListener("click", logout);
   if (logoutMobile) logoutMobile.addEventListener("click", logout);
   if (logoutMenu) logoutMenu.addEventListener("click", logout);
+
+  // Show the slim loader immediately for normal same-site page transitions.
+  document.querySelectorAll("a[href^='/']").forEach(link => {
+    if (link.dataset.transitionBound === "1") return;
+    link.dataset.transitionBound = "1";
+    link.addEventListener("click", event => {
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || link.target) return;
+      GoalbaziLoading.show();
+    });
+  });
 }
 
 function showToast(message, duration = 2400) {
@@ -542,17 +589,22 @@ function showToast(message, duration = 2400) {
 }
 
 async function apiFetch(path, options = {}) {
-  // Shared fetch wrapper. Redirects to login if the session is expired.
-  const res = await fetch(path, {
-    headers: { "Content-Type": "application/json" },
-    ...options,
-  });
-  if (res.status === 401) { window.location.href = "/login"; return null; }
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || "Request failed");
+  // Shared fetch wrapper. It also drives the slim transition loader used across the app.
+  GoalbaziLoading.show();
+  try {
+    const res = await fetch(path, {
+      headers: { "Content-Type": "application/json" },
+      ...options,
+    });
+    if (res.status === 401) { window.location.href = "/login"; return null; }
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || "Request failed");
+    }
+    return res.json();
+  } finally {
+    GoalbaziLoading.hide();
   }
-  return res.json();
 }
 
 if ("serviceWorker" in navigator) {

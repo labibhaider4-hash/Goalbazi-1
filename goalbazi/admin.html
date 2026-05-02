@@ -133,6 +133,40 @@
     .item-top { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
     .item-title { font-weight: 800; }
     .item-meta { color: var(--muted); font-size: .8rem; }
+    .team-compact-card { padding: 0; overflow: hidden; }
+    .team-compact-header {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      text-align: left;
+      padding: 14px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+    }
+    .team-compact-header:hover { background: rgba(132,242,85,.07); }
+    .team-compact-actions { display:flex; flex-wrap:wrap; gap:8px; padding:0 14px 14px; }
+    .team-compact-card:not(.team-open) > .team-compact-actions { display:none; }
+    .team-compact-body { border-top:1px solid var(--line); padding:14px; }
+    .team-chevron { color:var(--muted); font-size:.78rem; font-weight:900; }
+    .team-compact-card > .team-form,
+    .team-compact-card > .divider,
+    .team-compact-card > .member-form,
+    .team-compact-card > .sub-items { display:none; }
+    .team-compact-card.team-open > .sub-items { display:grid; padding:0 14px 14px; }
+    .team-compact-card.team-editing > .team-form,
+    .team-compact-card.team-editing > .divider,
+    .team-compact-card.team-editing > .member-form,
+    .team-compact-card.team-editing > .sub-items { display:grid; padding:0 14px 14px; }
+    .team-compact-card.team-editing > .team-form { padding-top:14px; }
+    .team-compact-card.team-editing > .divider { display:block; padding:0; margin:14px; }
+    .team-compact-card.team-editing .team-form > .item-top { display:none; }
+    .team-compact-card:not(.team-editing) .member-edit-form .form-grid,
+    .team-compact-card:not(.team-editing) .member-edit-form .action-row { display:none; }
     .action-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
     .mini-btn { padding: 8px 10px; font-size: .8rem; }
     .sub-items { display: grid; gap: 8px; margin-top: 10px; }
@@ -165,6 +199,23 @@
     .list-row-top { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
     .list-row-name { font-weight: 700; }
     .list-row-sub { color: var(--muted); font-size: .8rem; margin-top: 4px; line-height: 1.5; }
+    .admin-athlete-main { display:flex; align-items:center; gap:12px; min-width:0; }
+    .admin-athlete-avatar {
+      width:44px;
+      height:44px;
+      border-radius:50%;
+      flex:0 0 auto;
+      display:grid;
+      place-items:center;
+      overflow:hidden;
+      border:1px solid rgba(127,255,69,.22);
+      background:linear-gradient(135deg, rgba(127,255,69,.95), rgba(61,232,160,.78));
+      color:#06110b;
+      font-weight:900;
+      letter-spacing:.02em;
+    }
+    .admin-athlete-avatar.large { width:54px; height:54px; }
+    .admin-athlete-avatar img { width:100%; height:100%; object-fit:cover; display:block; }
     .player-editor-panel { margin-top: 14px; }
     .divider { height: 1px; background: var(--line); margin: 14px 0; }
     .hidden { display: none !important; }
@@ -192,6 +243,7 @@
         <button class="tab-btn" data-tab="leagues">Leagues</button>
         <button class="tab-btn" data-tab="arenas">Arenas</button>
         <button class="tab-btn" data-tab="ratings">Ratings</button>
+        <a class="tab-btn" href="/dashboard" style="text-decoration:none">Back to dashboard</a>
         <button class="tab-btn" id="logout-btn">Log out</button>
       </div>
     </div>
@@ -377,10 +429,21 @@
       profileAssessments: [],
       activeTab: "overview",
       selectedUserId: null,
+      expandedTeamId: null,
+      editingTeamId: null,
     };
 
     function esc(value = "") {
       return String(value).replace(/[&<>"']/g, ch => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[ch]));
+    }
+
+    function adminAthleteAvatar(user, large = false) {
+      // Admin athlete lists show real profile photos first, then initials as a clean fallback.
+      const initials = (user.name || "?").split(" ").map(part => part[0]).slice(0, 2).join("").toUpperCase();
+      const sizeClass = large ? " large" : "";
+      return user.avatar_base64
+        ? `<div class="admin-athlete-avatar${sizeClass}"><img src="${esc(user.avatar_base64)}" alt="${esc(user.name)}"></div>`
+        : `<div class="admin-athlete-avatar${sizeClass}">${esc(initials)}</div>`;
     }
 
     async function api(path, options = {}) {
@@ -457,11 +520,17 @@
         <div class="list-card">
           ${state.users.map(user => `
             <button class="list-row ${user.id === state.selectedUserId ? "active" : ""}" type="button" onclick="selectUser(${user.id})">
-              <div class="list-row-top">
+              <div class="admin-athlete-main">
+                ${adminAthleteAvatar(user)}
+                <div style="min-width:0;flex:1">
+                  <div class="list-row-top">
                 <div class="list-row-name">${esc(user.name)}</div>
                 <div class="item-meta">${user.is_admin ? "Admin" : "Athlete"}</div>
+                  </div>
+                  <div class="list-row-sub">${esc(`@${user.handle}`)} - ${esc(user.location)} - ${esc(user.team_name || "No team")}</div>
+                  <div class="list-row-sub">${esc((user.activity_status || {}).label || "Offline")}</div>
+                </div>
               </div>
-              <div class="list-row-sub">${esc(`@${user.handle}`)} · ${esc(user.location)} · ${esc(user.team_name || "No team")}</div>
             </button>
           `).join("") || `<div class="item-card"><div class="item-meta">No athletes yet.</div></div>`}
         </div>
@@ -469,9 +538,12 @@
           ${selectedUser ? `
             <form class="item-card user-form" data-id="${selectedUser.id}">
               <div class="item-top">
-                <div>
+                <div class="admin-athlete-main">
+                  ${adminAthleteAvatar(selectedUser, true)}
+                  <div>
                   <div class="item-title">Edit ${esc(selectedUser.name)}</div>
-                  <div class="item-meta">${esc(selectedUser.team_name || "No team")} · ${selectedUser.is_admin ? "Admin" : "Athlete"}</div>
+                  <div class="item-meta">${esc(selectedUser.team_name || "No team")} - ${selectedUser.is_admin ? "Admin" : "Athlete"}</div>
+                  </div>
                 </div>
               </div>
               <div class="form-grid">
@@ -656,6 +728,7 @@
           </div>
         `;
       }).join("");
+      setupTeamCollapse();
       document.getElementById("archived-teams-grid").innerHTML = state.archivedTeams.length ? state.archivedTeams.map(team => `
         <div class="item-card">
           <div class="item-top">
@@ -691,6 +764,63 @@
         toast("Team member updated");
         await loadTeams();
       }));
+    }
+
+    function setupTeamCollapse() {
+      // Teams start as compact name cards; expanding reveals members and the edit action.
+      document.querySelectorAll("#teams-grid > .item-card").forEach(card => {
+        const form = card.querySelector(".team-form");
+        if (!form || card.dataset.compactReady === "1") return;
+        const teamId = Number(form.dataset.id);
+        const top = form.querySelector(".item-top");
+        card.dataset.compactReady = "1";
+        card.dataset.teamId = String(teamId);
+        card.classList.add("team-compact-card");
+        const header = document.createElement("button");
+        header.type = "button";
+        header.className = "team-compact-header";
+        header.innerHTML = `
+          <div>${top ? top.innerHTML : `<div class="item-title">Team</div>`}</div>
+          <div class="team-chevron" data-team-chevron>${state.expandedTeamId === teamId ? "Hide" : "Open"}</div>
+        `;
+        header.addEventListener("click", () => toggleTeamCard(teamId));
+        const actions = document.createElement("div");
+        actions.className = "team-compact-actions";
+        actions.innerHTML = `
+          <button class="mini-btn primary" type="button" data-team-edit>${state.editingTeamId === teamId ? "Close edit" : "Edit"}</button>
+          <button class="mini-btn danger" type="button" onclick="deleteTeam(${teamId})">Delete team</button>
+        `;
+        actions.querySelector("[data-team-edit]").addEventListener("click", () => editTeamCard(teamId));
+        card.insertBefore(actions, form);
+        card.insertBefore(header, actions);
+      });
+      applyTeamCardState();
+    }
+
+    function applyTeamCardState() {
+      document.querySelectorAll("#teams-grid > .team-compact-card").forEach(card => {
+        const teamId = Number(card.dataset.teamId);
+        const isOpen = state.expandedTeamId === teamId;
+        const isEditing = state.editingTeamId === teamId;
+        card.classList.toggle("team-open", isOpen);
+        card.classList.toggle("team-editing", isEditing);
+        const chevron = card.querySelector("[data-team-chevron]");
+        const editButton = card.querySelector("[data-team-edit]");
+        if (chevron) chevron.textContent = isOpen ? "Hide" : "Open";
+        if (editButton) editButton.textContent = isEditing ? "Close edit" : "Edit";
+      });
+    }
+
+    function toggleTeamCard(teamId) {
+      state.expandedTeamId = state.expandedTeamId === teamId ? null : teamId;
+      if (state.expandedTeamId !== teamId) state.editingTeamId = null;
+      applyTeamCardState();
+    }
+
+    function editTeamCard(teamId) {
+      state.expandedTeamId = teamId;
+      state.editingTeamId = state.editingTeamId === teamId ? null : teamId;
+      applyTeamCardState();
     }
 
     async function deleteTeam(teamId) {
@@ -1010,6 +1140,8 @@
     window.deleteUser = deleteUser;
     window.deleteTeam = deleteTeam;
     window.restoreTeam = restoreTeam;
+    window.toggleTeamCard = toggleTeamCard;
+    window.editTeamCard = editTeamCard;
     window.permanentlyDeleteTeam = permanentlyDeleteTeam;
     window.deleteMembership = deleteMembership;
     window.deleteLeague = deleteLeague;

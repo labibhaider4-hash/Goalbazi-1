@@ -23,6 +23,9 @@
     .page-header { margin-bottom: 24px; }
     .page-header h1 { font-size: clamp(1.6rem,5vw,2.4rem); font-weight:800; letter-spacing:-.04em; }
     .page-header p { color: var(--muted); margin-top:4px; }
+    .league-location-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:10px; }
+    .league-location-copy { color:var(--muted); font-size:.9rem; line-height:1.5; }
+    .league-location-btn { padding:8px 12px; border-radius:999px; font-size:.78rem; }
     .leagues-grid { display:grid; gap:14px; margin-bottom:36px; }
     .league-card {
       background: var(--panel);
@@ -76,7 +79,11 @@
   <div class="container leagues-shell">
     <div class="page-header">
       <h1>Leagues</h1>
-      <p>Active competitions and standings across Delhi NCR</p>
+      <p id="league-location-copy">Active competitions near your football circle.</p>
+      <div class="league-location-row">
+        <button class="btn btn-ghost btn-sm league-location-btn" id="league-location-btn" type="button">Use my location</button>
+        <span class="league-location-copy" id="league-location-note">Showing leagues from your saved city until GPS is enabled.</span>
+      </div>
     </div>
 
     <div class="section-title" style="font-size:1rem;margin-bottom:14px">Active leagues</div>
@@ -112,9 +119,44 @@
     return String(value).replace(/[&<>"']/g, ch => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[ch]));
   }
 
+  function setLeagueLocationCopy(locationLabel = "") {
+    // v3.0: location is privacy-first; GPS only runs after the athlete taps the button.
+    const city = (locationLabel || "").trim();
+    document.getElementById("league-location-copy").textContent = city
+      ? `Active competitions and standings around ${esc(city)}`
+      : "Active competitions near your football circle.";
+  }
+
+  function bindLeagueLocation(profileLocation = "") {
+    setLeagueLocationCopy(profileLocation);
+    const btn = document.getElementById("league-location-btn");
+    const note = document.getElementById("league-location-note");
+    btn.addEventListener("click", () => {
+      if (!navigator.geolocation) {
+        note.textContent = "GPS is not available here, so we are using your saved city.";
+        return;
+      }
+      note.textContent = "Finding your local league area...";
+      navigator.geolocation.getCurrentPosition(
+        position => {
+          sessionStorage.setItem("goalbazi_league_lat", String(position.coords.latitude));
+          sessionStorage.setItem("goalbazi_league_lng", String(position.coords.longitude));
+          setLeagueLocationCopy("your current location");
+          note.textContent = "GPS is on. Nearby league discovery can now use your current area.";
+        },
+        () => {
+          setLeagueLocationCopy(profileLocation || "your city");
+          note.textContent = "Location permission was not enabled, so we are using your saved city.";
+        },
+        { enableHighAccuracy: false, timeout: 7000, maximumAge: 300000 }
+      );
+    }, { once: false });
+  }
+
   async function load() {
     const data = await apiFetch("/api/dashboard");
     if (!data) return;
+    bindLeagueLocation(data.profile?.location || "");
 
     const leaguesGrid = document.getElementById("leagues-grid");
     const standingsTitle = document.getElementById("standings-title");

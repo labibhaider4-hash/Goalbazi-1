@@ -35,21 +35,57 @@
     .land-nav-right { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
 
     @media (max-width: 560px) {
+      /* v3.0 mobile landing: keep the logo centered, keep the install banner,
+         and move utility buttons out of the hero headline's way. */
       .land-nav {
-        align-items: flex-start;
+        align-items: center;
+        justify-content: center;
+        padding: 12px 14px 10px;
       }
       .land-brand {
         flex: 1 1 100%;
+        justify-content: center;
+        text-align: center;
       }
       .land-nav-right {
         width: 100%;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
       }
-      .land-nav-right .btn,
+      .land-nav-right .btn {
+        width: 100%;
+        justify-content: center;
+      }
       .land-nav-right .theme-toggle {
-        flex: 1 1 0;
+        position: fixed;
+        right: 14px;
+        bottom: calc(74px + env(safe-area-inset-bottom));
+        z-index: 220;
+        width: 44px;
+        height: 44px;
+        border-radius: 15px;
       }
       .land-nav-right [data-install-app] {
-        flex: 1 1 100%;
+        position: fixed;
+        left: 14px;
+        right: 68px;
+        bottom: calc(18px + env(safe-area-inset-bottom));
+        z-index: 220;
+        width: auto;
+        min-height: 42px;
+        justify-content: center;
+        box-shadow: var(--shadow-md);
+      }
+      .hero {
+        align-items: center;
+        text-align: center;
+        padding-top: 176px;
+        padding-bottom: 118px;
+      }
+      .hero-btns,
+      .hero-stats {
+        justify-content: center;
       }
     }
 

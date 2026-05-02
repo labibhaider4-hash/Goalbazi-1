@@ -63,7 +63,12 @@ html[data-theme="light"] {
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-html { scroll-behavior: smooth; -webkit-tap-highlight-color: transparent; }
+html {
+  background: var(--bg);
+  scroll-behavior: smooth;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
 
 body {
   font-family: 'DM Sans', sans-serif;
@@ -72,6 +77,7 @@ body {
   min-height: 100vh;
   line-height: 1.6;
   overflow-x: hidden;
+  overscroll-behavior-y: none;
   transition: background .2s ease, color .2s ease;
 }
 
@@ -82,6 +88,7 @@ body.goalbazi-admin-bg {
     radial-gradient(circle at var(--gbx, 18%) var(--gby, 12%), rgba(127,255,69,.10), transparent 24%),
     radial-gradient(circle at 50% -10%, rgba(127,255,69,.08), transparent 34%),
     linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 58%, var(--bg) 100%);
+  background-attachment: fixed;
   animation: goalbaziAmbientShift 18s ease-in-out infinite alternate;
 }
 
@@ -631,7 +638,8 @@ img { display: block; max-width: 100%; }
   opacity: 0;
   pointer-events: none;
   transform: translate(-50%, -68px) scale(.96);
-  transition: opacity .16s ease, transform .16s ease;
+  will-change: transform, opacity;
+  transition: opacity .14s ease, transform .14s cubic-bezier(.2,.8,.2,1);
 }
 
 .pull-refresh-indicator.visible {
@@ -643,18 +651,27 @@ img { display: block; max-width: 100%; }
 }
 
 .pull-refresh-ring {
-  width: 44px;
-  height: 44px;
+  /* v3.0: hard size limits stop the logo from becoming huge inside admin/mobile scroll views. */
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  max-width: 40px;
+  min-height: 40px;
+  max-height: 40px;
   border-radius: 50%;
   display: grid;
   place-items: center;
   background: conic-gradient(from 0deg, var(--brand), var(--accent), transparent 72%);
-  animation: pullRingTurn 1.2s linear infinite;
+  animation: pullRingTurn 1.05s linear infinite;
 }
 
 .pull-refresh-logo {
-  width: 38px;
-  height: 38px;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  max-width: 34px;
+  min-height: 34px;
+  max-height: 34px;
   border-radius: 50%;
   background: rgba(16,28,22,.96);
   display: grid;
@@ -664,12 +681,14 @@ img { display: block; max-width: 100%; }
 }
 
 .pull-refresh-logo img {
-  width: 27px;
-  height: 27px;
-  object-fit: cover;
+  width: 23px !important;
+  height: 23px !important;
+  max-width: 23px !important;
+  max-height: 23px !important;
+  object-fit: contain;
   border-radius: 50%;
   display: block;
-  animation: pullLogoFloat 1.2s ease-in-out infinite;
+  animation: pullLogoFloat 1.05s ease-in-out infinite;
 }
 
 .pull-refresh-copy {
@@ -679,7 +698,7 @@ img { display: block; max-width: 100%; }
   font-weight: 900;
   letter-spacing: .14em;
   transform: translateY(1px);
-  animation: pullSiuFade 1.2s ease-in-out infinite;
+  animation: pullSiuFade 1.05s ease-in-out infinite;
 }
 
 body.pull-refreshing {
@@ -723,6 +742,103 @@ body.pull-refreshing {
   display: grid;
   place-items: center;
   min-height: 40vh;
+}
+
+/* Slim page/API transition loader.
+   Best use: quick route/API feedback without blocking the whole screen. */
+.top-page-loader {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(255,255,255,.04);
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(-3px);
+  pointer-events: none;
+  z-index: 999;
+  transition: opacity .16s ease, transform .16s ease;
+}
+
+.top-page-loader.active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.top-page-loader span {
+  display: block;
+  width: 44%;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, var(--brand), var(--accent), transparent);
+  animation: topLoaderSlide 1.05s ease-in-out infinite;
+}
+
+/* Reusable skeleton placeholders for premium mobile loading states.
+   Use these in sections where a spinner feels too empty or too abrupt. */
+.skeleton-card,
+.skeleton-line,
+.skeleton-avatar {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255,255,255,.06);
+}
+
+.skeleton-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.skeleton-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.skeleton-line {
+  height: 12px;
+  border-radius: 999px;
+}
+
+.skeleton-line.short { width: 44%; }
+.skeleton-line.mid { width: 68%; }
+.skeleton-line.long { width: 92%; }
+
+.skeleton-stack {
+  display: grid;
+  gap: 10px;
+  flex: 1;
+}
+
+.skeleton-card::after,
+.skeleton-line::after,
+.skeleton-avatar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(127,255,69,.13), transparent);
+  animation: skeletonShimmer 1.45s ease-in-out infinite;
+}
+
+@keyframes topLoaderSlide {
+  from { transform: translateX(-70%); }
+  to { transform: translateX(255%); }
+}
+
+@keyframes skeletonShimmer {
+  to { transform: translateX(100%); }
 }
 
 /* ============================================================
@@ -776,6 +892,18 @@ html[data-theme="light"] .ambient-b { background: radial-gradient(circle, rgba(3
 }
 
 @media (max-width: 720px) {
+  html,
+  body {
+    background-color: var(--bg);
+  }
+
+  /* Mobile browsers can flash the browser canvas during momentum scroll.
+     Keeping app backgrounds scroll-local on phones avoids white/light-mode bleed. */
+  body.goalbazi-app-bg,
+  body.goalbazi-admin-bg {
+    background-attachment: scroll;
+  }
+
   body.goalbazi-app-bg::before {
     opacity: .09;
     background-size: 58px 58px;
