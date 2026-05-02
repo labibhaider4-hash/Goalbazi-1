@@ -207,11 +207,23 @@
       border-radius:20px;
       background:linear-gradient(135deg, rgba(127,255,69,.08), rgba(61,232,160,.035));
     }
+    .dm-back-btn {
+      display:none;
+      width:36px;
+      height:36px;
+      border-radius:50%;
+      border:1px solid var(--line);
+      background:var(--panel-2);
+      color:var(--text);
+      font-weight:900;
+    }
     .dm-thread-action { color:var(--brand); font-size:.76rem; font-weight:900; text-decoration:none; }
     .dm-card {
       position:relative;
       overflow:hidden;
       transition:transform .18s ease, border-color .18s ease, background .18s ease;
+      text-align:left;
+      width:100%;
     }
     .dm-card:hover { transform:translateY(-1px); border-color:rgba(127,255,69,.22); }
     .dm-card::after {
@@ -226,8 +238,29 @@
       opacity:.65;
       transform:translateY(-50%) rotate(-45deg);
     }
+    .dm-card.active { border-color:rgba(127,255,69,.32); background:rgba(127,255,69,.07); }
     .dm-preview { padding-right:22px; }
+    .dm-side { display:grid; justify-items:end; gap:7px; }
     .dm-time { color:var(--muted); font-size:.72rem; white-space:nowrap; }
+    .dm-unread-dot { width:9px; height:9px; border-radius:50%; background:var(--brand); box-shadow:0 0 0 4px rgba(127,255,69,.10); }
+    .dm-quick-actions {
+      display:flex;
+      flex-wrap:wrap;
+      gap:7px;
+      margin:10px 0 0;
+    }
+    .dm-quick-chip {
+      border:1px solid rgba(127,255,69,.22);
+      color:var(--brand);
+      background:rgba(127,255,69,.06);
+      border-radius:999px;
+      padding:7px 9px;
+      font:inherit;
+      font-size:.72rem;
+      font-weight:900;
+      cursor:pointer;
+    }
+    .dm-quick-chip:hover { background:rgba(127,255,69,.10); }
     .chat-feed {
       display: grid;
       gap: 10px;
@@ -250,6 +283,13 @@
       font-size: .84rem;
       line-height: 1.5;
       box-shadow:0 8px 22px rgba(0,0,0,.14);
+    }
+    .bubble .stamp {
+      display:block;
+      margin-top:5px;
+      opacity:.58;
+      font-size:.68rem;
+      font-weight:700;
     }
     .bubble.me {
       background:linear-gradient(135deg, rgba(127,255,69,.95), rgba(61,232,160,.9));
@@ -401,7 +441,17 @@
         grid-template-rows: auto minmax(0, 1fr) auto auto;
       }
       .assistant-feed { max-height: none; min-height: 120px; }
-      .chat-feed { max-height: min(48vh, 360px); }
+      #messages-panel.thread-open .section-head,
+      #messages-panel.thread-open #chat-results { display:none; }
+      #messages-panel.thread-open #chat-panel {
+        display:grid !important;
+        min-height:calc(100dvh - var(--nav-h) - 24px);
+        grid-template-rows:auto minmax(0, 1fr) auto;
+      }
+      .dm-back-btn { display:grid; place-items:center; }
+      .dm-thread-head { position:sticky; top:0; z-index:2; margin-top:0; }
+      .chat-feed { max-height:none; min-height:0; }
+      .chat-compose { position:sticky; bottom:0; margin-bottom:0; }
       body.phone-panel-open { overflow: hidden; }
     }
   </style>
@@ -1096,6 +1146,24 @@
     return `<div class="user-sub"><span class="activity-dot activity-${esc(status.kind)}"></span>${esc(status.label)}</div>`;
   }
 
+  function shortMessageTime(value = "") {
+    // v3.2: compact DM timestamps keep the conversation list readable on phones.
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value).slice(0, 16);
+    const today = new Date();
+    const sameDay = date.toDateString() === today.toDateString();
+    return sameDay
+      ? date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      : date.toLocaleDateString([], { month: "short", day: "numeric" });
+  }
+
+  function insertQuickMessage(text) {
+    const input = document.getElementById("chat-input");
+    input.value = text;
+    input.focus();
+  }
+
   function friendshipActionHtml(user) {
     // One source of truth keeps Discover and Suggested friend-request buttons consistent.
     if (user.friendship_status === "accepted") {
@@ -1211,16 +1279,20 @@
 
   function renderConversations() {
     document.getElementById("chat-results").innerHTML = state.conversations.length ? state.conversations.map(conv => `
-      <button class="chat-card dm-card" type="button" onclick="openChat(${conv.partner_id})" style="text-align:left">
+      <button class="chat-card dm-card ${state.activeChatUserId === conv.partner_id ? "active" : ""}" type="button" onclick="openChat(${conv.partner_id})">
         <div class="chat-top">
           <div class="user-main">
             ${avatarHtml(conv)}
             <div class="user-main-body">
               <div class="user-name">${esc(conv.name)}</div>
               <div class="user-sub dm-preview">${esc(conv.message)}</div>
+              ${activityHtml(conv)}
             </div>
           </div>
-          <div class="dm-time">${esc((conv.created_at || "").slice(0, 16))}</div>
+          <div class="dm-side">
+            <div class="dm-time">${esc(shortMessageTime(conv.created_at))}</div>
+            ${conv.sender_id !== state.dashboard?.profile?.id ? `<span class="dm-unread-dot" title="New message"></span>` : ""}
+          </div>
         </div>
       </button>
     `).join("") : `<div class="empty-note">Private conversations will show up here.</div>`;
@@ -1359,12 +1431,14 @@
 
   function renderChatHeader(userId = state.activeChatUserId) {
     const partner = chatPartner(userId);
+    const status = partner.activity_status || { label: partner.location || "Goalbazi", kind: "offline" };
     document.getElementById("chat-thread-head").innerHTML = `
+      <button class="dm-back-btn" type="button" onclick="closeChatThread()" aria-label="Back to messages">←</button>
       <div class="user-main">
         ${avatarHtml(partner)}
         <div class="user-main-body">
           <div class="user-name">${esc(partner.name)}</div>
-          <div class="user-sub">${esc([partner.handle ? `@${partner.handle}` : "", partner.location, partner.team_name].filter(Boolean).join(" - "))}</div>
+          <div class="user-sub"><span class="activity-dot activity-${esc(status.kind)}"></span>${esc(status.label)}</div>
         </div>
       </div>
       <button class="mini-btn" type="button" onclick="openPlayerCard(${userId})">View card</button>
@@ -1374,8 +1448,20 @@
   function renderChatMessages(messages = [], userId = state.activeChatUserId) {
     const feed = document.getElementById("chat-feed");
     feed.innerHTML = messages.length ? messages.map(msg => `
-      <div class="bubble ${msg.sender_id === userId ? "them" : "me"}">${esc(msg.message)}</div>
-    `).join("") : `<div class="empty-note">Start the conversation.</div>`;
+      <div class="bubble ${msg.sender_id === userId ? "them" : "me"}">
+        ${esc(msg.message)}
+        <span class="stamp">${esc(shortMessageTime(msg.created_at))}</span>
+      </div>
+    `).join("") : `
+      <div class="empty-note">
+        Start the conversation.
+        <div class="dm-quick-actions">
+          <button class="dm-quick-chip" type="button" onclick="insertQuickMessage('Can you play today?')">Can you play today?</button>
+          <button class="dm-quick-chip" type="button" onclick="insertQuickMessage('Send arena location')">Send arena</button>
+          <button class="dm-quick-chip" type="button" onclick="insertQuickMessage('Want to challenge our team?')">Challenge?</button>
+        </div>
+      </div>
+    `;
     feed.scrollTop = feed.scrollHeight;
   }
 
@@ -1390,9 +1476,21 @@
   async function openChat(userId) {
     state.activeChatUserId = userId;
     openPhonePanel("messages");
+    document.getElementById("messages-panel").classList.add("thread-open");
     document.getElementById("chat-panel").style.display = "block";
     renderChatHeader(userId);
     await refreshActiveChat();
+    renderConversations();
+  }
+
+  function closeChatThread() {
+    // v3.2: mobile back returns to the Instagram-style conversation list.
+    document.getElementById("messages-panel").classList.remove("thread-open");
+    if (isPhoneLayout()) {
+      document.getElementById("chat-panel").style.display = "none";
+      state.activeChatUserId = null;
+      renderConversations();
+    }
   }
 
   async function sendChat() {
@@ -1405,17 +1503,18 @@
   }
 
   function startMessagePolling() {
-    // Lightweight polling keeps private messages fresh while the app is open; WebSockets can replace this later.
+    // v3.2: faster polling keeps DMs feeling live without adding WebSocket infrastructure yet.
     if (state.chatPollTimer) clearInterval(state.chatPollTimer);
     const refreshMessages = async () => {
       if (document.hidden) return;
       await loadConversations({ silent: true });
       await refreshActiveChat({ silent: true });
     };
-    state.chatPollTimer = setInterval(refreshMessages, 8000);
+    state.chatPollTimer = setInterval(refreshMessages, 2500);
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) refreshMessages();
     });
+    window.addEventListener("focus", refreshMessages);
   }
 
   async function searchArenasWithQuery() {

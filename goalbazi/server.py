@@ -3392,12 +3392,14 @@ def api_direct_messages():
                   dm.id,
                   dm.message,
                   dm.created_at,
+                  dm.sender_id,
                   partner_id,
                   u.name,
                   u.handle,
-                  u.avatar_base64
+                  u.avatar_base64,
+                  u.last_seen_at
            FROM (
-             SELECT id, message, created_at,
+             SELECT id, message, created_at, sender_id,
                     CASE WHEN sender_id = %s THEN receiver_id ELSE sender_id END AS partner_id
              FROM direct_messages
              WHERE sender_id = %s OR receiver_id = %s
@@ -3406,6 +3408,9 @@ def api_direct_messages():
            ORDER BY partner_id, dm.id DESC""",
         (current_user_id(), current_user_id(), current_user_id()),
     )]
+    for conversation in conversations:
+        # v3.2: conversation cards can show live/recent/offline status without extra requests.
+        conversation["activity_status"] = activity_status(conversation.get("last_seen_at"))
     return jsonify({"conversations": conversations})
 
 
