@@ -52,6 +52,7 @@ const GoalbaziTheme = {
       const iconTarget = btn.querySelector("[data-theme-icon]");
       const labelTarget = btn.querySelector("[data-theme-label]");
       const currentTarget = btn.querySelector("[data-theme-current]");
+      btn.classList.add("theme-toggle-labeled");
       if (iconTarget) iconTarget.innerHTML = icon;
       else btn.innerHTML = `${icon}<span data-theme-current>${currentLabel}</span>`;
       if (labelTarget) labelTarget.textContent = nextLabel;

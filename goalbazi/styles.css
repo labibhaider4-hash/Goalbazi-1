@@ -1047,12 +1047,19 @@ html[data-theme="light"] .ambient-b { background: radial-gradient(circle, rgba(3
   cursor: pointer;
   box-shadow: var(--shadow-sm);
   transition: transform .18s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease;
+  white-space: nowrap;
 }
 .theme-toggle:not(.theme-toggle-labeled) { width: 42px; padding: 0; }
+.theme-toggle.theme-toggle-labeled {
+  width: auto;
+  min-width: 72px;
+}
 .theme-toggle [data-theme-current] {
   font-size: .72rem;
   font-weight: 900;
   letter-spacing: .02em;
+  line-height: 1;
+  white-space: nowrap;
 }
 .theme-toggle:hover {
   background: var(--ghost-bg-hover);
@@ -1097,8 +1104,10 @@ html[data-theme="light"] .ambient-b { background: radial-gradient(circle, rgba(3
 }
 
 .auth-theme-corner .theme-toggle {
-  width: 36px;
+  width: auto;
+  min-width: 68px;
   height: 36px;
+  padding: 0 9px;
   border-radius: 12px;
   box-shadow: none;
   background: var(--surface-soft);
