@@ -50,6 +50,41 @@
 .field-grid input{
   height:48px;
 }
+
+/* Password reveal controls help users catch typing mistakes before account creation. */
+.password-field{
+  position:relative;
+}
+
+.password-field input{
+  padding-right:50px;
+}
+
+.password-toggle{
+  position:absolute;
+  right:10px;
+  top:50%;
+  transform:translateY(-50%);
+  width:34px;
+  height:34px;
+  border-radius:10px;
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.04);
+  color:var(--muted-2);
+  cursor:pointer;
+  display:grid;
+  place-items:center;
+}
+
+.password-toggle:hover{
+  color:var(--accent);
+  border-color:rgba(110,255,71,.35);
+}
+
+.password-toggle svg{
+  width:18px;
+  height:18px;
+}
     .primary-btn{
   width:100%;
   padding:14px;
@@ -142,7 +177,21 @@
         </label>
         <label>
           <span>Password</span>
-          <input type="password" name="password" placeholder="Min 8 characters" required autocomplete="new-password">
+          <div class="password-field">
+            <input id="register-password" type="password" name="password" placeholder="Min 8 characters" required autocomplete="new-password">
+            <button class="password-toggle" type="button" data-toggle-password="register-password" aria-label="Show password">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 5c5 0 8.5 4.1 9.7 5.8a2 2 0 0 1 0 2.4C20.5 14.9 17 19 12 19s-8.5-4.1-9.7-5.8a2 2 0 0 1 0-2.4C3.5 9.1 7 5 12 5Zm0 2c-4 0-6.9 3.4-8 5 1.1 1.6 4 5 8 5s6.9-3.4 8-5c-1.1-1.6-4-5-8-5Zm0 2.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5Z"/></svg>
+            </button>
+          </div>
+        </label>
+        <label>
+          <span>Confirm password</span>
+          <div class="password-field">
+            <input id="register-confirm-password" type="password" name="confirm_password" placeholder="Re-enter password" required autocomplete="new-password">
+            <button class="password-toggle" type="button" data-toggle-password="register-confirm-password" aria-label="Show confirm password">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 5c5 0 8.5 4.1 9.7 5.8a2 2 0 0 1 0 2.4C20.5 14.9 17 19 12 19s-8.5-4.1-9.7-5.8a2 2 0 0 1 0-2.4C3.5 9.1 7 5 12 5Zm0 2c-4 0-6.9 3.4-8 5 1.1 1.6 4 5 8 5s6.9-3.4 8-5c-1.1-1.6-4-5-8-5Zm0 2.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5Z"/></svg>
+            </button>
+          </div>
         </label>
         <p class="error-msg" id="error-msg"></p>
         <button class="primary-btn" type="submit" id="submit-btn">Create account</button>
@@ -177,14 +226,33 @@
       handleInput.value = handleInput.value.toLowerCase().replace(/[^a-z0-9]/g, "");
     });
 
+    // Reusable password reveal buttons keep login/register behavior consistent.
+    document.querySelectorAll("[data-toggle-password]").forEach(button => {
+      button.addEventListener("click", () => {
+        const input = document.getElementById(button.dataset.togglePassword);
+        const shouldShow = input.type === "password";
+        input.type = shouldShow ? "text" : "password";
+        button.setAttribute("aria-label", shouldShow ? "Hide password" : "Show password");
+      });
+    });
+
     document.getElementById("register-form").addEventListener("submit", async (e) => {
       e.preventDefault();
       const btn = document.getElementById("submit-btn");
       const err = document.getElementById("error-msg");
       const data = Object.fromEntries(new FormData(e.currentTarget).entries());
+      err.style.display = "none";
+
+      // Confirm password is checked on the browser first so accidental typos are caught instantly.
+      if (data.password !== data.confirm_password) {
+        err.textContent = "Passwords do not match.";
+        err.style.display = "block";
+        return;
+      }
+      delete data.confirm_password;
+
       btn.textContent = "Creating account...";
       btn.disabled = true;
-      err.style.display = "none";
       try {
         const res = await fetch("/api/auth/register", {
           method: "POST",

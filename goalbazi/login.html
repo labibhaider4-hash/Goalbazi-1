@@ -41,6 +41,41 @@
              0 8px 25px rgba(0,0,0,0.3);
   background:var(--panel);
 }
+
+/* Password reveal control lets users verify their typed password on mobile keyboards. */
+.password-field{
+  position:relative;
+}
+
+.password-field input{
+  padding-right:50px;
+}
+
+.password-toggle{
+  position:absolute;
+  right:10px;
+  top:50%;
+  transform:translateY(-50%);
+  width:34px;
+  height:34px;
+  border-radius:10px;
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.04);
+  color:var(--muted-2);
+  cursor:pointer;
+  display:grid;
+  place-items:center;
+}
+
+.password-toggle:hover{
+  color:var(--accent);
+  border-color:rgba(110,255,71,.35);
+}
+
+.password-toggle svg{
+  width:18px;
+  height:18px;
+}
     .primary-btn{
   width:100%;
   padding:14px;
@@ -86,13 +121,20 @@
         </label>
         <label>
           <span>Password</span>
-          <input type="password" name="password" placeholder="••••••••" required autocomplete="current-password">
+          <div class="password-field">
+            <input id="login-password" type="password" name="password" placeholder="Password" required autocomplete="current-password">
+            <button class="password-toggle" type="button" data-toggle-password="login-password" aria-label="Show password">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 5c5 0 8.5 4.1 9.7 5.8a2 2 0 0 1 0 2.4C20.5 14.9 17 19 12 19s-8.5-4.1-9.7-5.8a2 2 0 0 1 0-2.4C3.5 9.1 7 5 12 5Zm0 2c-4 0-6.9 3.4-8 5 1.1 1.6 4 5 8 5s6.9-3.4 8-5c-1.1-1.6-4-5-8-5Zm0 2.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5Z"/></svg>
+            </button>
+          </div>
         </label>
         <p class="error-msg" id="error-msg"></p>
         <button class="primary-btn" type="submit" id="submit-btn">Sign in</button>
         <a class="btn btn-ghost btn-full" href="/auth/google" style="margin-top:8px">Continue with Google</a>
       </form>
+      <p class="auth-switch" style="margin-top:12px"><a href="/forgot-password">Forgot password?</a></p>
       <p class="auth-switch">New to Goalbazi? <a href="/register">Create an account</a></p>
+      <p class="auth-switch" style="margin-top:8px"><a href="/support">Need help or found a bug?</a></p>
       <p class="auth-switch" style="margin-top:8px"><a href="/">Back to landing page</a></p>
     </div>
   </div>
@@ -115,6 +157,16 @@
       err.textContent = messages[googleError] || "Google sign-in failed. Please try again.";
       err.style.display = "block";
     }
+
+    // The eye button toggles only the password field type, so it does not affect form submission.
+    document.querySelectorAll("[data-toggle-password]").forEach(button => {
+      button.addEventListener("click", () => {
+        const input = document.getElementById(button.dataset.togglePassword);
+        const shouldShow = input.type === "password";
+        input.type = shouldShow ? "text" : "password";
+        button.setAttribute("aria-label", shouldShow ? "Hide password" : "Show password");
+      });
+    });
 
     document.getElementById("login-form").addEventListener("submit", async (e) => {
       e.preventDefault();

@@ -374,6 +374,9 @@ img { display: block; max-width: 100%; }
   transform: translateY(-110%);
   transition: transform .25s cubic-bezier(.4,0,.2,1);
   z-index: 199;
+  max-height: calc(100dvh - var(--nav-h));
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .nav-drawer.open { transform: translateY(0); }
@@ -413,6 +416,17 @@ img { display: block; max-width: 100%; }
 }
 
 .install-app-btn[hidden] { display: none !important; }
+
+@media (max-width: 767px) {
+  .nav-drawer {
+    /* v3.3: keep drawer actions, especially Log out, above the fixed phone nav. */
+    max-height: calc(100dvh - var(--nav-h) - 104px - env(safe-area-inset-bottom));
+    padding-bottom: calc(22px + env(safe-area-inset-bottom));
+  }
+  .nav-drawer-bottom {
+    padding-bottom: 6px;
+  }
+}
 
 @media (min-width: 768px) {
   .navbar { padding: 0 28px; }

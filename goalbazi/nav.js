@@ -439,6 +439,7 @@ function initNav(activePage) {
     { id: "leagues",   label: "Leagues",   href: "/leagues" },
     { id: "profile",   label: "Profile",   href: "/profile" },
     { id: "about",     label: "About",     href: "/about" },
+    { id: "support",   label: "Support",   href: "/support" },
   ];
 
   const navbar = document.getElementById("navbar");

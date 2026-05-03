@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<!-- Support page: public contact and bug-report form for pre-launch feedback. -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Goalbazi - Support</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/goalbazi-logo.svg">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/assets/goalbazi-logo.svg">
+  <meta name="theme-color" content="#07110d">
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    .support-shell { padding: 34px 20px 80px; }
+    .support-card {
+      max-width: 720px;
+      margin: 0 auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      padding: 24px;
+      position: relative;
+      z-index: 1;
+    }
+    .support-title { font-family: "Syne", sans-serif; font-size: clamp(1.8rem, 6vw, 3rem); letter-spacing: -.05em; margin-bottom: 8px; }
+    .support-sub { color: var(--muted); line-height: 1.6; margin-bottom: 20px; }
+    .support-success {
+      display: none;
+      color: var(--brand);
+      border: 1px solid rgba(127,255,69,.22);
+      background: rgba(127,255,69,.08);
+      border-radius: 14px;
+      padding: 11px;
+      font-size: .86rem;
+    }
+  </style>
+</head>
+<body class="goalbazi-app-bg">
+  <nav class="navbar" id="navbar"></nav>
+  <div class="nav-drawer" id="nav-drawer"></div>
+  <div class="ambient ambient-a"></div>
+  <div class="ambient ambient-b"></div>
+  <div class="page-wrap support-shell">
+    <div class="support-card">
+      <h1 class="support-title">Support & bug reports</h1>
+      <p class="support-sub">Tell us what went wrong, what confused you, or what you want Goalbazi to improve. This is the feedback loop before launch.</p>
+      <form class="auth-form" id="support-form">
+        <div class="form-grid form-grid-2">
+          <label>
+            <span>Name</span>
+            <input class="form-input" name="name" placeholder="Your name">
+          </label>
+          <label>
+            <span>Email</span>
+            <input class="form-input" type="email" name="email" placeholder="you@example.com">
+          </label>
+        </div>
+        <label>
+          <span>Type</span>
+          <select class="form-input" name="category">
+            <option value="support">Support request</option>
+            <option value="bug">Bug report</option>
+            <option value="feedback">Feedback</option>
+            <option value="account">Account help</option>
+          </select>
+        </label>
+        <label>
+          <span>Message</span>
+          <textarea class="form-input" name="message" rows="5" placeholder="Describe the issue..." required></textarea>
+        </label>
+        <p class="error-msg" id="error-msg"></p>
+        <p class="support-success" id="success-msg"></p>
+        <button class="btn btn-primary btn-full" type="submit" id="submit-btn">Send to support</button>
+      </form>
+    </div>
+  </div>
+  <script src="/nav.js"></script>
+  <script>
+    // Support can be opened by signed-in users or guests; initNav is best-effort.
+    try { initNav("support"); } catch {}
+
+    document.getElementById("support-form").addEventListener("submit", async event => {
+      event.preventDefault();
+      const btn = document.getElementById("submit-btn");
+      const err = document.getElementById("error-msg");
+      const success = document.getElementById("success-msg");
+      err.style.display = "none";
+      success.style.display = "none";
+      btn.disabled = true;
+      btn.textContent = "Sending...";
+      try {
+        const res = await fetch("/api/support", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget).entries())),
+        });
+        const body = await res.json();
+        if (!res.ok) throw new Error(body.error || "Could not send request");
+        success.textContent = body.message || "Support request sent.";
+        success.style.display = "block";
+        event.currentTarget.reset();
+      } catch (error) {
+        err.textContent = error.message || "Could not send request.";
+        err.style.display = "block";
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Send to support";
+      }
+    });
+  </script>
+</body>
+</html>

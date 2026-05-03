@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<!-- About page: explains Goalbazi inside both the website and installed PWA. -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Goalbazi - About</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/goalbazi-logo.svg">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/assets/goalbazi-logo.svg">
+  <meta name="theme-color" content="#07110d">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Goalbazi">
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    .about-shell { max-width: 1080px; margin: 0 auto; padding: 32px 16px 88px; }
+    .about-hero {
+      display:grid;
+      gap:18px;
+      padding:24px;
+      border:1px solid var(--line);
+      border-radius:28px;
+      background:linear-gradient(135deg, rgba(127,255,69,.12), rgba(61,232,160,.04)), var(--panel);
+      box-shadow:var(--shadow-sm);
+    }
+    .about-kicker { color:var(--brand); font-weight:900; letter-spacing:.08em; text-transform:uppercase; font-size:.78rem; }
+    .about-title { font-family:'Syne', sans-serif; font-size:clamp(2rem, 9vw, 4.6rem); line-height:.92; letter-spacing:-.08em; margin:0; }
+    .about-copy { color:var(--muted-2); line-height:1.75; max-width:760px; margin:0; }
+    .about-grid { display:grid; gap:14px; margin-top:18px; }
+    .about-card {
+      border:1px solid var(--line);
+      border-radius:22px;
+      padding:18px;
+      background:rgba(255,255,255,.025);
+    }
+    .about-card h2 { margin:0 0 8px; font-size:1.05rem; }
+    .about-card p { margin:0; color:var(--muted); line-height:1.65; }
+    .about-list { display:grid; gap:10px; margin:0; padding:0; list-style:none; }
+    .about-list li { border:1px solid var(--line); border-radius:16px; padding:12px; color:var(--muted-2); background:var(--panel-2); }
+    @media (min-width: 820px) {
+      .about-shell { padding-top:48px; }
+      .about-hero { padding:34px; }
+      .about-grid { grid-template-columns:repeat(3, minmax(0, 1fr)); }
+    }
+  </style>
+</head>
+<body class="goalbazi-app-bg">
+  <nav class="navbar" id="navbar"></nav>
+  <div class="nav-drawer" id="nav-drawer"></div>
+  <div class="ambient ambient-a"></div>
+  <div class="ambient ambient-b"></div>
+
+  <main class="about-shell">
+    <section class="about-hero">
+      <div class="about-kicker">About Goalbazi</div>
+      <h1 class="about-title">Football made easier to organize.</h1>
+      <p class="about-copy">
+        Goalbazi helps local athletes find matches, connect with players, discover arenas,
+        build teams, run challenges, and follow leagues from one phone-first web app.
+      </p>
+      <div class="action-row">
+        <a class="btn btn-primary btn-sm" href="/games">Find matches</a>
+        <a class="btn btn-ghost btn-sm" href="/turfs">Explore arenas</a>
+      </div>
+    </section>
+
+    <section class="about-grid">
+      <div class="about-card">
+        <h2>For Athletes</h2>
+        <p>Create your player profile, connect with friends, message athletes, join games, and build your football identity.</p>
+      </div>
+      <div class="about-card">
+        <h2>For Teams</h2>
+        <p>Teams can manage members, challenge other squads, and appear in leagues with standings and stats.</p>
+      </div>
+      <div class="about-card">
+        <h2>For Arenas</h2>
+        <p>Arena Partners can list grounds, add photos, describe facilities, and make their space easier to discover.</p>
+      </div>
+    </section>
+
+    <section class="about-card" style="margin-top:18px">
+      <h2>What Goalbazi Includes</h2>
+      <ul class="about-list">
+        <li>Player profiles with ratings, positions, levels, and visual player cards.</li>
+        <li>Private messages, friend requests, team challenges, and notifications.</li>
+        <li>Arena search, match creation, league standings, and admin control tools.</li>
+        <li>Installable PWA experience designed mainly for mobile phones.</li>
+      </ul>
+    </section>
+  </main>
+
+  <div class="toast" id="toast"></div>
+  <script src="/nav.js"></script>
+  <script>
+    // About uses the same app navigation as the rest of the signed-in experience.
+    initNav("about");
+  </script>
+</body>
+</html>

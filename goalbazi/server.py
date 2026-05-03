@@ -18,9 +18,11 @@ import json
 import os
 import re
 import secrets
+import smtplib
 import uuid
 import base64
 from datetime import datetime, timedelta
+from email.message import EmailMessage
 from functools import wraps
 from urllib import error as urllib_error
 from urllib.parse import parse_qs, urlencode, urlparse
@@ -55,6 +57,13 @@ PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").strip().rstrip("/")
 VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "").strip()
 VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "").strip()
 VAPID_CLAIMS_EMAIL = os.environ.get("VAPID_CLAIMS_EMAIL", "admin@goalbazi.app").strip()
+SMTP_HOST = os.environ.get("SMTP_HOST", "").strip()
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USER = os.environ.get("SMTP_USER", "").strip()
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "").strip()
+SMTP_FROM_EMAIL = os.environ.get("SMTP_FROM_EMAIL", SMTP_USER or "support@goalbazi.com").strip()
+SUPPORT_EMAIL = os.environ.get("SUPPORT_EMAIL", "support@goalbazi.com").strip()
+SHOW_PASSWORD_RESET_LINK = os.environ.get("SHOW_PASSWORD_RESET_LINK", "").strip().lower() in {"1", "true", "yes"}
 # Production should not recreate sample arenas/leagues/teams after admin deletes
 # them. Set SEED_STARTER_DATA=true only when you intentionally want demo data.
 SEED_STARTER_DATA = os.environ.get("SEED_STARTER_DATA", "").strip().lower() in {"1", "true", "yes"}
@@ -177,6 +186,37 @@ def sanitize_handle(handle: str) -> str:
 def display_handle(handle: str) -> str:
     clean = sanitize_handle(handle)
     return f"@{clean}" if clean else "@player"
+
+
+def public_url(path: str) -> str:
+    """Build a user-facing URL for emails and reset links."""
+    base = PUBLIC_BASE_URL or request.url_root.rstrip("/")
+    return f"{base}{path}"
+
+
+def email_is_configured() -> bool:
+    """SMTP is optional during pre-launch; UI falls back gracefully when missing."""
+    return bool(SMTP_HOST and SMTP_FROM_EMAIL)
+
+
+def send_email(to_email: str, subject: str, body: str) -> bool:
+    """Send plain-text transactional email when SMTP variables are configured."""
+    if not email_is_configured():
+        return False
+    message = EmailMessage()
+    message["From"] = SMTP_FROM_EMAIL
+    message["To"] = to_email
+    message["Subject"] = subject
+    message.set_content(body)
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=12) as smtp:
+            smtp.starttls()
+            if SMTP_USER and SMTP_PASSWORD:
+                smtp.login(SMTP_USER, SMTP_PASSWORD)
+            smtp.send_message(message)
+        return True
+    except Exception:
+        return False
 
 
 def unique_handle_from_email_name(email: str, name: str) -> str:
@@ -590,6 +630,29 @@ def seed_db():
             sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             receiver_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             message TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            token_hash TEXT NOT NULL UNIQUE,
+            expires_at TEXT NOT NULL,
+            used_at TEXT,
+            created_at TEXT NOT NULL
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS support_requests (
+            id SERIAL PRIMARY KEY,
+            name TEXT NOT NULL DEFAULT '',
+            email TEXT NOT NULL DEFAULT '',
+            category TEXT NOT NULL DEFAULT 'support',
+            message TEXT NOT NULL,
+            user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
             created_at TEXT NOT NULL
         )
     """)
@@ -1543,6 +1606,21 @@ def register_page():
     return send_from_directory(".", "register.html")
 
 
+@app.route("/forgot-password")
+def forgot_password_page():
+    return send_from_directory(".", "forgot_password.html")
+
+
+@app.route("/reset-password/<token>")
+def reset_password_page(token):
+    return send_from_directory(".", "reset_password.html")
+
+
+@app.route("/support")
+def support_page():
+    return send_from_directory(".", "support.html")
+
+
 @app.route("/api/auth/register", methods=["POST"])
 def api_register():
     data = request.get_json()
@@ -1588,6 +1666,82 @@ def api_login():
     session.permanent = True
     session["user_id"] = user["id"]
     log_event("auth_login", "/api/auth/login", {"user_id": user["id"]})
+    return jsonify({"ok": True})
+
+
+@app.route("/api/auth/forgot-password", methods=["POST"])
+def api_forgot_password():
+    """Create a one-hour reset token without revealing whether the email exists."""
+    data = request.get_json() or {}
+    email = data.get("email", "").strip().lower()
+    response = {
+        "ok": True,
+        "message": "If that email exists on Goalbazi, password reset instructions are ready.",
+        "email_sent": False,
+        "support_email": SUPPORT_EMAIL,
+    }
+    if not email:
+        return jsonify(response)
+
+    user = query("SELECT id, name FROM users WHERE email = %s", (email,), one=True)
+    if not user:
+        return jsonify(response)
+
+    raw_token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+    expires_at = (datetime.now() + timedelta(hours=1)).isoformat()
+    query(
+        """INSERT INTO password_reset_tokens (user_id, token_hash, expires_at, created_at)
+           VALUES (%s, %s, %s, %s)""",
+        (user["id"], token_hash, expires_at, datetime.now().isoformat()),
+        commit=True,
+    )
+    reset_url = public_url(f"/reset-password/{raw_token}")
+    email_sent = send_email(
+        email,
+        "Reset your Goalbazi password",
+        f"Hi {user['name']},\n\nUse this secure link to reset your Goalbazi password. It expires in 1 hour:\n{reset_url}\n\nIf you did not request this, you can ignore this email.\n\nGoalbazi",
+    )
+    response["email_sent"] = email_sent
+    if SHOW_PASSWORD_RESET_LINK and not email_sent:
+        # Dev/pre-launch escape hatch only; keep disabled in production unless testing.
+        response["reset_url"] = reset_url
+    log_event("forgot_password_request", "/api/auth/forgot-password", {"user_id": user["id"], "email_sent": email_sent})
+    return jsonify(response)
+
+
+@app.route("/api/auth/reset-password", methods=["POST"])
+def api_reset_password():
+    """Validate a reset token, set the new password, and mark the token as used."""
+    data = request.get_json() or {}
+    token = data.get("token", "").strip()
+    password = data.get("password", "")
+    if len(password) < 8:
+        return jsonify({"error": "Password must be at least 8 characters"}), 400
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    reset = query(
+        """SELECT * FROM password_reset_tokens
+           WHERE token_hash = %s AND used_at IS NULL
+           ORDER BY id DESC""",
+        (token_hash,),
+        one=True,
+    )
+    if not reset:
+        return jsonify({"error": "Reset link is invalid or already used"}), 400
+    try:
+        expires_at = datetime.fromisoformat(reset["expires_at"])
+    except Exception:
+        expires_at = datetime.now() - timedelta(seconds=1)
+    if expires_at < datetime.now():
+        return jsonify({"error": "Reset link has expired"}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET password_hash = %s WHERE id = %s", (hash_password(password), reset["user_id"]))
+    cur.execute("UPDATE password_reset_tokens SET used_at = %s WHERE id = %s", (datetime.now().isoformat(), reset["id"]))
+    conn.commit()
+    session.permanent = True
+    session["user_id"] = reset["user_id"]
+    log_event("password_reset_complete", "/api/auth/reset-password", {"user_id": reset["user_id"]})
     return jsonify({"ok": True})
 
 
@@ -1664,6 +1818,32 @@ def google_callback():
 def api_logout():
     session.clear()
     return jsonify({"ok": True})
+
+
+@app.route("/api/support", methods=["POST"])
+def api_support_request():
+    """Collect support and bug reports even from users who cannot log in."""
+    data = request.get_json() or {}
+    name = data.get("name", "").strip()
+    email = data.get("email", "").strip().lower()
+    category = data.get("category", "support").strip() or "support"
+    message = data.get("message", "").strip()
+    if len(message) < 8:
+        return jsonify({"error": "Please describe the issue in a little more detail."}), 400
+    user_id = current_user_id()
+    query(
+        """INSERT INTO support_requests (name, email, category, message, user_id, created_at)
+           VALUES (%s, %s, %s, %s, %s, %s)""",
+        (name, email, category, message, user_id, datetime.now().isoformat()),
+        commit=True,
+    )
+    send_email(
+        SUPPORT_EMAIL,
+        f"Goalbazi {category.title()} request",
+        f"Name: {name or 'Not provided'}\nEmail: {email or 'Not provided'}\nUser ID: {user_id or 'guest'}\n\n{message}",
+    )
+    log_event("support_request", "/api/support", {"category": category, "user_id": user_id})
+    return jsonify({"ok": True, "message": "Thanks. Goalbazi support has received your request."})
 
 
 @app.route("/api/auth/me")
