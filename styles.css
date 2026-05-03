@@ -1036,9 +1036,10 @@ html[data-theme="light"] .ambient-b { background: radial-gradient(circle, rgba(3
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 42px;
+  min-width: 42px;
   height: 42px;
-  padding: 0;
+  padding: 0 11px;
+  gap: 7px;
   border-radius: 14px;
   border: 1px solid var(--line-2);
   background: var(--ghost-bg);
@@ -1046,6 +1047,12 @@ html[data-theme="light"] .ambient-b { background: radial-gradient(circle, rgba(3
   cursor: pointer;
   box-shadow: var(--shadow-sm);
   transition: transform .18s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.theme-toggle:not(.theme-toggle-labeled) { width: 42px; padding: 0; }
+.theme-toggle [data-theme-current] {
+  font-size: .72rem;
+  font-weight: 900;
+  letter-spacing: .02em;
 }
 .theme-toggle:hover {
   background: var(--ghost-bg-hover);

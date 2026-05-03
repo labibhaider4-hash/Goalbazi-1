@@ -40,6 +40,7 @@ const GoalbaziTheme = {
   syncButtons() {
     const current = this.current();
     const nextLabel = current === "dark" ? "Switch to light theme" : current === "light" ? "Switch to Gen Z Derby" : "Switch to dark theme";
+    const currentLabel = current === "genz" ? "Gen Z" : current === "light" ? "Light" : "Dark";
     document.querySelectorAll("[data-theme-toggle]").forEach(btn => {
       const icon = `
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
@@ -50,9 +51,11 @@ const GoalbaziTheme = {
       `;
       const iconTarget = btn.querySelector("[data-theme-icon]");
       const labelTarget = btn.querySelector("[data-theme-label]");
+      const currentTarget = btn.querySelector("[data-theme-current]");
       if (iconTarget) iconTarget.innerHTML = icon;
-      else btn.innerHTML = icon;
+      else btn.innerHTML = `${icon}<span data-theme-current>${currentLabel}</span>`;
       if (labelTarget) labelTarget.textContent = nextLabel;
+      if (currentTarget) currentTarget.textContent = currentLabel;
       btn.title = nextLabel;
       btn.setAttribute("aria-label", btn.title);
     });
@@ -466,7 +469,10 @@ function initNav(activePage) {
     </a>
     <nav class="nav-links">${linksHtml}</nav>
     <div class="nav-right">
-      <button class="theme-toggle hide-mobile" id="nav-theme-toggle" type="button" data-theme-toggle></button>
+      <button class="theme-toggle theme-toggle-labeled hide-mobile" id="nav-theme-toggle" type="button" data-theme-toggle>
+        <span data-theme-icon></span>
+        <span data-theme-current>Dark</span>
+      </button>
       <div class="nav-profile-wrap">
         <button class="nav-avatar" id="nav-avatar" type="button" title="Profile" aria-label="Open profile menu">?</button>
         <div class="nav-profile-menu" id="nav-profile-menu" hidden>
@@ -496,8 +502,11 @@ function initNav(activePage) {
         <button class="btn btn-primary btn-sm btn-full install-app-btn" id="nav-install-mobile" type="button" data-install-app hidden>Install app</button>
         <button class="btn btn-ghost btn-sm btn-full drawer-theme-toggle" id="nav-theme-toggle-mobile" type="button" data-theme-toggle>
           <span data-theme-icon></span>
+          <span data-theme-current>Dark</span>
           <span data-theme-label>Theme</span>
         </button>
+        <button class="btn btn-ghost btn-sm btn-full" type="button" data-theme-direct="genz">Turn on Gen Z Derby</button>
+        <button class="btn btn-ghost btn-sm btn-full" type="button" data-theme-direct="dark">Back to classic dark</button>
         <button class="btn btn-ghost btn-sm btn-full" id="nav-logout-mobile">Log out</button>
       </div>
     `;
@@ -505,6 +514,11 @@ function initNav(activePage) {
 
   GoalbaziTheme.attachButton(document.getElementById("nav-theme-toggle"));
   GoalbaziTheme.attachButton(document.getElementById("nav-theme-toggle-mobile"));
+  document.querySelectorAll("[data-theme-direct]").forEach(btn => {
+    if (btn.dataset.themeDirectBound === "1") return;
+    btn.dataset.themeDirectBound = "1";
+    btn.addEventListener("click", () => GoalbaziTheme.apply(btn.dataset.themeDirect));
+  });
   GoalbaziInstall.bind();
   GoalbaziPush.bind();
   GoalbaziPullRefresh.bind();

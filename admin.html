@@ -89,6 +89,42 @@
     .brand-card { padding: 18px; }
     .brand-name { font-size: 1.2rem; font-weight: 800; }
     .brand-sub { color: var(--muted); font-size: .88rem; margin-top: 4px; }
+    .command-hero {
+      display:grid;
+      gap:12px;
+      padding:18px;
+      border-radius:24px;
+      border:1px solid rgba(132,242,85,.18);
+      background:
+        radial-gradient(circle at 12% 16%, rgba(132,242,85,.18), transparent 32%),
+        linear-gradient(135deg, rgba(132,242,85,.10), rgba(61,232,160,.04)),
+        var(--panel);
+      box-shadow:0 22px 80px rgba(0,0,0,.26);
+    }
+    .command-hero-kicker {
+      color:var(--brand);
+      font-size:.72rem;
+      font-weight:900;
+      text-transform:uppercase;
+      letter-spacing:.16em;
+    }
+    .command-hero-title {
+      font-family:"Manrope", sans-serif;
+      font-size:clamp(1.8rem, 8vw, 3.4rem);
+      line-height:.95;
+      font-weight:900;
+      letter-spacing:-.08em;
+    }
+    .command-quick-grid { display:grid; gap:10px; grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .command-quick-card {
+      border:1px solid var(--line);
+      border-radius:16px;
+      background:var(--panel-2);
+      padding:13px;
+      min-height:88px;
+    }
+    .command-quick-card strong { display:block; color:var(--text); font-size:.92rem; margin-bottom:4px; }
+    .command-quick-card span { color:var(--muted); font-size:.78rem; line-height:1.4; }
     .tab-row { display: flex; gap: 8px; flex-wrap: wrap; }
     .tab-btn, .btn, .mini-btn {
       border-radius: 12px;
@@ -252,6 +288,8 @@
       .stats-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
       .items-grid.two-col { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .command-grid { grid-template-columns: minmax(0, 1fr) minmax(320px, .7fr); }
+      .command-hero { grid-template-columns: minmax(0, 1fr) minmax(360px, .8fr); align-items:end; }
+      .command-quick-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
     }
   </style>
 </head>
@@ -276,16 +314,41 @@
     </div>
 
     <section class="section-card active" id="tab-overview">
+      <div class="command-hero" style="margin-bottom:14px">
+        <div>
+          <div class="command-hero-kicker">Admin Command Center</div>
+          <div class="command-hero-title">Control the whole pitch.</div>
+          <div class="section-sub" style="margin-top:10px">Search anything, review activity, manage archives, and keep Goalbazi safe before more users arrive.</div>
+        </div>
+        <div class="command-quick-grid">
+          <div class="command-quick-card">
+            <strong>Smart search</strong>
+            <span>Find athletes, teams, leagues, and arenas from one box.</span>
+          </div>
+          <div class="command-quick-card">
+            <strong>Audit trail</strong>
+            <span>See admin edits, approvals, deletes, and system actions.</span>
+          </div>
+          <div class="command-quick-card">
+            <strong>Private notes</strong>
+            <span>Store internal notes without showing them to athletes.</span>
+          </div>
+          <div class="command-quick-card">
+            <strong>Safer deletes</strong>
+            <span>Dangerous actions now ask for typed confirmation.</span>
+          </div>
+        </div>
+      </div>
       <div class="section-head">
         <div>
-          <div class="section-title">Platform overview</div>
-          <div class="section-sub">Quick totals across the platform.</div>
+          <div class="section-title">Live platform overview</div>
+          <div class="section-sub">Quick totals, active users, and pending decisions.</div>
         </div>
       </div>
       <div class="stats-grid" id="overview-stats"></div>
       <div class="command-grid">
         <div class="editor-card">
-          <div class="editor-title">Command search</div>
+          <div class="editor-title">Global command search</div>
           <div class="section-sub" style="margin-bottom:10px">Find any athlete, team, league, or arena from one box.</div>
           <form class="command-search" id="admin-search-form">
             <input id="admin-search-input" placeholder="Search users, teams, leagues, arenas..." autocomplete="off">
