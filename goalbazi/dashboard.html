@@ -330,6 +330,19 @@
     .notify-item { border: 1px solid var(--line); border-radius: 16px; background: rgba(255,255,255,.02); padding: 12px; }
     .notify-title { font-weight: 700; margin-bottom: 4px; }
     .growth-card { padding: 16px; background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%); border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: 16px; }
+    .quote-card {
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      margin-bottom: 16px;
+      background:
+        radial-gradient(circle at 12% 18%, rgba(127,255,69,.12), transparent 30%),
+        linear-gradient(135deg, rgba(255,255,255,.04), rgba(255,255,255,.015)),
+        var(--panel);
+    }
+    .quote-kicker { color: var(--brand); font-size: .72rem; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+    .quote-text { font-family: 'Syne', sans-serif; font-weight: 800; letter-spacing: -.04em; line-height: 1.1; font-size: clamp(1.2rem, 5vw, 1.75rem); margin-top: 8px; }
+    .quote-sub { color: var(--muted); font-size: .82rem; margin-top: 8px; }
     .badge-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
     .first-xi-badge { display: inline-flex; align-items: center; gap: 8px; border: 1px solid rgba(245,200,66,.26); background: rgba(245,200,66,.10); color: var(--warn); border-radius: 999px; padding: 7px 11px; font-weight: 800; font-size: .78rem; }
     .activity-dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:6px; background:var(--muted); box-shadow:0 0 0 3px rgba(255,255,255,.04); }
@@ -473,6 +486,7 @@
     </div>
 
     <div class="stats-grid-local" id="dash-stats"></div>
+    <div class="quote-card" id="quote-card"></div>
     <div class="growth-card" id="growth-card"></div>
 
     <div class="quick-actions">
@@ -857,6 +871,66 @@
     `;
   }
 
+  const goalbaziQuotes = [
+    "Your boots miss you. Stop ghosting the pitch.",
+    "One match away from your comeback season.",
+    "Group chat said yes. Attendance said maybe.",
+    "Hydrate first, nutmeg later.",
+    "No VAR today. Just vibes and questionable tackles.",
+    "Your left foot has filed a transfer request.",
+    "If you are late, bring the ball. That is the law.",
+    "A clean first touch is cheaper than therapy.",
+    "Sunday league legend loading.",
+    "No keeper? Congratulations, everyone is nervous.",
+    "The pitch is empty. The excuses are full.",
+    "Your stamina bar is asking for mercy.",
+    "Pass the ball. Main character arcs can wait.",
+    "Today feels like a 2 assist kind of day.",
+    "Defenders hate this one simple trick: movement.",
+    "If in doubt, blame the turf.",
+    "Your team needs you. Mostly because nobody else replied.",
+    "Come for football, stay for the post-match chai.",
+    "Every missed shot is just content.",
+    "The comeback starts when you stop scrolling.",
+    "Bring boots, bring water, leave the ego.",
+    "Prime form is only one booking away.",
+    "A good pass is a love language.",
+    "You cannot lose a match you never booked. But where is the fun?",
+    "Today’s mission: touch grass, literally.",
+    "Your captain is one cancellation away from madness.",
+    "No random slander. Earn the rating on the pitch.",
+    "Your pace stat wants a software update.",
+    "Warning: side effects may include confidence.",
+    "The bench is not a lifestyle.",
+    "A match a week keeps the excuses weak.",
+    "Dribble less if three people are shouting your name.",
+    "Your squad is not complete until someone says 'I know a guy'.",
+    "Friendly match until the first nutmeg.",
+    "The ball does not lie, but your fitness tracker might.",
+    "If the shot goes out, call it a cross.",
+    "You are not tired. You are in your training arc.",
+    "Good teams communicate. Great teams bring extra water.",
+    "Today’s forecast: light tackles, heavy banter.",
+    "Book the match before motivation expires."
+  ];
+
+  function quoteOfTheDay() {
+    // Daily rotation keeps the dashboard fresh without needing database storage.
+    const start = new Date(new Date().getFullYear(), 0, 0);
+    const diff = new Date() - start;
+    const day = Math.floor(diff / 86400000);
+    return goalbaziQuotes[day % goalbaziQuotes.length];
+  }
+
+  function renderQuoteCard() {
+    const quote = quoteOfTheDay();
+    document.getElementById("quote-card").innerHTML = `
+      <div class="quote-kicker">${window.GoalbaziTheme?.isGenz?.() ? "Daily pitch propaganda" : "Quote of the day"}</div>
+      <div class="quote-text">${esc(quote)}</div>
+      <div class="quote-sub">${window.GoalbaziTheme?.isGenz?.() ? "New quote tomorrow. Same hunger today." : "A small push to get your next match moving."}</div>
+    `;
+  }
+
   function renderTeamChallengeCard(data) {
     const hub = data.team_hub || {};
     const myTeam = hub.my_team;
@@ -1108,6 +1182,7 @@
     `;
 
     renderArenaResults(data.turfs);
+    renderQuoteCard();
     renderGrowthCard(data);
     renderTeamChallengeCard(data);
     document.getElementById("community-meta").textContent = `${data.community.friend_count} friends · ${data.community.message_count} messages`;
