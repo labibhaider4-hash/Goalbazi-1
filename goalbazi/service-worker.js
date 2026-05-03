@@ -1,4 +1,4 @@
-const CACHE_NAME = "goalbazi-pwa-v20";
+const CACHE_NAME = "goalbazi-pwa-v21";
 
 // Files that make the installed PWA open quickly and still show a useful page offline.
 const APP_SHELL = [
@@ -11,6 +11,11 @@ const APP_SHELL = [
   "/styles.css",
   "/nav.js",
   "/assets/goalbazi-logo.svg",
+  "/assets/icon-192.png",
+  "/assets/icon-512.png",
+  "/assets/maskable-icon-192.png",
+  "/assets/maskable-icon-512.png",
+  "/assets/apple-touch-icon.png",
   "/manifest.webmanifest"
 ];
 
@@ -85,8 +90,8 @@ self.addEventListener("push", event => {
   event.waitUntil(
     self.registration.showNotification(data.title || "Goalbazi", {
       body: data.body || "You have a new notification.",
-      icon: data.icon || "/assets/goalbazi-logo.svg",
-      badge: data.badge || "/assets/goalbazi-logo.svg",
+      icon: data.icon || "/assets/icon-192.png",
+      badge: data.badge || "/assets/maskable-icon-192.png",
       data: { url: data.url || "/dashboard" },
     })
   );
