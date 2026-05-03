@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<!--
+  Goalbazi Admin Panel
+  --------------------
+  Admin-only control room for athletes, teams, leagues, arenas, ratings, archives,
+  and notifications. Most actions call /api/admin/* routes in server.py.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Goalbazi Admin</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/goalbazi-logo.svg">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/assets/goalbazi-logo.svg">
+  <meta name="theme-color" content="#07110d">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Goalbazi">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #07110d;
+      --panel: #12201a;
+      --panel-2: #162721;
+      --line: rgba(255,255,255,.08);
+      --text: #eff7f3;
+      --muted: #8ba499;
+      --brand: #84f255;
+      --danger: #ff8569;
+      --warn: #ffd166;
+    }
+    html[data-theme="light"] {
+      --bg: #f6faf4;
+      --panel: #ffffff;
+      --panel-2: #eef5ee;
+      --line: rgba(18,54,31,.12);
+      --text: #163121;
+      --muted: #617c69;
+      --brand: #58b72f;
+      --danger: #d4553f;
+      --warn: #c8941f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Manrope", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(132,242,85,.12), transparent 30%),
+        linear-gradient(180deg, var(--bg) 0%, var(--panel-2) 100%);
+      overflow-x: hidden;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: -12%;
+      pointer-events: none;
+      z-index: 0;
+      opacity: .055;
+      transform: rotate(-7deg);
+      background:
+        linear-gradient(rgba(160,255,190,.12) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(160,255,190,.08) 1px, transparent 1px);
+      background-size: 74px 74px;
+      animation: adminPitchDrift 42s linear infinite;
+    }
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      opacity: .10;
+      background: radial-gradient(circle at 80% 16%, rgba(132,242,85,.12), transparent 34%);
+    }
+    @keyframes adminPitchDrift {
+      from { background-position: 0 0, 0 0; }
+      to { background-position: 148px 74px, 148px 74px; }
+    }
+    .shell { max-width: 1200px; margin: 0 auto; padding: 18px 14px 56px; }
+    .shell { position: relative; z-index: 1; }
+    .topbar { display: grid; gap: 12px; margin-bottom: 18px; }
+    .brand-card, .section-card, .editor-card, .item-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+    }
+    .brand-card { padding: 18px; }
+    .brand-name { font-size: 1.2rem; font-weight: 800; }
+    .brand-sub { color: var(--muted); font-size: .88rem; margin-top: 4px; }
+    .tab-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .tab-btn, .btn, .mini-btn {
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      font-family: inherit;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    .tab-btn { padding: 10px 12px; font-size: .85rem; }
+    .tab-btn.active { color: var(--brand); border-color: rgba(132,242,85,.28); }
+    .section-card { padding: 16px; display: none; }
+    .section-card.active { display: block; }
+    .section-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .section-title { font-size: 1.05rem; font-weight: 800; }
+    .section-sub { color: var(--muted); font-size: .84rem; }
+    .stats-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .stat-card { background: var(--panel-2); border: 1px solid var(--line); border-radius: 16px; padding: 14px; }
+    .stat-value { color: var(--brand); font-size: 1.5rem; font-weight: 800; }
+    .stat-label { color: var(--muted); font-size: .8rem; margin-top: 4px; }
+    .editor-card { padding: 14px; margin-bottom: 14px; }
+    .editor-title { font-weight: 800; margin-bottom: 12px; }
+    .form-grid { display: grid; gap: 10px; }
+    .form-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    input, select, textarea {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      padding: 11px 12px;
+      font-family: inherit;
+      font-size: .85rem;
+    }
+    textarea { min-height: 84px; resize: vertical; }
+    .btn { padding: 10px 14px; }
+    .btn.primary, .mini-btn.primary { color: var(--brand); border-color: rgba(132,242,85,.28); }
+    .btn.danger, .mini-btn.danger { color: var(--danger); }
+    .items-grid { display: grid; gap: 12px; }
+    .item-card { padding: 14px; }
+    .item-top { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+    .item-title { font-weight: 800; }
+    .item-meta { color: var(--muted); font-size: .8rem; }
+    .team-compact-card { padding: 0; overflow: hidden; }
+    .team-compact-header {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      text-align: left;
+      padding: 14px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+    }
+    .team-compact-header:hover { background: rgba(132,242,85,.07); }
+    .team-compact-actions { display:flex; flex-wrap:wrap; gap:8px; padding:0 14px 14px; }
+    .team-compact-card:not(.team-open) > .team-compact-actions { display:none; }
+    .team-compact-body { border-top:1px solid var(--line); padding:14px; }
+    .team-chevron { color:var(--muted); font-size:.78rem; font-weight:900; }
+    .team-compact-card > .team-form,
+    .team-compact-card > .divider,
+    .team-compact-card > .member-form,
+    .team-compact-card > .sub-items { display:none; }
+    .team-compact-card.team-open > .sub-items { display:grid; padding:0 14px 14px; }
+    .team-compact-card.team-editing > .team-form,
+    .team-compact-card.team-editing > .divider,
+    .team-compact-card.team-editing > .member-form,
+    .team-compact-card.team-editing > .sub-items { display:grid; padding:0 14px 14px; }
+    .team-compact-card.team-editing > .team-form { padding-top:14px; }
+    .team-compact-card.team-editing > .divider { display:block; padding:0; margin:14px; }
+    .team-compact-card.team-editing .team-form > .item-top { display:none; }
+    .team-compact-card:not(.team-editing) .member-edit-form .form-grid,
+    .team-compact-card:not(.team-editing) .member-edit-form .action-row { display:none; }
+    .action-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .mini-btn { padding: 8px 10px; font-size: .8rem; }
+    .sub-items { display: grid; gap: 8px; margin-top: 10px; }
+    .sub-item {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--panel-2);
+      padding: 10px;
+    }
+    .list-card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--panel-2);
+      overflow: hidden;
+    }
+    .list-row {
+      display: block;
+      width: 100%;
+      text-align: left;
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-family: inherit;
+      padding: 14px;
+      cursor: pointer;
+      border-bottom: 1px solid var(--line);
+    }
+    .list-row:last-child { border-bottom: none; }
+    .list-row:hover, .list-row.active { background: rgba(132,242,85,.08); }
+    .list-row-top { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+    .list-row-name { font-weight: 700; }
+    .list-row-sub { color: var(--muted); font-size: .8rem; margin-top: 4px; line-height: 1.5; }
+    .admin-athlete-main { display:flex; align-items:center; gap:12px; min-width:0; }
+    .admin-athlete-avatar {
+      width:44px;
+      height:44px;
+      border-radius:50%;
+      flex:0 0 auto;
+      display:grid;
+      place-items:center;
+      overflow:hidden;
+      border:1px solid rgba(127,255,69,.22);
+      background:linear-gradient(135deg, rgba(127,255,69,.95), rgba(61,232,160,.78));
+      color:#06110b;
+      font-weight:900;
+      letter-spacing:.02em;
+    }
+    .admin-athlete-avatar.large { width:54px; height:54px; }
+    .admin-athlete-avatar img { width:100%; height:100%; object-fit:cover; display:block; }
+    .player-editor-panel { margin-top: 14px; }
+    .divider { height: 1px; background: var(--line); margin: 14px 0; }
+    .hidden { display: none !important; }
+    .notify-list { display:grid; gap:10px; margin-top:14px; }
+    .notify-item { border:1px solid var(--line); border-radius:14px; padding:12px; background:var(--panel-2); }
+    .command-grid { display:grid; gap:12px; margin-top:14px; }
+    .command-search { display:flex; gap:8px; align-items:center; }
+    .command-search input { min-height:44px; }
+    .result-chip {
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:center;
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:11px 12px;
+      background:var(--panel-2);
+    }
+    .type-pill {
+      color:var(--brand);
+      border:1px solid rgba(132,242,85,.24);
+      border-radius:999px;
+      padding:4px 8px;
+      font-size:.72rem;
+      font-weight:900;
+      text-transform:uppercase;
+    }
+    .activity-row { display:grid; gap:5px; }
+    .activity-meta { color:var(--muted); font-size:.78rem; line-height:1.45; }
+    .danger-confirm { border-color:rgba(255,133,105,.32); }
+    .danger-confirm input { border-color:rgba(255,133,105,.28); }
+    @media (min-width: 900px) {
+      .shell { padding: 28px 24px 64px; }
+      .stats-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .items-grid.two-col { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .command-grid { grid-template-columns: minmax(0, 1fr) minmax(320px, .7fr); }
+    }
+  </style>
+</head>
+<body class="goalbazi-admin-bg">
+  <div class="shell">
+    <div class="topbar">
+      <div class="brand-card">
+        <div class="brand-name">Goalbazi Admin</div>
+        <div class="brand-sub">Manage athletes, leagues, teams, arenas, and ratings from one mobile-friendly control room.</div>
+      </div>
+      <div class="tab-row">
+        <button class="tab-btn" id="admin-theme-toggle" type="button" data-theme-toggle></button>
+        <button class="tab-btn active" data-tab="overview">Overview</button>
+        <button class="tab-btn" data-tab="users">Athletes</button>
+        <button class="tab-btn" data-tab="teams">Teams</button>
+        <button class="tab-btn" data-tab="leagues">Leagues</button>
+        <button class="tab-btn" data-tab="arenas">Arenas</button>
+        <button class="tab-btn" data-tab="ratings">Ratings</button>
+        <a class="tab-btn" href="/dashboard" style="text-decoration:none">Back to dashboard</a>
+        <button class="tab-btn" id="logout-btn">Log out</button>
+      </div>
+    </div>
+
+    <section class="section-card active" id="tab-overview">
+      <div class="section-head">
+        <div>
+          <div class="section-title">Platform overview</div>
+          <div class="section-sub">Quick totals across the platform.</div>
+        </div>
+      </div>
+      <div class="stats-grid" id="overview-stats"></div>
+      <div class="command-grid">
+        <div class="editor-card">
+          <div class="editor-title">Command search</div>
+          <div class="section-sub" style="margin-bottom:10px">Find any athlete, team, league, or arena from one box.</div>
+          <form class="command-search" id="admin-search-form">
+            <input id="admin-search-input" placeholder="Search users, teams, leagues, arenas..." autocomplete="off">
+            <button class="btn primary" type="submit">Search</button>
+          </form>
+          <div class="notify-list" id="admin-search-results"></div>
+        </div>
+        <div class="editor-card">
+          <div class="editor-title">Notifications</div>
+          <div class="notify-list" id="admin-notifications"></div>
+        </div>
+      </div>
+      <div class="editor-card">
+        <div class="editor-title">Recent admin activity</div>
+        <div class="section-sub" style="margin-bottom:12px">Audit trail for edits, deletes, approvals, and important system actions.</div>
+        <div class="notify-list" id="admin-activity-log"></div>
+      </div>
+    </section>
+
+    <section class="section-card" id="tab-users">
+      <div class="section-head">
+        <div>
+          <div class="section-title">Athletes</div>
+          <div class="section-sub">Edit every athlete attribute, including skill level, role, and avatar link.</div>
+        </div>
+      </div>
+      <div class="editor-card">
+        <div class="editor-title">Create athlete</div>
+        <form id="create-user-form" class="form-grid">
+          <div class="form-grid two">
+            <input name="name" placeholder="Name" required>
+            <input name="handle" placeholder="Handle" required>
+          </div>
+          <div class="form-grid two">
+            <input name="email" placeholder="Email" required>
+            <input name="password" placeholder="Password" required>
+          </div>
+          <div class="form-grid two">
+            <input name="location" placeholder="Location" value="Delhi NCR">
+            <select name="skill"><option>Beginner</option><option selected>Intermediate</option><option>Competitive</option></select>
+          </div>
+          <button class="btn primary" type="submit">Create athlete</button>
+        </form>
+      </div>
+      <div class="editor-card">
+        <div class="editor-title">Profile assessment requests</div>
+        <div class="section-sub" style="margin-bottom:12px">Athletes can request profile/stat edits. Nothing becomes public until you approve it.</div>
+        <div class="items-grid" id="profile-assessments-grid"></div>
+      </div>
+      <div class="items-grid two-col" id="users-grid"></div>
+    </section>
+
+    <section class="section-card" id="tab-teams">
+      <div class="section-head">
+        <div>
+          <div class="section-title">Teams</div>
+          <div class="section-sub">Create teams, upload logo links, and attach registered users as members.</div>
+        </div>
+      </div>
+      <div class="editor-card">
+        <div class="editor-title">Create team</div>
+        <form id="create-team-form" class="form-grid">
+          <div class="form-grid two">
+            <input name="name" placeholder="Team name" required>
+            <input name="short_name" placeholder="Short name">
+          </div>
+          <div class="form-grid two">
+            <input name="city" placeholder="City">
+            <select name="skill_level"><option>Beginner</option><option selected>Intermediate</option><option>Competitive</option></select>
+          </div>
+          <input name="logo_url" placeholder="Logo URL">
+          <textarea name="description" placeholder="Team description"></textarea>
+          <button class="btn primary" type="submit">Create team</button>
+        </form>
+      </div>
+      <div class="editor-card">
+        <div class="editor-title">Archived teams</div>
+        <div class="items-grid" id="archived-teams-grid"></div>
+      </div>
+      <div class="items-grid two-col" id="teams-grid"></div>
+    </section>
+
+    <section class="section-card" id="tab-leagues">
+      <div class="section-head">
+        <div>
+          <div class="section-title">Leagues</div>
+          <div class="section-sub">Create, edit, and delete leagues. Add teams and control league tables from here.</div>
+        </div>
+      </div>
+      <div class="editor-card">
+        <div class="editor-title">Create league</div>
+        <form id="create-league-form" class="form-grid">
+          <div class="form-grid two">
+            <input name="name" placeholder="League name" required>
+            <input name="city" placeholder="City" value="Delhi NCR">
+          </div>
+          <div class="form-grid two">
+            <input name="season" placeholder="Season" value="2026">
+            <select name="format"><option>5v5</option><option>7v7</option><option>11v11</option></select>
+          </div>
+          <div class="form-grid two">
+            <input name="stage" placeholder="Stage" value="Registration">
+            <select name="status"><option>Open</option><option>Live</option><option>Completed</option></select>
+          </div>
+          <input name="banner_url" placeholder="Banner URL">
+          <textarea name="description" placeholder="League description"></textarea>
+          <button class="btn primary" type="submit">Create league</button>
+        </form>
+      </div>
+      <div class="items-grid" id="leagues-grid"></div>
+    </section>
+
+    <section class="section-card" id="tab-arenas">
+      <div class="section-head">
+        <div>
+          <div class="section-title">Arenas</div>
+          <div class="section-sub">Create and update arena details, pricing, ownership, and location.</div>
+        </div>
+      </div>
+      <div class="editor-card">
+        <div class="editor-title">Create arena</div>
+        <form id="create-arena-form" class="form-grid">
+          <div class="form-grid two">
+            <input name="name" placeholder="Arena name" required>
+            <input name="area" placeholder="Area" required>
+          </div>
+          <div class="form-grid two">
+            <select name="surface"><option>Astroturf</option><option>Natural grass</option><option>Hybrid</option><option>Concrete</option></select>
+            <input name="distance_km" type="number" step="0.1" placeholder="Distance km">
+          </div>
+          <div class="form-grid two">
+            <input name="price_per_hour" type="number" placeholder="Price per hour">
+            <input name="rating" type="number" step="0.1" min="1" max="5" placeholder="Rating">
+          </div>
+          <div class="form-grid two">
+            <input name="latitude" placeholder="Latitude">
+            <input name="longitude" placeholder="Longitude">
+          </div>
+          <input name="upi_id" placeholder="UPI ID">
+          <input name="map_link" placeholder="Map link">
+          <textarea name="description" placeholder="Arena description"></textarea>
+          <textarea name="image_urls" placeholder="Arena image links, one per line"></textarea>
+          <button class="btn primary" type="submit">Create arena</button>
+        </form>
+      </div>
+      <div class="editor-card">
+        <div class="editor-title">Archived arenas</div>
+        <div class="items-grid" id="archived-arenas-grid"></div>
+      </div>
+      <div class="items-grid two-col" id="arenas-grid"></div>
+    </section>
+
+    <section class="section-card" id="tab-ratings">
+      <div class="section-head">
+        <div>
+          <div class="section-title">Ratings</div>
+          <div class="section-sub">See who rated whom across both match-based and community ratings.</div>
+        </div>
+      </div>
+      <div class="items-grid" id="ratings-grid"></div>
+    </section>
+  </div>
+
+  <script src="/nav.js"></script>
+  <script>
+    // Admin page script map:
+    // 1. Load data for each tab from /api/admin/*
+    // 2. Render editable cards/forms for each entity
+    // 3. Archive/restore/delete teams and arenas safely
+    // 4. Keep related sections refreshed after every save/delete
+    GoalbaziTheme.attachButton(document.getElementById("admin-theme-toggle"));
+
+    const state = {
+      users: [],
+      teams: [],
+      archivedTeams: [],
+      memberships: [],
+      leagueTeams: [],
+      leagues: [],
+      ratings: [],
+      arenas: [],
+      archivedArenas: [],
+      playersForTeams: [],
+      profileAssessments: [],
+      activity: [],
+      searchResults: [],
+      activeTab: "overview",
+      selectedUserId: null,
+      expandedTeamId: null,
+      editingTeamId: null,
+    };
+
+    function esc(value = "") {
+      return String(value).replace(/[&<>"']/g, ch => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[ch]));
+    }
+
+    function adminAthleteAvatar(user, large = false) {
+      // Admin athlete lists show real profile photos first, then initials as a clean fallback.
+      const initials = (user.name || "?").split(" ").map(part => part[0]).slice(0, 2).join("").toUpperCase();
+      const sizeClass = large ? " large" : "";
+      return user.avatar_base64
+        ? `<div class="admin-athlete-avatar${sizeClass}"><img src="${esc(user.avatar_base64)}" alt="${esc(user.name)}"></div>`
+        : `<div class="admin-athlete-avatar${sizeClass}">${esc(initials)}</div>`;
+    }
+
+    async function api(path, options = {}) {
+      const res = await fetch(path, {
+        headers: { "Content-Type": "application/json" },
+        ...options,
+      });
+      if (res.status === 401) { window.location.href = "/login"; return null; }
+      if (res.status === 403) {
+        document.body.innerHTML = '<div style="padding:28px;color:#ff8569;font-family:Manrope,sans-serif">Access denied. Admin only.</div>';
+        return null;
+      }
+      const text = await res.text();
+      const body = text ? JSON.parse(text) : {};
+      if (!res.ok) throw new Error(body.error || "Request failed");
+      return body;
+    }
+
+    function formObject(form) {
+      return Object.fromEntries(new FormData(form).entries());
+    }
+
+    function toast(message) {
+      let el = document.getElementById("toast");
+      if (!el) {
+        el = document.createElement("div");
+        el.id = "toast";
+        el.style.cssText = "position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--line);color:var(--text);padding:11px 14px;border-radius:12px;z-index:999;opacity:0;transition:.2s";
+        document.body.appendChild(el);
+      }
+      el.textContent = message;
+      el.style.opacity = "1";
+      clearTimeout(toast._t);
+      toast._t = setTimeout(() => el.style.opacity = "0", 2400);
+    }
+
+    function formatDate(value) {
+      if (!value) return "Unknown time";
+      return String(value).replace("T", " ").slice(0, 16);
+    }
+
+    function eventLabel(type = "") {
+      return String(type).replace(/^admin_/, "").replaceAll("_", " ");
+    }
+
+    function renderActivity(items, targetId = "admin-activity-log") {
+      // The admin activity log is the audit trail: every important action has actor, route, and time.
+      const target = document.getElementById(targetId);
+      if (!target) return;
+      target.innerHTML = items.length ? items.map(item => `
+        <div class="notify-item activity-row">
+          <div class="item-title">${esc(eventLabel(item.event_type))}</div>
+          <div class="activity-meta">By ${esc(item.actor || "System")} &middot; ${esc(formatDate(item.created_at))}</div>
+          <div class="activity-meta">${esc(item.path || "")}</div>
+        </div>
+      `).join("") : `<div class="item-meta">No activity recorded yet.</div>`;
+    }
+
+    function requireTypedConfirm(label, phrase) {
+      // Dangerous actions require typed confirmation so admins do not delete live data by accident.
+      const answer = prompt(`${label}\n\nType ${phrase} to confirm.`);
+      return answer === phrase;
+    }
+
+    async function loadOverview() {
+      const data = await api("/api/admin/overview");
+      if (!data) return;
+      document.getElementById("overview-stats").innerHTML = data.stats.map(stat => `
+        <div class="stat-card">
+          <div class="stat-value">${stat.value}</div>
+          <div class="stat-label">${esc(stat.label)}</div>
+        </div>
+      `).join("");
+      state.activity = data.recent_activity || [];
+      renderActivity(state.activity);
+      const notifyData = await api("/api/notifications");
+      document.getElementById("admin-notifications").innerHTML = (notifyData?.notifications || []).length
+        ? notifyData.notifications.map(item => `
+          <div class="notify-item">
+            <div class="item-title">${esc(item.title)}</div>
+            <div class="item-meta">${esc(item.message)}</div>
+          </div>
+        `).join("")
+        : `<div class="item-meta">No notifications right now.</div>`;
+    }
+
+    async function runAdminSearch(term) {
+      const q = String(term || "").trim();
+      const target = document.getElementById("admin-search-results");
+      if (q.length < 2) {
+        target.innerHTML = `<div class="item-meta">Type at least 2 letters to search.</div>`;
+        return;
+      }
+      const data = await api(`/api/admin/search?q=${encodeURIComponent(q)}`);
+      state.searchResults = data?.results || [];
+      target.innerHTML = state.searchResults.length ? state.searchResults.map(item => `
+        <div class="result-chip">
+          <div>
+            <div class="item-title">${esc(item.name)}</div>
+            <div class="item-meta">${esc(item.meta || "")} ${item.subtext ? "&middot; " + esc(item.subtext) : ""}</div>
+          </div>
+          <span class="type-pill">${esc(item.type)}</span>
+        </div>
+      `).join("") : `<div class="item-meta">No matching result.</div>`;
+    }
+
+    async function loadUsers() {
+      const data = await api("/api/admin/users");
+      if (!data) return;
+      state.users = data.users || [];
+      const assessmentData = await api("/api/admin/profile-assessments");
+      state.profileAssessments = assessmentData?.pending || [];
+      if (!state.selectedUserId && state.users.length) state.selectedUserId = state.users[0].id;
+      if (state.selectedUserId && !state.users.find(user => user.id === state.selectedUserId)) {
+        state.selectedUserId = state.users.length ? state.users[0].id : null;
+      }
+      renderUsersPanel();
+    }
+
+    function renderUsersPanel() {
+      const selectedUser = state.users.find(user => user.id === state.selectedUserId);
+      renderProfileAssessments();
+      document.getElementById("users-grid").innerHTML = `
+        <div class="list-card">
+          ${state.users.map(user => `
+            <button class="list-row ${user.id === state.selectedUserId ? "active" : ""}" type="button" onclick="selectUser(${user.id})">
+              <div class="admin-athlete-main">
+                ${adminAthleteAvatar(user)}
+                <div style="min-width:0;flex:1">
+                  <div class="list-row-top">
+                <div class="list-row-name">${esc(user.name)}</div>
+                <div class="item-meta">${user.is_admin ? "Admin" : "Athlete"}</div>
+                  </div>
+                  <div class="list-row-sub">${esc(`@${user.handle}`)} - ${esc(user.location)} - ${esc(user.team_name || "No team")}</div>
+                  <div class="list-row-sub">${esc((user.activity_status || {}).label || "Offline")}</div>
+                </div>
+              </div>
+            </button>
+          `).join("") || `<div class="item-card"><div class="item-meta">No athletes yet.</div></div>`}
+        </div>
+        <div class="player-editor-panel">
+          ${selectedUser ? `
+            <form class="item-card user-form" data-id="${selectedUser.id}">
+              <div class="item-top">
+                <div class="admin-athlete-main">
+                  ${adminAthleteAvatar(selectedUser, true)}
+                  <div>
+                  <div class="item-title">Edit ${esc(selectedUser.name)}</div>
+                  <div class="item-meta">${esc(selectedUser.team_name || "No team")} - ${selectedUser.is_admin ? "Admin" : "Athlete"}</div>
+                  </div>
+                </div>
+              </div>
+              <div class="form-grid">
+                <div class="form-grid two">
+                  <input name="name" value="${esc(selectedUser.name)}">
+                  <input name="handle" value="${esc(selectedUser.handle)}">
+                </div>
+                <div class="form-grid two">
+                  <input name="email" value="${esc(selectedUser.email)}">
+                  <input name="location" value="${esc(selectedUser.location)}">
+                </div>
+                <div class="form-grid two">
+                  <input name="position" value="${esc(selectedUser.position || "")}">
+                  <input name="secondary_position" value="${esc(selectedUser.secondary_position || "")}" placeholder="Secondary position">
+                </div>
+                <div class="form-grid two">
+                  <input name="preferred_format" value="${esc(selectedUser.preferred_format || "")}">
+                  <input name="skill" value="${esc(selectedUser.skill || "")}">
+                </div>
+                <div class="form-grid two">
+                  <input name="strong_foot" value="${esc(selectedUser.strong_foot || "")}" placeholder="Strong foot">
+                  <input name="availability" value="${esc(selectedUser.availability || "")}" placeholder="Availability">
+                </div>
+                <div class="form-grid two">
+                  <input name="pace" type="number" min="1" max="100" value="${esc(selectedUser.pace || 50)}" placeholder="Pace">
+                  <input name="shooting" type="number" min="1" max="100" value="${esc(selectedUser.shooting || 50)}" placeholder="Shooting">
+                </div>
+                <div class="form-grid two">
+                  <input name="passing" type="number" min="1" max="100" value="${esc(selectedUser.passing || 50)}" placeholder="Passing">
+                  <input name="dribbling" type="number" min="1" max="100" value="${esc(selectedUser.dribbling || 50)}" placeholder="Dribbling">
+                </div>
+                <div class="form-grid two">
+                  <input name="defending" type="number" min="1" max="100" value="${esc(selectedUser.defending || 50)}" placeholder="Defending">
+                  <input name="physical" type="number" min="1" max="100" value="${esc(selectedUser.physical || 50)}" placeholder="Physical">
+                </div>
+                <div class="form-grid two">
+                  <input name="avatar_base64" value="${esc(selectedUser.avatar_base64 || "")}" placeholder="Avatar image URL or base64">
+                </div>
+                <textarea name="bio">${esc(selectedUser.bio || "")}</textarea>
+                <textarea name="admin_note" placeholder="Private admin note">${esc(selectedUser.admin_note || "")}</textarea>
+                <label style="display:flex;gap:8px;align-items:center"><input name="is_admin" type="checkbox" ${selectedUser.is_admin ? "checked" : ""} style="width:auto"> Admin access</label>
+                <div class="action-row">
+                  <button class="mini-btn primary" type="submit">Save athlete</button>
+                  <button class="mini-btn danger" type="button" onclick="deleteUser(${selectedUser.id})">Delete athlete</button>
+                </div>
+              </div>
+            </form>
+          ` : `<div class="item-card"><div class="item-meta">Select an athlete from the list to edit their attributes.</div></div>`}
+        </div>
+      `;
+
+      const form = document.querySelector(".user-form");
+      if (form) {
+        form.addEventListener("submit", async event => {
+          event.preventDefault();
+          const userId = form.dataset.id;
+          const data = formObject(form);
+          data.is_admin = form.querySelector('[name="is_admin"]').checked;
+          data.handle = (data.handle || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+          await api(`/api/admin/users/${userId}`, { method: "PUT", body: JSON.stringify(data) });
+          toast("Athlete updated");
+          await loadUsers();
+        });
+      }
+    }
+
+    function renderProfileAssessments() {
+      const target = document.getElementById("profile-assessments-grid");
+      if (!target) return;
+      const fields = ["position", "secondary_position", "skill", "strong_foot", "availability", "pace", "shooting", "passing", "dribbling", "defending", "physical"];
+      target.innerHTML = state.profileAssessments.length
+        ? state.profileAssessments.map(item => {
+            const payload = item.requested_payload || {};
+            const summary = fields
+              .filter(field => payload[field] !== undefined && payload[field] !== "")
+              .map(field => `${field.replace("_", " ")}: ${payload[field]}`)
+              .join(" · ");
+            return `
+              <div class="item-card">
+                <div class="item-top">
+                  <div>
+                    <div class="item-title">${esc(item.name)} wants profile approval</div>
+                    <div class="item-meta">${esc(item.handle_display || `@${item.handle}`)} · ${esc(item.email)}</div>
+                  </div>
+                </div>
+                <div class="item-meta" style="margin:8px 0">${esc(summary || "Basic profile details requested")}</div>
+                <div class="action-row">
+                  <button class="mini-btn primary" type="button" onclick="approveProfileAssessment(${item.id})">Approve</button>
+                  <button class="mini-btn danger" type="button" onclick="rejectProfileAssessment(${item.id})">Reject</button>
+                </div>
+              </div>
+            `;
+          }).join("")
+        : `<div class="item-card"><div class="item-meta">No profile requests waiting right now.</div></div>`;
+    }
+
+    async function approveProfileAssessment(id) {
+      await api(`/api/admin/profile-assessments/${id}/approve`, { method: "POST", body: JSON.stringify({}) });
+      toast("Profile request approved");
+      await loadUsers();
+    }
+
+    async function rejectProfileAssessment(id) {
+      const adminNote = prompt("Optional note for this rejection") || "";
+      await api(`/api/admin/profile-assessments/${id}/reject`, { method: "POST", body: JSON.stringify({ admin_note: adminNote }) });
+      toast("Profile request rejected");
+      await loadUsers();
+    }
+
+    function selectUser(userId) {
+      state.selectedUserId = userId;
+      renderUsersPanel();
+    }
+
+    async function deleteUser(userId) {
+      if (!requireTypedConfirm("Delete this athlete and related private data?", "DELETE ATHLETE")) return;
+      await api(`/api/admin/users/${userId}`, { method: "DELETE" });
+      toast("Athlete deleted");
+      await Promise.all([loadUsers(), loadOverview(), loadTeams()]);
+    }
+
+    async function loadTeams() {
+      const data = await api("/api/admin/teams");
+      if (!data) return;
+      state.teams = data.teams || [];
+      state.archivedTeams = data.archived_teams || [];
+      state.memberships = data.memberships || [];
+      state.playersForTeams = data.players || [];
+      document.getElementById("teams-grid").innerHTML = state.teams.map(team => {
+        const teamMembers = state.memberships.filter(member => member.team_id === team.id);
+        const availableOptions = state.playersForTeams.map(player => `<option value="${player.id}">${esc(player.name)}${player.team_name ? ` (${esc(player.team_name)})` : ""}</option>`).join("");
+        return `
+          <div class="item-card">
+            <form class="team-form" data-id="${team.id}">
+              <div class="item-top">
+                <div>
+                  <div class="item-title">${esc(team.name)}</div>
+                  <div class="item-meta">${esc(team.city)} · ${team.member_count} athletes</div>
+                </div>
+              </div>
+              <div class="form-grid">
+                <div class="form-grid two">
+                  <input name="name" value="${esc(team.name)}">
+                  <input name="short_name" value="${esc(team.short_name || "")}">
+                </div>
+                <div class="form-grid two">
+                  <input name="city" value="${esc(team.city || "")}">
+                  <input name="skill_level" value="${esc(team.skill_level || "")}">
+                </div>
+                <input name="logo_url" value="${esc(team.logo_url || "")}" placeholder="Logo URL">
+                <textarea name="description">${esc(team.description || "")}</textarea>
+                <textarea name="admin_note" placeholder="Private admin note">${esc(team.admin_note || "")}</textarea>
+                <div class="action-row">
+                  <button class="mini-btn primary" type="submit">Save team</button>
+                  <button class="mini-btn danger" type="button" onclick="deleteTeam(${team.id})">Delete team</button>
+                </div>
+              </div>
+            </form>
+            <div class="divider"></div>
+            <form class="member-form" data-team-id="${team.id}">
+              <div class="editor-title">Add athlete</div>
+              <div class="form-grid two">
+                <select name="user_id">${availableOptions}</select>
+                <input name="role" placeholder="Role" value="Athlete">
+              </div>
+              <input name="jersey_number" placeholder="Jersey number">
+              <div class="action-row"><button class="mini-btn primary" type="submit">Add to team</button></div>
+            </form>
+            <div class="sub-items">
+              ${teamMembers.map(member => `
+                <form class="sub-item member-edit-form" data-id="${member.id}">
+                  <div class="item-title">${esc(member.user_name)}</div>
+                  <div class="form-grid two" style="margin-top:8px">
+                    <input name="role" value="${esc(member.role || "")}">
+                    <input name="jersey_number" value="${esc(member.jersey_number || "")}">
+                  </div>
+                  <div class="action-row">
+                    <button class="mini-btn primary" type="submit">Save</button>
+                    <button class="mini-btn danger" type="button" onclick="deleteMembership(${member.id})">Remove</button>
+                  </div>
+                </form>
+              `).join("") || `<div class="item-meta">No athletes in this team yet.</div>`}
+            </div>
+          </div>
+        `;
+      }).join("");
+      setupTeamCollapse();
+      document.getElementById("archived-teams-grid").innerHTML = state.archivedTeams.length ? state.archivedTeams.map(team => `
+        <div class="item-card">
+          <div class="item-top">
+            <div>
+              <div class="item-title">${esc(team.name)}</div>
+              <div class="item-meta">${esc(team.city || "No city")} · archived</div>
+            </div>
+          </div>
+          <div class="action-row">
+            <button class="mini-btn primary" type="button" onclick="restoreTeam(${team.id})">Restore</button>
+            <button class="mini-btn danger" type="button" onclick="permanentlyDeleteTeam(${team.id})">Delete permanently</button>
+          </div>
+        </div>
+      `).join("") : `<div class="item-meta">No archived teams.</div>`;
+
+      document.querySelectorAll(".team-form").forEach(form => form.addEventListener("submit", async event => {
+        event.preventDefault();
+        await api(`/api/admin/teams/${form.dataset.id}`, { method: "PUT", body: JSON.stringify(formObject(form)) });
+        toast("Team updated");
+        await loadTeams();
+      }));
+
+      document.querySelectorAll(".member-form").forEach(form => form.addEventListener("submit", async event => {
+        event.preventDefault();
+        await api(`/api/admin/teams/${form.dataset.teamId}/members`, { method: "POST", body: JSON.stringify(formObject(form)) });
+        toast("Athlete added to team");
+        await Promise.all([loadTeams(), loadUsers()]);
+      }));
+
+      document.querySelectorAll(".member-edit-form").forEach(form => form.addEventListener("submit", async event => {
+        event.preventDefault();
+        await api(`/api/admin/team-memberships/${form.dataset.id}`, { method: "PUT", body: JSON.stringify(formObject(form)) });
+        toast("Team member updated");
+        await loadTeams();
+      }));
+    }
+
+    function setupTeamCollapse() {
+      // Teams start as compact name cards; expanding reveals members and the edit action.
+      document.querySelectorAll("#teams-grid > .item-card").forEach(card => {
+        const form = card.querySelector(".team-form");
+        if (!form || card.dataset.compactReady === "1") return;
+        const teamId = Number(form.dataset.id);
+        const top = form.querySelector(".item-top");
+        card.dataset.compactReady = "1";
+        card.dataset.teamId = String(teamId);
+        card.classList.add("team-compact-card");
+        const header = document.createElement("button");
+        header.type = "button";
+        header.className = "team-compact-header";
+        header.innerHTML = `
+          <div>${top ? top.innerHTML : `<div class="item-title">Team</div>`}</div>
+          <div class="team-chevron" data-team-chevron>${state.expandedTeamId === teamId ? "Hide" : "Open"}</div>
+        `;
+        header.addEventListener("click", () => toggleTeamCard(teamId));
+        const actions = document.createElement("div");
+        actions.className = "team-compact-actions";
+        actions.innerHTML = `
+          <button class="mini-btn primary" type="button" data-team-edit>${state.editingTeamId === teamId ? "Close edit" : "Edit"}</button>
+          <button class="mini-btn danger" type="button" onclick="deleteTeam(${teamId})">Delete team</button>
+        `;
+        actions.querySelector("[data-team-edit]").addEventListener("click", () => editTeamCard(teamId));
+        card.insertBefore(actions, form);
+        card.insertBefore(header, actions);
+      });
+      applyTeamCardState();
+    }
+
+    function applyTeamCardState() {
+      document.querySelectorAll("#teams-grid > .team-compact-card").forEach(card => {
+        const teamId = Number(card.dataset.teamId);
+        const isOpen = state.expandedTeamId === teamId;
+        const isEditing = state.editingTeamId === teamId;
+        card.classList.toggle("team-open", isOpen);
+        card.classList.toggle("team-editing", isEditing);
+        const chevron = card.querySelector("[data-team-chevron]");
+        const editButton = card.querySelector("[data-team-edit]");
+        if (chevron) chevron.textContent = isOpen ? "Hide" : "Open";
+        if (editButton) editButton.textContent = isEditing ? "Close edit" : "Edit";
+      });
+    }
+
+    function toggleTeamCard(teamId) {
+      state.expandedTeamId = state.expandedTeamId === teamId ? null : teamId;
+      if (state.expandedTeamId !== teamId) state.editingTeamId = null;
+      applyTeamCardState();
+    }
+
+    function editTeamCard(teamId) {
+      state.expandedTeamId = teamId;
+      state.editingTeamId = state.editingTeamId === teamId ? null : teamId;
+      applyTeamCardState();
+    }
+
+    async function deleteTeam(teamId) {
+      if (!confirm("Archive this team? You can restore it later from Archived teams.")) return;
+      await api(`/api/admin/teams/${teamId}`, { method: "DELETE" });
+      toast("Team archived");
+      await Promise.all([loadTeams(), loadLeagues(), loadUsers()]);
+    }
+
+    async function restoreTeam(teamId) {
+      await api(`/api/admin/teams/${teamId}/restore`, { method: "POST" });
+      toast("Team restored");
+      await Promise.all([loadTeams(), loadLeagues(), loadUsers()]);
+    }
+
+    async function permanentlyDeleteTeam(teamId) {
+      if (!requireTypedConfirm("Delete this archived team permanently? This cannot be undone.", "DELETE TEAM")) return;
+      await api(`/api/admin/teams/${teamId}/permanent-delete`, { method: "DELETE" });
+      toast("Team permanently deleted");
+      await Promise.all([loadTeams(), loadLeagues(), loadUsers()]);
+    }
+
+    async function deleteMembership(id) {
+      await api(`/api/admin/team-memberships/${id}`, { method: "DELETE" });
+      toast("Athlete removed from team");
+      await Promise.all([loadTeams(), loadUsers()]);
+    }
+
+    async function loadLeagues() {
+      const data = await api("/api/admin/leagues");
+      if (!data) return;
+      state.leagues = data.leagues || [];
+      state.teams = data.teams || state.teams;
+      document.getElementById("leagues-grid").innerHTML = state.leagues.map(league => `
+        <div class="item-card">
+          <form class="league-form" data-id="${league.id}">
+            <div class="item-top">
+              <div>
+                <div class="item-title">${esc(league.name)}</div>
+                <div class="item-meta">${esc(league.city || "Delhi NCR")} · ${league.team_count || 0} teams</div>
+              </div>
+            </div>
+            <div class="form-grid">
+              <div class="form-grid two">
+                <input name="name" value="${esc(league.name)}">
+                <input name="city" value="${esc(league.city || "")}">
+              </div>
+              <div class="form-grid two">
+                <input name="season" value="${esc(league.season || "")}">
+                <input name="format" value="${esc(league.format || "")}">
+              </div>
+              <div class="form-grid two">
+                <input name="stage" value="${esc(league.stage || "")}">
+                <input name="status" value="${esc(league.status || "")}">
+              </div>
+              <input name="banner_url" value="${esc(league.banner_url || "")}" placeholder="Banner URL">
+              <textarea name="description">${esc(league.description || "")}</textarea>
+              <textarea name="admin_note" placeholder="Private admin note">${esc(league.admin_note || "")}</textarea>
+              <div class="action-row">
+                <button class="mini-btn primary" type="submit">Save league</button>
+                <button class="mini-btn danger" type="button" onclick="deleteLeague(${league.id})">Delete league</button>
+              </div>
+            </div>
+          </form>
+          <div class="divider"></div>
+          <form class="league-team-form" data-league-id="${league.id}">
+            <div class="editor-title">Add team to league</div>
+            <div class="form-grid two">
+              <select name="team_id">${state.teams.map(team => `<option value="${team.id}">${esc(team.name)}</option>`).join("")}</select>
+              <input name="rank" type="number" placeholder="Rank" value="0">
+            </div>
+            <div class="form-grid two">
+              <input name="played" type="number" placeholder="Played" value="0">
+              <input name="won" type="number" placeholder="Won" value="0">
+            </div>
+            <div class="form-grid two">
+              <input name="drawn" type="number" placeholder="Drawn" value="0">
+              <input name="lost" type="number" placeholder="Lost" value="0">
+            </div>
+            <div class="form-grid two">
+              <input name="goals_for" type="number" placeholder="Goals for" value="0">
+              <input name="goals_against" type="number" placeholder="Goals against" value="0">
+            </div>
+            <div class="form-grid two">
+              <input name="points" type="number" placeholder="Points" value="0">
+              <input name="form" placeholder="Form e.g. W,W,L">
+            </div>
+            <input name="notes" placeholder="Notes">
+            <div class="action-row"><button class="mini-btn primary" type="submit">Add league team</button></div>
+          </form>
+          <div class="sub-items">
+            ${(league.teams || []).map(team => `
+              <form class="sub-item league-team-edit-form" data-id="${team.id}">
+                <div class="item-title">${esc(team.team_name)}</div>
+                <div class="form-grid two" style="margin-top:8px">
+                  <input name="rank" type="number" value="${team.rank}">
+                  <input name="points" type="number" value="${team.points}">
+                </div>
+                <div class="form-grid two">
+                  <input name="played" type="number" value="${team.played}">
+                  <input name="won" type="number" value="${team.won}">
+                </div>
+                <div class="form-grid two">
+                  <input name="drawn" type="number" value="${team.drawn}">
+                  <input name="lost" type="number" value="${team.lost}">
+                </div>
+                <div class="form-grid two">
+                  <input name="goals_for" type="number" value="${team.goals_for}">
+                  <input name="goals_against" type="number" value="${team.goals_against}">
+                </div>
+                <input name="form" value="${esc(team.form || "")}">
+                <input name="notes" value="${esc(team.notes || "")}">
+                <div class="action-row">
+                  <button class="mini-btn primary" type="submit">Save</button>
+                  <button class="mini-btn danger" type="button" onclick="deleteLeagueTeam(${team.id})">Remove</button>
+                </div>
+              </form>
+            `).join("") || `<div class="item-meta">No teams added to this league yet.</div>`}
+          </div>
+        </div>
+      `).join("");
+
+      document.querySelectorAll(".league-form").forEach(form => form.addEventListener("submit", async event => {
+        event.preventDefault();
+        await api(`/api/admin/leagues/${form.dataset.id}`, { method: "PUT", body: JSON.stringify(formObject(form)) });
+        toast("League updated");
+        await loadLeagues();
+      }));
+
+      document.querySelectorAll(".league-team-form").forEach(form => form.addEventListener("submit", async event => {
+        event.preventDefault();
+        await api(`/api/admin/leagues/${form.dataset.leagueId}/teams`, { method: "POST", body: JSON.stringify(formObject(form)) });
+        toast("Team added to league");
+        await loadLeagues();
+      }));
+
+      document.querySelectorAll(".league-team-edit-form").forEach(form => form.addEventListener("submit", async event => {
+        event.preventDefault();
+        await api(`/api/admin/league-teams/${form.dataset.id}`, { method: "PUT", body: JSON.stringify(formObject(form)) });
+        toast("League table updated");
+        await loadLeagues();
+      }));
+    }
+
+    async function deleteLeague(leagueId) {
+      if (!requireTypedConfirm("Archive this league?", "DELETE LEAGUE")) return;
+      await api(`/api/admin/leagues/${leagueId}`, { method: "DELETE" });
+      toast("League deleted");
+      await Promise.all([loadLeagues(), loadOverview()]);
+    }
+
+    async function deleteLeagueTeam(id) {
+      await api(`/api/admin/league-teams/${id}`, { method: "DELETE" });
+      toast("League team removed");
+      await loadLeagues();
+    }
+
+    async function loadArenas() {
+      const data = await api("/api/admin/turfs");
+      if (!data) return;
+      state.arenas = data.turfs || [];
+      state.archivedArenas = data.archived_turfs || [];
+      document.getElementById("arenas-grid").innerHTML = state.arenas.map(arena => `
+        <form class="item-card arena-form" data-id="${arena.id}">
+          <div class="item-top">
+            <div>
+              <div class="item-title">${esc(arena.name)}</div>
+              <div class="item-meta">${esc(arena.area)} · ${esc(arena.surface)}</div>
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="form-grid two">
+              <input name="name" value="${esc(arena.name)}">
+              <input name="area" value="${esc(arena.area)}">
+            </div>
+            <div class="form-grid two">
+              <input name="surface" value="${esc(arena.surface)}">
+              <input name="distance_km" type="number" step="0.1" value="${esc(arena.distance_km)}">
+            </div>
+            <div class="form-grid two">
+              <input name="price_per_hour" type="number" value="${esc(arena.price_per_hour)}">
+              <input name="rating" type="number" step="0.1" min="1" max="5" value="${esc(arena.rating)}">
+            </div>
+            <div class="form-grid two">
+              <input name="latitude" value="${esc(arena.latitude || "")}">
+              <input name="longitude" value="${esc(arena.longitude || "")}">
+            </div>
+            <input name="upi_id" value="${esc(arena.upi_id || "")}">
+            <input name="map_link" value="${esc(arena.map_link || "")}">
+            <textarea name="description">${esc(arena.description || "")}</textarea>
+            <textarea name="image_urls">${esc((arena.image_urls || []).join("\n"))}</textarea>
+            <textarea name="admin_note" placeholder="Private admin note">${esc(arena.admin_note || "")}</textarea>
+            <div class="action-row">
+              <button class="mini-btn primary" type="submit">Save arena</button>
+              <button class="mini-btn danger" type="button" onclick="deleteArena(${arena.id})">Delete arena</button>
+            </div>
+          </div>
+        </form>
+      `).join("");
+
+      document.querySelectorAll(".arena-form").forEach(form => form.addEventListener("submit", async event => {
+        event.preventDefault();
+        await api(`/api/admin/turfs/${form.dataset.id}`, { method: "PUT", body: JSON.stringify(formObject(form)) });
+        toast("Arena updated");
+        await loadArenas();
+      }));
+
+      document.getElementById("archived-arenas-grid").innerHTML = state.archivedArenas.length ? state.archivedArenas.map(arena => `
+        <div class="item-card">
+          <div class="item-top">
+            <div>
+              <div class="item-title">${esc(arena.name)}</div>
+              <div class="item-meta">${esc(arena.area || "No area")} · archived</div>
+            </div>
+          </div>
+          <div class="action-row">
+            <button class="mini-btn primary" type="button" onclick="restoreArena(${arena.id})">Restore</button>
+            <button class="mini-btn danger" type="button" onclick="permanentlyDeleteArena(${arena.id})">Delete permanently</button>
+          </div>
+        </div>
+      `).join("") : `<div class="item-meta">No archived arenas.</div>`;
+    }
+
+    async function deleteArena(arenaId) {
+      if (!confirm("Archive this arena? It will disappear from the app, but you can restore it later.")) return;
+      await api(`/api/admin/turfs/${arenaId}`, { method: "DELETE" });
+      toast("Arena archived");
+      await Promise.all([loadArenas(), loadOverview()]);
+    }
+
+    async function restoreArena(arenaId) {
+      await api(`/api/admin/turfs/${arenaId}/restore`, { method: "POST" });
+      toast("Arena restored");
+      await Promise.all([loadArenas(), loadOverview()]);
+    }
+
+    async function permanentlyDeleteArena(arenaId) {
+      if (!requireTypedConfirm("Delete this archived arena permanently? This cannot be undone.", "DELETE ARENA")) return;
+      await api(`/api/admin/turfs/${arenaId}/permanent-delete`, { method: "DELETE" });
+      toast("Arena permanently deleted");
+      await Promise.all([loadArenas(), loadOverview()]);
+    }
+
+    async function loadRatings() {
+      const data = await api("/api/admin/ratings");
+      if (!data) return;
+      state.ratings = data.ratings || [];
+      document.getElementById("ratings-grid").innerHTML = state.ratings.map(rating => `
+        <div class="item-card">
+          <div class="item-top">
+            <div>
+              <div class="item-title">${esc(rating.rated_name)}</div>
+              <div class="item-meta">${esc(rating.rating_type)} rating · ${esc(rating.context_label || "")}</div>
+            </div>
+            <div class="item-title">${esc(rating.rating)} / 10</div>
+          </div>
+          <div class="item-meta">Rated by ${esc(rating.rater_name)} on ${(rating.created_at || "").slice(0, 16)}</div>
+        </div>
+      `).join("") || `<div class="item-card"><div class="item-meta">No ratings yet.</div></div>`;
+    }
+
+    document.getElementById("create-user-form").addEventListener("submit", async event => {
+      event.preventDefault();
+      const data = formObject(event.currentTarget);
+      data.handle = (data.handle || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      await api("/api/admin/users", { method: "POST", body: JSON.stringify(data) });
+      event.currentTarget.reset();
+      toast("Athlete created");
+      await Promise.all([loadUsers(), loadOverview()]);
+    });
+
+    document.getElementById("create-team-form").addEventListener("submit", async event => {
+      event.preventDefault();
+      await api("/api/admin/teams", { method: "POST", body: JSON.stringify(formObject(event.currentTarget)) });
+      event.currentTarget.reset();
+      toast("Team created");
+      await Promise.all([loadTeams(), loadOverview()]);
+    });
+
+    document.getElementById("create-league-form").addEventListener("submit", async event => {
+      event.preventDefault();
+      await api("/api/admin/leagues", { method: "POST", body: JSON.stringify(formObject(event.currentTarget)) });
+      event.currentTarget.reset();
+      toast("League created");
+      await Promise.all([loadLeagues(), loadOverview()]);
+    });
+
+    document.getElementById("create-arena-form").addEventListener("submit", async event => {
+      event.preventDefault();
+      await api("/api/admin/turfs", { method: "POST", body: JSON.stringify(formObject(event.currentTarget)) });
+      event.currentTarget.reset();
+      toast("Arena created");
+      await Promise.all([loadArenas(), loadOverview()]);
+    });
+
+    document.getElementById("admin-search-form").addEventListener("submit", async event => {
+      event.preventDefault();
+      await runAdminSearch(document.getElementById("admin-search-input").value);
+    });
+
+    document.querySelectorAll(".tab-btn[data-tab]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        document.querySelectorAll(".tab-btn[data-tab]").forEach(node => node.classList.remove("active"));
+        document.querySelectorAll(".section-card").forEach(node => node.classList.remove("active"));
+        btn.classList.add("active");
+        state.activeTab = btn.dataset.tab;
+        document.getElementById(`tab-${state.activeTab}`).classList.add("active");
+        if (state.activeTab === "overview") await loadOverview();
+        if (state.activeTab === "users") await loadUsers();
+        if (state.activeTab === "teams") await loadTeams();
+        if (state.activeTab === "leagues") await loadLeagues();
+        if (state.activeTab === "arenas") await loadArenas();
+        if (state.activeTab === "ratings") await loadRatings();
+      });
+    });
+
+    document.getElementById("logout-btn").addEventListener("click", async () => {
+      await fetch("/api/auth/logout", { method: "POST" });
+      window.location.href = "/";
+    });
+
+    loadOverview();
+
+    window.deleteUser = deleteUser;
+    window.deleteTeam = deleteTeam;
+    window.restoreTeam = restoreTeam;
+    window.toggleTeamCard = toggleTeamCard;
+    window.editTeamCard = editTeamCard;
+    window.permanentlyDeleteTeam = permanentlyDeleteTeam;
+    window.deleteMembership = deleteMembership;
+    window.deleteLeague = deleteLeague;
+    window.deleteLeagueTeam = deleteLeagueTeam;
+    window.deleteArena = deleteArena;
+    window.restoreArena = restoreArena;
+    window.permanentlyDeleteArena = permanentlyDeleteArena;
+    window.selectUser = selectUser;
+    window.approveProfileAssessment = approveProfileAssessment;
+    window.rejectProfileAssessment = rejectProfileAssessment;
+  </script>
+</body>
+</html>
