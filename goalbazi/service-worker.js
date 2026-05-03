@@ -1,4 +1,4 @@
-const CACHE_NAME = "goalbazi-pwa-v21";
+const CACHE_NAME = "goalbazi-pwa-v24";
 
 // Files that make the installed PWA open quickly and still show a useful page offline.
 const APP_SHELL = [

@@ -191,13 +191,14 @@
     document.getElementById("turfs-count").textContent = `${turfs.length} arenas available`;
 
     if (turfs.length === 0) {
-      document.getElementById("turfs-list").innerHTML = `<div class="empty-state"><div class="empty-icon">🏟️</div><div class="empty-title">No arenas found</div><p>Try a different search or date.</p></div>`;
+      const genz = window.GoalbaziTheme?.isGenz?.();
+      document.getElementById("turfs-list").innerHTML = `<div class="empty-state"><div class="empty-icon">🏟️</div><div class="empty-title">${genz ? "No arenas found. Pain." : "No arenas found"}</div><p>${genz ? "Try another area. Even the pitch ghosted this search." : "Try a different search or date."}</p></div>`;
       return;
     }
 
     document.getElementById("turfs-list").innerHTML = `<div class="turfs-list">${turfs.map(t => {
       const slotsHtml = t.slots.length === 0
-        ? `<div class="no-slots">No slots for this date</div>`
+        ? `<div class="no-slots">${window.GoalbaziTheme?.isGenz?.() ? "No slots. Fully booked like a World Cup final." : "No slots for this date"}</div>`
         : `<div class="slots-row">${t.slots.map(s => {
             const cls = s.status === "pending" ? "pending" : s.is_booked ? "booked" : "available";
             const disabled = cls !== "available" ? "disabled" : "";

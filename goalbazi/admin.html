@@ -89,6 +89,42 @@
     .brand-card { padding: 18px; }
     .brand-name { font-size: 1.2rem; font-weight: 800; }
     .brand-sub { color: var(--muted); font-size: .88rem; margin-top: 4px; }
+    .command-hero {
+      display:grid;
+      gap:12px;
+      padding:18px;
+      border-radius:24px;
+      border:1px solid rgba(132,242,85,.18);
+      background:
+        radial-gradient(circle at 12% 16%, rgba(132,242,85,.18), transparent 32%),
+        linear-gradient(135deg, rgba(132,242,85,.10), rgba(61,232,160,.04)),
+        var(--panel);
+      box-shadow:0 22px 80px rgba(0,0,0,.26);
+    }
+    .command-hero-kicker {
+      color:var(--brand);
+      font-size:.72rem;
+      font-weight:900;
+      text-transform:uppercase;
+      letter-spacing:.16em;
+    }
+    .command-hero-title {
+      font-family:"Manrope", sans-serif;
+      font-size:clamp(1.8rem, 8vw, 3.4rem);
+      line-height:.95;
+      font-weight:900;
+      letter-spacing:-.08em;
+    }
+    .command-quick-grid { display:grid; gap:10px; grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .command-quick-card {
+      border:1px solid var(--line);
+      border-radius:16px;
+      background:var(--panel-2);
+      padding:13px;
+      min-height:88px;
+    }
+    .command-quick-card strong { display:block; color:var(--text); font-size:.92rem; margin-bottom:4px; }
+    .command-quick-card span { color:var(--muted); font-size:.78rem; line-height:1.4; }
     .tab-row { display: flex; gap: 8px; flex-wrap: wrap; }
     .tab-btn, .btn, .mini-btn {
       border-radius: 12px;
@@ -221,10 +257,39 @@
     .hidden { display: none !important; }
     .notify-list { display:grid; gap:10px; margin-top:14px; }
     .notify-item { border:1px solid var(--line); border-radius:14px; padding:12px; background:var(--panel-2); }
+    .command-grid { display:grid; gap:12px; margin-top:14px; }
+    .command-search { display:flex; gap:8px; align-items:center; }
+    .command-search input { min-height:44px; }
+    .result-chip {
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:center;
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:11px 12px;
+      background:var(--panel-2);
+    }
+    .type-pill {
+      color:var(--brand);
+      border:1px solid rgba(132,242,85,.24);
+      border-radius:999px;
+      padding:4px 8px;
+      font-size:.72rem;
+      font-weight:900;
+      text-transform:uppercase;
+    }
+    .activity-row { display:grid; gap:5px; }
+    .activity-meta { color:var(--muted); font-size:.78rem; line-height:1.45; }
+    .danger-confirm { border-color:rgba(255,133,105,.32); }
+    .danger-confirm input { border-color:rgba(255,133,105,.28); }
     @media (min-width: 900px) {
       .shell { padding: 28px 24px 64px; }
       .stats-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
       .items-grid.two-col { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .command-grid { grid-template-columns: minmax(0, 1fr) minmax(320px, .7fr); }
+      .command-hero { grid-template-columns: minmax(0, 1fr) minmax(360px, .8fr); align-items:end; }
+      .command-quick-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
     }
   </style>
 </head>
@@ -249,16 +314,57 @@
     </div>
 
     <section class="section-card active" id="tab-overview">
+      <div class="command-hero" style="margin-bottom:14px">
+        <div>
+          <div class="command-hero-kicker">Admin Command Center</div>
+          <div class="command-hero-title">Control the whole pitch.</div>
+          <div class="section-sub" style="margin-top:10px">Search anything, review activity, manage archives, and keep Goalbazi safe before more users arrive.</div>
+        </div>
+        <div class="command-quick-grid">
+          <div class="command-quick-card">
+            <strong>Smart search</strong>
+            <span>Find athletes, teams, leagues, and arenas from one box.</span>
+          </div>
+          <div class="command-quick-card">
+            <strong>Audit trail</strong>
+            <span>See admin edits, approvals, deletes, and system actions.</span>
+          </div>
+          <div class="command-quick-card">
+            <strong>Private notes</strong>
+            <span>Store internal notes without showing them to athletes.</span>
+          </div>
+          <div class="command-quick-card">
+            <strong>Safer deletes</strong>
+            <span>Dangerous actions now ask for typed confirmation.</span>
+          </div>
+        </div>
+      </div>
       <div class="section-head">
         <div>
-          <div class="section-title">Platform overview</div>
-          <div class="section-sub">Quick totals across the platform.</div>
+          <div class="section-title">Live platform overview</div>
+          <div class="section-sub">Quick totals, active users, and pending decisions.</div>
         </div>
       </div>
       <div class="stats-grid" id="overview-stats"></div>
-      <div class="editor-card" style="margin-top:14px">
-        <div class="editor-title">Notifications</div>
-        <div class="notify-list" id="admin-notifications"></div>
+      <div class="command-grid">
+        <div class="editor-card">
+          <div class="editor-title">Global command search</div>
+          <div class="section-sub" style="margin-bottom:10px">Find any athlete, team, league, or arena from one box.</div>
+          <form class="command-search" id="admin-search-form">
+            <input id="admin-search-input" placeholder="Search users, teams, leagues, arenas..." autocomplete="off">
+            <button class="btn primary" type="submit">Search</button>
+          </form>
+          <div class="notify-list" id="admin-search-results"></div>
+        </div>
+        <div class="editor-card">
+          <div class="editor-title">Notifications</div>
+          <div class="notify-list" id="admin-notifications"></div>
+        </div>
+      </div>
+      <div class="editor-card">
+        <div class="editor-title">Recent admin activity</div>
+        <div class="section-sub" style="margin-bottom:12px">Audit trail for edits, deletes, approvals, and important system actions.</div>
+        <div class="notify-list" id="admin-activity-log"></div>
       </div>
     </section>
 
@@ -427,6 +533,8 @@
       archivedArenas: [],
       playersForTeams: [],
       profileAssessments: [],
+      activity: [],
+      searchResults: [],
       activeTab: "overview",
       selectedUserId: null,
       expandedTeamId: null,
@@ -480,6 +588,34 @@
       toast._t = setTimeout(() => el.style.opacity = "0", 2400);
     }
 
+    function formatDate(value) {
+      if (!value) return "Unknown time";
+      return String(value).replace("T", " ").slice(0, 16);
+    }
+
+    function eventLabel(type = "") {
+      return String(type).replace(/^admin_/, "").replaceAll("_", " ");
+    }
+
+    function renderActivity(items, targetId = "admin-activity-log") {
+      // The admin activity log is the audit trail: every important action has actor, route, and time.
+      const target = document.getElementById(targetId);
+      if (!target) return;
+      target.innerHTML = items.length ? items.map(item => `
+        <div class="notify-item activity-row">
+          <div class="item-title">${esc(eventLabel(item.event_type))}</div>
+          <div class="activity-meta">By ${esc(item.actor || "System")} &middot; ${esc(formatDate(item.created_at))}</div>
+          <div class="activity-meta">${esc(item.path || "")}</div>
+        </div>
+      `).join("") : `<div class="item-meta">No activity recorded yet.</div>`;
+    }
+
+    function requireTypedConfirm(label, phrase) {
+      // Dangerous actions require typed confirmation so admins do not delete live data by accident.
+      const answer = prompt(`${label}\n\nType ${phrase} to confirm.`);
+      return answer === phrase;
+    }
+
     async function loadOverview() {
       const data = await api("/api/admin/overview");
       if (!data) return;
@@ -489,6 +625,8 @@
           <div class="stat-label">${esc(stat.label)}</div>
         </div>
       `).join("");
+      state.activity = data.recent_activity || [];
+      renderActivity(state.activity);
       const notifyData = await api("/api/notifications");
       document.getElementById("admin-notifications").innerHTML = (notifyData?.notifications || []).length
         ? notifyData.notifications.map(item => `
@@ -498,6 +636,26 @@
           </div>
         `).join("")
         : `<div class="item-meta">No notifications right now.</div>`;
+    }
+
+    async function runAdminSearch(term) {
+      const q = String(term || "").trim();
+      const target = document.getElementById("admin-search-results");
+      if (q.length < 2) {
+        target.innerHTML = `<div class="item-meta">Type at least 2 letters to search.</div>`;
+        return;
+      }
+      const data = await api(`/api/admin/search?q=${encodeURIComponent(q)}`);
+      state.searchResults = data?.results || [];
+      target.innerHTML = state.searchResults.length ? state.searchResults.map(item => `
+        <div class="result-chip">
+          <div>
+            <div class="item-title">${esc(item.name)}</div>
+            <div class="item-meta">${esc(item.meta || "")} ${item.subtext ? "&middot; " + esc(item.subtext) : ""}</div>
+          </div>
+          <span class="type-pill">${esc(item.type)}</span>
+        </div>
+      `).join("") : `<div class="item-meta">No matching result.</div>`;
     }
 
     async function loadUsers() {
@@ -583,6 +741,7 @@
                   <input name="avatar_base64" value="${esc(selectedUser.avatar_base64 || "")}" placeholder="Avatar image URL or base64">
                 </div>
                 <textarea name="bio">${esc(selectedUser.bio || "")}</textarea>
+                <textarea name="admin_note" placeholder="Private admin note">${esc(selectedUser.admin_note || "")}</textarea>
                 <label style="display:flex;gap:8px;align-items:center"><input name="is_admin" type="checkbox" ${selectedUser.is_admin ? "checked" : ""} style="width:auto"> Admin access</label>
                 <div class="action-row">
                   <button class="mini-btn primary" type="submit">Save athlete</button>
@@ -658,7 +817,7 @@
     }
 
     async function deleteUser(userId) {
-      if (!confirm("Delete this athlete?")) return;
+      if (!requireTypedConfirm("Delete this athlete and related private data?", "DELETE ATHLETE")) return;
       await api(`/api/admin/users/${userId}`, { method: "DELETE" });
       toast("Athlete deleted");
       await Promise.all([loadUsers(), loadOverview(), loadTeams()]);
@@ -694,6 +853,7 @@
                 </div>
                 <input name="logo_url" value="${esc(team.logo_url || "")}" placeholder="Logo URL">
                 <textarea name="description">${esc(team.description || "")}</textarea>
+                <textarea name="admin_note" placeholder="Private admin note">${esc(team.admin_note || "")}</textarea>
                 <div class="action-row">
                   <button class="mini-btn primary" type="submit">Save team</button>
                   <button class="mini-btn danger" type="button" onclick="deleteTeam(${team.id})">Delete team</button>
@@ -837,7 +997,7 @@
     }
 
     async function permanentlyDeleteTeam(teamId) {
-      if (!confirm("Delete this archived team permanently? This cannot be undone.")) return;
+      if (!requireTypedConfirm("Delete this archived team permanently? This cannot be undone.", "DELETE TEAM")) return;
       await api(`/api/admin/teams/${teamId}/permanent-delete`, { method: "DELETE" });
       toast("Team permanently deleted");
       await Promise.all([loadTeams(), loadLeagues(), loadUsers()]);
@@ -878,6 +1038,7 @@
               </div>
               <input name="banner_url" value="${esc(league.banner_url || "")}" placeholder="Banner URL">
               <textarea name="description">${esc(league.description || "")}</textarea>
+              <textarea name="admin_note" placeholder="Private admin note">${esc(league.admin_note || "")}</textarea>
               <div class="action-row">
                 <button class="mini-btn primary" type="submit">Save league</button>
                 <button class="mini-btn danger" type="button" onclick="deleteLeague(${league.id})">Delete league</button>
@@ -965,7 +1126,7 @@
     }
 
     async function deleteLeague(leagueId) {
-      if (!confirm("Delete this league?")) return;
+      if (!requireTypedConfirm("Archive this league?", "DELETE LEAGUE")) return;
       await api(`/api/admin/leagues/${leagueId}`, { method: "DELETE" });
       toast("League deleted");
       await Promise.all([loadLeagues(), loadOverview()]);
@@ -1011,6 +1172,7 @@
             <input name="map_link" value="${esc(arena.map_link || "")}">
             <textarea name="description">${esc(arena.description || "")}</textarea>
             <textarea name="image_urls">${esc((arena.image_urls || []).join("\n"))}</textarea>
+            <textarea name="admin_note" placeholder="Private admin note">${esc(arena.admin_note || "")}</textarea>
             <div class="action-row">
               <button class="mini-btn primary" type="submit">Save arena</button>
               <button class="mini-btn danger" type="button" onclick="deleteArena(${arena.id})">Delete arena</button>
@@ -1056,7 +1218,7 @@
     }
 
     async function permanentlyDeleteArena(arenaId) {
-      if (!confirm("Delete this archived arena permanently? This cannot be undone.")) return;
+      if (!requireTypedConfirm("Delete this archived arena permanently? This cannot be undone.", "DELETE ARENA")) return;
       await api(`/api/admin/turfs/${arenaId}/permanent-delete`, { method: "DELETE" });
       toast("Arena permanently deleted");
       await Promise.all([loadArenas(), loadOverview()]);
@@ -1073,7 +1235,7 @@
               <div class="item-title">${esc(rating.rated_name)}</div>
               <div class="item-meta">${esc(rating.rating_type)} rating · ${esc(rating.context_label || "")}</div>
             </div>
-            <div class="item-title">${esc(rating.rating)} / 5</div>
+            <div class="item-title">${esc(rating.rating)} / 10</div>
           </div>
           <div class="item-meta">Rated by ${esc(rating.rater_name)} on ${(rating.created_at || "").slice(0, 16)}</div>
         </div>
@@ -1112,6 +1274,11 @@
       event.currentTarget.reset();
       toast("Arena created");
       await Promise.all([loadArenas(), loadOverview()]);
+    });
+
+    document.getElementById("admin-search-form").addEventListener("submit", async event => {
+      event.preventDefault();
+      await runAdminSearch(document.getElementById("admin-search-input").value);
     });
 
     document.querySelectorAll(".tab-btn[data-tab]").forEach(btn => {

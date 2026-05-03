@@ -330,6 +330,7 @@ def haversine_km(lat1, lon1, lat2, lon2):
 
 
 def log_event(event_type: str, path_value: str, meta: dict | None = None) -> None:
+    """Store product analytics and admin audit events in one lightweight timeline."""
     try:
         query(
             """INSERT INTO analytics_events (event_type, path, user_id, owner_id, meta, created_at)
@@ -346,6 +347,14 @@ def log_event(event_type: str, path_value: str, meta: dict | None = None) -> Non
         )
     except Exception:
         pass
+
+
+def parse_event_meta(row: dict) -> dict:
+    """Decode analytics meta safely so admin activity never breaks if old rows are malformed."""
+    try:
+        return json.loads(row.get("meta") or "{}")
+    except Exception:
+        return {}
 
 
 def current_user_is_admin() -> bool:
@@ -448,6 +457,7 @@ def seed_db():
     cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS defending INTEGER NOT NULL DEFAULT 50")
     cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS physical INTEGER NOT NULL DEFAULT 50")
     cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen_at TEXT DEFAULT ''")
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS admin_note TEXT NOT NULL DEFAULT ''")
     cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS qr_base64 TEXT DEFAULT ''")
     cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS map_link TEXT DEFAULT ''")
     cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION")
@@ -455,6 +465,7 @@ def seed_db():
     cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS description TEXT DEFAULT ''")
     cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS image_urls TEXT NOT NULL DEFAULT '[]'")
     cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS archived_at TEXT")
+    cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS admin_note TEXT NOT NULL DEFAULT ''")
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS analytics_events (
@@ -550,6 +561,7 @@ def seed_db():
     cur.execute("ALTER TABLE leagues ADD COLUMN IF NOT EXISTS season TEXT NOT NULL DEFAULT '2026'")
     cur.execute("ALTER TABLE leagues ADD COLUMN IF NOT EXISTS banner_url TEXT DEFAULT ''")
     cur.execute("ALTER TABLE leagues ADD COLUMN IF NOT EXISTS archived_at TEXT")
+    cur.execute("ALTER TABLE leagues ADD COLUMN IF NOT EXISTS admin_note TEXT NOT NULL DEFAULT ''")
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS teams (
@@ -564,6 +576,7 @@ def seed_db():
         )
     """)
     cur.execute("ALTER TABLE teams ADD COLUMN IF NOT EXISTS archived_at TEXT")
+    cur.execute("ALTER TABLE teams ADD COLUMN IF NOT EXISTS admin_note TEXT NOT NULL DEFAULT ''")
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS team_memberships (
@@ -2132,8 +2145,11 @@ def admin_page():
 @app.route("/api/admin/overview")
 @admin_required
 def api_admin_overview():
+    active_since = (datetime.now() - timedelta(minutes=15)).isoformat()
     stats = [
         {"value": query("SELECT COUNT(*) FROM users", one=True)["count"], "label": "Total users"},
+        {"value": query("SELECT COUNT(*) FROM users WHERE last_seen_at >= %s", (active_since,), one=True)["count"], "label": "Active now"},
+        {"value": query("SELECT COUNT(*) FROM profile_assessments WHERE status = 'pending'", one=True)["count"], "label": "Pending approvals"},
         {"value": query("SELECT COUNT(*) FROM games g JOIN turfs t ON t.id = g.turf_id WHERE t.archived_at IS NULL", one=True)["count"], "label": "Total games"},
         {"value": query("SELECT COUNT(*) FROM turf_slots ts JOIN turfs t ON t.id = ts.turf_id WHERE ts.is_booked = 1 AND t.archived_at IS NULL", one=True)["count"], "label": "Bookings"},
         {"value": query("SELECT COUNT(*) FROM game_messages WHERE is_system = 0", one=True)["count"], "label": "Chat messages"},
@@ -2170,7 +2186,77 @@ def api_admin_overview():
                LIMIT 8"""
         )],
     }
-    return jsonify({"stats": stats, "recent_users": recent_users, "recent_games": recent_games, "analytics": analytics})
+    recent_activity = admin_activity_rows(limit=10)
+    return jsonify({"stats": stats, "recent_users": recent_users, "recent_games": recent_games, "analytics": analytics, "recent_activity": recent_activity})
+
+
+def admin_activity_rows(limit: int = 80) -> list[dict]:
+    """Return recent admin/system activity with actor names for the admin command center."""
+    rows = [dict(r) for r in query(
+        """SELECT ae.id, ae.event_type, ae.path, ae.user_id, ae.owner_id, ae.meta, ae.created_at,
+                  u.name AS user_name, u.handle AS user_handle, o.name AS owner_name
+           FROM analytics_events ae
+           LEFT JOIN users u ON u.id = ae.user_id
+           LEFT JOIN turf_owners o ON o.id = ae.owner_id
+           WHERE ae.event_type != 'page_view'
+           ORDER BY ae.id DESC
+           LIMIT %s""",
+        (limit,),
+    )]
+    for row in rows:
+        row["meta"] = parse_event_meta(row)
+        row["actor"] = row.get("user_name") or row.get("owner_name") or "System"
+    return rows
+
+
+@app.route("/api/admin/activity")
+@admin_required
+def api_admin_activity():
+    return jsonify({"activity": admin_activity_rows(limit=120)})
+
+
+@app.route("/api/admin/search")
+@admin_required
+def api_admin_search():
+    """One admin search across athletes, teams, leagues, and arenas."""
+    term = (request.args.get("q") or "").strip()
+    if len(term) < 2:
+        return jsonify({"results": []})
+    like = f"%{term}%"
+    results = []
+    for row in query(
+        """SELECT id, name, handle AS meta, location AS subtext, 'athlete' AS type
+           FROM users
+           WHERE name ILIKE %s OR handle ILIKE %s OR email ILIKE %s OR location ILIKE %s
+           ORDER BY name ASC LIMIT 10""",
+        (like, like, like, like),
+    ):
+        results.append(dict(row))
+    for row in query(
+        """SELECT id, name, city AS meta, skill_level AS subtext, 'team' AS type
+           FROM teams
+           WHERE archived_at IS NULL AND (name ILIKE %s OR city ILIKE %s OR short_name ILIKE %s)
+           ORDER BY name ASC LIMIT 10""",
+        (like, like, like),
+    ):
+        results.append(dict(row))
+    for row in query(
+        """SELECT id, name, city AS meta, status AS subtext, 'league' AS type
+           FROM leagues
+           WHERE archived_at IS NULL AND (name ILIKE %s OR city ILIKE %s OR status ILIKE %s)
+           ORDER BY name ASC LIMIT 10""",
+        (like, like, like),
+    ):
+        results.append(dict(row))
+    for row in query(
+        """SELECT id, name, area AS meta, surface AS subtext, 'arena' AS type
+           FROM turfs
+           WHERE archived_at IS NULL AND (name ILIKE %s OR area ILIKE %s OR surface ILIKE %s)
+           ORDER BY name ASC LIMIT 10""",
+        (like, like, like),
+    ):
+        results.append(dict(row))
+    return jsonify({"results": results[:30]})
 
 
 @app.route("/api/admin/users")
@@ -2180,7 +2266,7 @@ def api_admin_users():
         """SELECT u.id, u.name, u.handle, u.email, u.location, u.position, u.secondary_position,
                   u.skill, u.preferred_format, u.strong_foot, u.availability,
                   u.pace, u.shooting, u.passing, u.dribbling, u.defending, u.physical,
-                  u.bio, u.avatar_base64, u.is_admin, u.last_seen_at, t.name AS team_name
+                  u.bio, u.avatar_base64, u.is_admin, u.last_seen_at, u.admin_note, t.name AS team_name
            FROM users u
            LEFT JOIN team_memberships tm ON tm.user_id = u.id
            LEFT JOIN teams t ON t.id = tm.team_id AND t.archived_at IS NULL
@@ -2246,7 +2332,8 @@ def api_admin_update_user(user_id):
            SET name = %s, handle = %s, email = %s, location = %s, position = %s,
                secondary_position = %s, preferred_format = %s, skill = %s, strong_foot = %s,
                availability = %s, pace = %s, shooting = %s, passing = %s, dribbling = %s,
-               defending = %s, physical = %s, bio = %s, avatar_base64 = %s, is_admin = %s
+               defending = %s, physical = %s, bio = %s, avatar_base64 = %s, is_admin = %s,
+               admin_note = %s
            WHERE id = %s""",
         (
             data.get("name", "").strip(),
@@ -2268,6 +2355,7 @@ def api_admin_update_user(user_id):
             data.get("bio", ""),
             data.get("avatar_base64", ""),
             bool(data.get("is_admin")),
+            str(data.get("admin_note", "") or "").strip()[:1000],
             user_id,
         ),
         commit=True,
@@ -2599,7 +2687,8 @@ def api_admin_update_team(team_id):
     data = request.get_json()
     query(
         """UPDATE teams
-           SET name = %s, city = %s, short_name = %s, logo_url = %s, skill_level = %s, description = %s
+           SET name = %s, city = %s, short_name = %s, logo_url = %s, skill_level = %s,
+               description = %s, admin_note = %s
            WHERE id = %s""",
         (
             data.get("name", "").strip(),
@@ -2608,6 +2697,7 @@ def api_admin_update_team(team_id):
             data.get("logo_url", "").strip(),
             data.get("skill_level", "Intermediate").strip(),
             data.get("description", "").strip(),
+            str(data.get("admin_note", "") or "").strip()[:1000],
             team_id,
         ),
         commit=True,
@@ -2729,7 +2819,8 @@ def api_admin_update_league(league_id):
     data = request.get_json()
     query(
         """UPDATE leagues
-           SET name = %s, description = %s, format = %s, stage = %s, status = %s, city = %s, season = %s, banner_url = %s
+           SET name = %s, description = %s, format = %s, stage = %s, status = %s,
+               city = %s, season = %s, banner_url = %s, admin_note = %s
            WHERE id = %s""",
         (
             data.get("name", "").strip(),
@@ -2740,6 +2831,7 @@ def api_admin_update_league(league_id):
             data.get("city", "Delhi NCR").strip(),
             data.get("season", "2026").strip(),
             data.get("banner_url", "").strip(),
+            str(data.get("admin_note", "") or "").strip()[:1000],
             league_id,
         ),
         commit=True,
@@ -3843,14 +3935,15 @@ def api_admin_edit_turf(turf_id):
     query(
         """UPDATE turfs SET name=%s, area=%s, distance_km=%s, surface=%s,
            rating=%s, price_per_hour=%s, upi_id=%s, map_link=%s, latitude=%s, longitude=%s, owner_id=COALESCE(%s, owner_id),
-           description=%s, image_urls=%s WHERE id=%s""",
+           description=%s, image_urls=%s, admin_note=%s WHERE id=%s""",
         (data["name"], data["area"], float(data.get("distance_km",0)),
          data.get("surface","Astroturf"), float(data.get("rating",4.5)),
          int(data.get("price_per_hour",500)), data.get("upi_id",""), data.get("map_link", ""),
          float(data["latitude"]) if data.get("latitude") not in (None, "") else None,
          float(data["longitude"]) if data.get("longitude") not in (None, "") else None,
          int(data["owner_id"]) if data.get("owner_id") not in (None, "") else None,
-         data.get("description", ""), serialize_image_urls(data.get("image_urls", "")), turf_id),
+         data.get("description", ""), serialize_image_urls(data.get("image_urls", "")),
+         str(data.get("admin_note", "") or "").strip()[:1000], turf_id),
         commit=True,
     )
     log_event("admin_edit_turf", f"/api/admin/turfs/{turf_id}", {"turf_id": turf_id})

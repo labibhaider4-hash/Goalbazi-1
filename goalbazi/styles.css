@@ -61,6 +61,32 @@ html[data-theme="light"] {
   --surface-soft: rgba(17,59,33,.04);
 }
 
+html[data-theme="genz"] {
+  --bg: #080612;
+  --bg-2: #13091f;
+  --panel: rgba(18, 12, 34, .92);
+  --panel-2: rgba(27, 17, 48, .92);
+  --line: rgba(255,255,255,.11);
+  --line-2: rgba(255,255,255,.18);
+  --text: #fff8ff;
+  --muted: #b7a8c9;
+  --muted-2: #e0d5ee;
+  --brand: #7fff45;
+  --brand-dim: #63d438;
+  --brand-2: #ff7adf;
+  --accent: #37d6ff;
+  --danger: #ff785f;
+  --warn: #ffd166;
+  --shadow-sm: 0 8px 28px rgba(255, 72, 188, .10);
+  --shadow: 0 18px 60px rgba(55, 214, 255, .12);
+  --shadow-lg: 0 28px 90px rgba(255, 72, 188, .16);
+  --nav-bg: rgba(8,6,18,.88);
+  --ghost-bg: rgba(255,255,255,.07);
+  --ghost-bg-hover: rgba(255,255,255,.12);
+  --pill-muted-bg: rgba(255,255,255,.08);
+  --surface-soft: rgba(255,255,255,.06);
+}
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html {
@@ -90,6 +116,60 @@ body.goalbazi-admin-bg {
     linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 58%, var(--bg) 100%);
   background-attachment: fixed;
   animation: goalbaziAmbientShift 18s ease-in-out infinite alternate;
+}
+
+html[data-theme="genz"] body.goalbazi-app-bg,
+html[data-theme="genz"] body.goalbazi-landing-bg,
+html[data-theme="genz"] body.goalbazi-admin-bg {
+  /* Gen Z Derby theme: neon derby energy without replacing Goalbazi's green identity. */
+  background:
+    radial-gradient(circle at 16% 10%, rgba(255,72,188,.22), transparent 24%),
+    radial-gradient(circle at 84% 18%, rgba(55,214,255,.20), transparent 26%),
+    radial-gradient(circle at 50% 92%, rgba(127,255,69,.16), transparent 34%),
+    linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 58%, #05040b 100%);
+}
+
+html[data-theme="genz"] body.goalbazi-app-bg::before,
+html[data-theme="genz"] body.goalbazi-landing-bg::after,
+html[data-theme="genz"] body.goalbazi-admin-bg::before {
+  opacity: .16;
+  background:
+    linear-gradient(rgba(255,122,223,.13) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(55,214,255,.10) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+
+html[data-theme="genz"] .navbar,
+html[data-theme="genz"] .nav-drawer,
+html[data-theme="genz"] .phone-nav,
+html[data-theme="genz"] .card,
+html[data-theme="genz"] .panel-card,
+html[data-theme="genz"] .community-card,
+html[data-theme="genz"] .arena-card,
+html[data-theme="genz"] .growth-card,
+html[data-theme="genz"] .notify-card,
+html[data-theme="genz"] .auth-card,
+html[data-theme="genz"] .feature-card,
+html[data-theme="genz"] .stat-card,
+html[data-theme="genz"] .quick-card,
+html[data-theme="genz"] .user-card,
+html[data-theme="genz"] .game-card,
+html[data-theme="genz"] .turf-card {
+  border-color: rgba(255,255,255,.13);
+  box-shadow: 0 0 42px rgba(255,72,188,.07), var(--shadow-sm);
+}
+
+html[data-theme="genz"] .btn-primary,
+html[data-theme="genz"] .pill-green,
+html[data-theme="genz"] .mini-btn.primary {
+  background: linear-gradient(135deg, var(--brand), var(--accent) 58%, var(--brand-2));
+  color: #070911;
+  border-color: transparent;
+}
+
+html[data-theme="genz"] .empty-note,
+html[data-theme="genz"] .empty-state {
+  border-color: rgba(255,122,223,.16);
 }
 
 /* Shared animated atmosphere.
@@ -866,6 +946,9 @@ body.pull-refreshing {
 }
 .empty-state .empty-icon { font-size: 2.5rem; margin-bottom: 12px; }
 .empty-state .empty-title { font-family: 'Syne', sans-serif; font-size: 1.1rem; font-weight: 700; color: var(--muted-2); margin-bottom: 6px; }
+.genz-only { display: none !important; }
+html[data-theme="genz"] .genz-only { display: inline !important; }
+html[data-theme="genz"] .genz-hide { display: none !important; }
 
 /* ============================================================
    AMBIENT BLOBS
@@ -953,9 +1036,10 @@ html[data-theme="light"] .ambient-b { background: radial-gradient(circle, rgba(3
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 42px;
+  min-width: 42px;
   height: 42px;
-  padding: 0;
+  padding: 0 11px;
+  gap: 7px;
   border-radius: 14px;
   border: 1px solid var(--line-2);
   background: var(--ghost-bg);
@@ -963,6 +1047,12 @@ html[data-theme="light"] .ambient-b { background: radial-gradient(circle, rgba(3
   cursor: pointer;
   box-shadow: var(--shadow-sm);
   transition: transform .18s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.theme-toggle:not(.theme-toggle-labeled) { width: 42px; padding: 0; }
+.theme-toggle [data-theme-current] {
+  font-size: .72rem;
+  font-weight: 900;
+  letter-spacing: .02em;
 }
 .theme-toggle:hover {
   background: var(--ghost-bg-hover);

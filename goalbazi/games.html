@@ -187,7 +187,8 @@
 
     const el = document.getElementById("games-list");
     if (data.games.length === 0) {
-      el.innerHTML = `<div class="empty-state"><div class="empty-icon">🎮</div><div class="empty-title">No games yet</div><p>Be the first to create one!</p></div>`;
+      const genz = window.GoalbaziTheme?.isGenz?.();
+      el.innerHTML = `<div class="empty-state"><div class="empty-icon">⚽</div><div class="empty-title">${genz ? "No games. Tragic scenes." : "No games yet"}</div><p>${genz ? "Create one before the boots file a complaint." : "Be the first to create one!"}</p></div>`;
       return;
     }
 

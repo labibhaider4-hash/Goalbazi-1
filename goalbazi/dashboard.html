@@ -1067,8 +1067,8 @@
 
     document.getElementById("welcome-title").textContent = `Welcome back, ${data.profile.name.split(" ")[0]}`;
     document.getElementById("welcome-sub").textContent = data.profile.team
-      ? `${data.profile.team.name} is linked to your athlete profile.`
-      : "Build your squad, find athletes, and lock in your next match.";
+      ? modeCopy(`${data.profile.team.name} is linked to your athlete profile.`, `${data.profile.team.name} is your squad. Time to cook.`)
+      : modeCopy("Build your squad, find athletes, and lock in your next match.", "Build your squad, dodge the excuses, and lock the next match.");
 
     document.getElementById("dash-stats").innerHTML = data.stats.map(stat => `
       <div class="stat-card">
@@ -1089,7 +1089,7 @@
           <a class="mini-btn share-link" target="_blank" rel="noopener" href="${whatsappUrl(`Join my Goalbazi match: ${game.title} on ${game.game_date} at ${game.game_time}. ${appUrl(`/lobby?id=${game.id}`)}`)}">WhatsApp</a>
         </div>
       </div>
-    `).join("") : `<div class="empty-note">No matches yet. Create one and bring athletes in.</div>`;
+    `).join("") : `<div class="empty-note">${esc(modeCopy("No matches yet. Create one and bring athletes in.", "No matches yet. The boots are unemployed."))}</div>`;
 
     const p = data.profile;
     document.getElementById("profile-snap").innerHTML = `
@@ -1118,7 +1118,7 @@
           <div class="meta-line">${esc(item.message)}</div>
         </div>
       `).join("")
-      : `<div class="empty-note">No new notifications right now.</div>`;
+      : `<div class="empty-note">${esc(modeCopy("No new notifications right now.", "No notifications. The group chat is suspiciously quiet."))}</div>`;
   }
 
   function rateControls(userId, currentRating = "") {
@@ -1137,7 +1137,7 @@
     if (user.can_rate) {
       return rateControls(user.id || user.user_id, user.my_rating || "");
     }
-    return `<div class="helper-note">${esc(user.rating_rule || "You can rate only athletes who are friends or have played with you.")}</div>`;
+    return `<div class="helper-note">${esc(user.rating_rule || modeCopy("You can rate only athletes who are friends or have played with you.", "Ratings unlock after friendship or match history. No random slander."))}</div>`;
   }
 
   function activityHtml(user) {
@@ -1156,6 +1156,11 @@
     return sameDay
       ? date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
       : date.toLocaleDateString([], { month: "short", day: "numeric" });
+  }
+
+  function modeCopy(normal, genz) {
+    // Gen Z Derby keeps jokes optional: only users who choose that theme see this copy.
+    return window.GoalbaziTheme?.isGenz?.() ? genz : normal;
   }
 
   function insertQuickMessage(text) {
@@ -1205,7 +1210,7 @@
         </div>
         ${ratingControlsForUser(user)}
       </div>
-    `).join("") : `<div class="empty-note">Search for an athlete by name, handle, city, or team to see results.</div>`;
+    `).join("") : `<div class="empty-note">${esc(modeCopy("Search for an athlete by name, handle, city, or team to see results.", "Search an athlete. Stalking? No. Scouting? Absolutely."))}</div>`;
   }
 
   function renderSuggestedAthletes() {
@@ -1229,7 +1234,7 @@
         </div>
         ${ratingControlsForUser(user)}
       </div>
-    `).join("") : `<div class="empty-note">We’ll suggest athletes here based on your location, level, format, and team links.</div>`;
+    `).join("") : `<div class="empty-note">${esc(modeCopy("We'll suggest athletes here based on your location, level, format, and team links.", "We'll suggest ballers here. No NPC lists."))}</div>`;
   }
 
   function renderFriends() {
@@ -1274,7 +1279,7 @@
         </div>
       `));
     }
-    document.getElementById("friends-results").innerHTML = rows.length ? rows.join("") : `<div class="empty-note">Your friend list will appear here after you connect with other athletes.</div>`;
+    document.getElementById("friends-results").innerHTML = rows.length ? rows.join("") : `<div class="empty-note">${esc(modeCopy("Your friend list will appear here after you connect with other athletes.", "No friends here yet. Even Messi needed teammates."))}</div>`;
   }
 
   function renderConversations() {
@@ -1295,7 +1300,7 @@
           </div>
         </div>
       </button>
-    `).join("") : `<div class="empty-note">Private conversations will show up here.</div>`;
+    `).join("") : `<div class="empty-note">${esc(modeCopy("Private conversations will show up here.", "DMs will show here. Keep it football, not courtroom evidence."))}</div>`;
   }
 
   function renderArenaResults(arenas) {
@@ -1313,7 +1318,7 @@
           ${(arena.slots || []).slice(0, 6).map(slot => `<span class="slot-pill">${esc(slot.slot_time)} · ${esc(slot.status)}</span>`).join("")}
         </div>
       </div>
-    `).join("") : `<div class="empty-note">No arenas matched that search yet.</div>`;
+    `).join("") : `<div class="empty-note">${esc(modeCopy("No arenas matched that search yet.", "No arenas found. Even Google Maps took a touch first."))}</div>`;
   }
 
   async function loadFriends() {
@@ -1332,7 +1337,7 @@
     renderConversations();
     const nextSignature = conversationSignature(state.conversations);
     if (silent && previousSignature && nextSignature && nextSignature !== previousSignature) {
-      showToast("New private message");
+      showToast(modeCopy("New private message", "New DM. Someone entered the chat."));
     }
     state.lastConversationSignature = nextSignature;
   }
@@ -1347,7 +1352,7 @@
   async function searchUsers() {
     const q = document.getElementById("user-search").value.trim();
     if (!q) {
-      document.getElementById("community-results").innerHTML = `<div class="empty-note">Search for an athlete by name, handle, city, or team to see results.</div>`;
+      document.getElementById("community-results").innerHTML = `<div class="empty-note">${esc(modeCopy("Search for an athlete by name, handle, city, or team to see results.", "Search an athlete. Stalking? No. Scouting? Absolutely."))}</div>`;
       return;
     }
     const data = await apiFetch(`/api/community/users?q=${encodeURIComponent(q)}`);
