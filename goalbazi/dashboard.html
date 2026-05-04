@@ -329,6 +329,221 @@
     .notify-list { display: grid; gap: 10px; }
     .notify-item { border: 1px solid var(--line); border-radius: 16px; background: rgba(255,255,255,.02); padding: 12px; }
     .notify-title { font-weight: 700; margin-bottom: 4px; }
+    /* v3.9: Instagram-inspired notification center. It reuses existing server notifications,
+       so this push upgrades the experience without adding database risk. */
+    .notification-launcher {
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 12% 0%, rgba(127,255,69,.12), transparent 34%),
+        linear-gradient(135deg, rgba(255,255,255,.045), rgba(255,255,255,.015)),
+        var(--panel);
+    }
+    .notification-summary-row {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255,255,255,.025);
+      margin-bottom: 10px;
+    }
+    .notification-stack-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 16px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, var(--brand), var(--accent));
+      color: #061008;
+      font-family: 'Syne', sans-serif;
+      font-weight: 900;
+      box-shadow: 0 10px 28px rgba(127,255,69,.16);
+    }
+    .notification-open-btn {
+      border: 1px solid rgba(127,255,69,.24);
+      border-radius: 999px;
+      background: rgba(127,255,69,.09);
+      color: var(--brand);
+      padding: 9px 12px;
+      font: inherit;
+      font-size: .78rem;
+      font-weight: 900;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .notification-preview-list { display: grid; gap: 8px; }
+    .notification-preview {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 11px;
+      border: 1px solid rgba(255,255,255,.055);
+      border-radius: 16px;
+      background: rgba(255,255,255,.018);
+    }
+    .notification-mini-avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      background: rgba(127,255,69,.12);
+      border: 1px solid rgba(127,255,69,.18);
+      color: var(--brand);
+      font-size: .72rem;
+      font-weight: 900;
+    }
+    .notification-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 370;
+      display: none;
+      background: rgba(1,8,4,.54);
+      backdrop-filter: blur(10px);
+    }
+    .notification-backdrop.open { display: block; }
+    .notification-sheet {
+      position: fixed;
+      right: 18px;
+      top: calc(var(--nav-h) + 16px);
+      bottom: 18px;
+      width: min(420px, calc(100vw - 28px));
+      z-index: 380;
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr) auto;
+      gap: 12px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      background:
+        radial-gradient(circle at 18% 0%, rgba(127,255,69,.14), transparent 34%),
+        linear-gradient(180deg, var(--panel), var(--panel-2));
+      box-shadow: 0 28px 90px rgba(0,0,0,.42);
+      transform: translateX(calc(100% + 34px));
+      transition: transform .24s ease;
+    }
+    .notification-sheet.open { transform: translateX(0); }
+    .notification-grab {
+      display: none;
+      width: 42px;
+      height: 5px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.18);
+      justify-self: center;
+      margin-top: -2px;
+    }
+    .notification-sheet-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .notification-close {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.035);
+      color: var(--text);
+      font-size: 1.1rem;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .notification-filter-row {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+    .notification-filter {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255,255,255,.025);
+      color: var(--muted);
+      padding: 8px 11px;
+      font: inherit;
+      font-size: .76rem;
+      font-weight: 900;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .notification-filter.active {
+      border-color: rgba(127,255,69,.28);
+      background: rgba(127,255,69,.10);
+      color: var(--brand);
+    }
+    .notification-feed {
+      display: grid;
+      align-content: start;
+      gap: 10px;
+      overflow: auto;
+      padding-right: 2px;
+    }
+    .notification-row {
+      position: relative;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 11px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: rgba(255,255,255,.024);
+    }
+    .notification-row.unread {
+      background: linear-gradient(135deg, rgba(127,255,69,.10), rgba(61,232,160,.035));
+      border-color: rgba(127,255,69,.20);
+    }
+    .notification-row.unread::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 16px;
+      bottom: 16px;
+      width: 3px;
+      border-radius: 999px;
+      background: var(--brand);
+    }
+    .notification-avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: rgba(255,255,255,.045);
+      border: 1px solid rgba(255,255,255,.07);
+      color: var(--brand);
+      font-size: .76rem;
+      font-weight: 900;
+      flex-shrink: 0;
+    }
+    .notification-message { color: var(--muted); font-size: .82rem; line-height: 1.45; margin-top: 3px; }
+    .notification-meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-top: 9px;
+    }
+    .notification-time { color: var(--muted-2); font-size: .72rem; font-weight: 800; }
+    .notification-action {
+      border: 1px solid rgba(127,255,69,.24);
+      border-radius: 999px;
+      background: rgba(127,255,69,.08);
+      color: var(--brand);
+      padding: 6px 9px;
+      font-size: .72rem;
+      font-weight: 900;
+      text-decoration: none;
+    }
+    .notification-footer-note {
+      color: var(--muted);
+      text-align: center;
+      font-size: .76rem;
+      padding-top: 2px;
+    }
     .growth-card { padding: 16px; background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%); border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: 16px; }
     .quote-card {
       padding: 16px;
@@ -448,6 +663,22 @@
         align-items: flex-end;
         padding: 14px 12px calc(96px + env(safe-area-inset-bottom));
       }
+      .notification-backdrop { z-index: 390; }
+      .notification-sheet {
+        left: 10px;
+        right: 10px;
+        top: auto;
+        bottom: calc(84px + env(safe-area-inset-bottom));
+        width: auto;
+        max-height: min(74vh, 620px);
+        border-radius: 28px 28px 24px 24px;
+        transform: translateY(calc(100% + 110px));
+        transition: transform .24s ease;
+      }
+      .notification-sheet.open { transform: translateY(0); }
+      .notification-grab { display: block; }
+      .notification-summary-row { grid-template-columns: auto 1fr; }
+      .notification-open-btn { grid-column: 1 / -1; justify-self: stretch; }
       .assistant-card {
         max-height: calc(100vh - var(--nav-h) - 122px - env(safe-area-inset-bottom));
         display: grid;
@@ -504,10 +735,18 @@
       </a>
     </div>
 
-    <div class="notify-card" style="margin-bottom:16px">
+    <div class="notify-card notification-launcher" style="margin-bottom:16px">
       <div class="section-head">
         <h2>Notifications</h2>
         <span class="meta-line">Updates you should see first</span>
+      </div>
+      <div class="notification-summary-row">
+        <div class="notification-stack-avatar" id="notification-stack-avatar">GB</div>
+        <div>
+          <div class="user-name" id="notification-summary-title">Matchday activity</div>
+          <div class="meta-line" id="notification-summary-sub">Your football updates will appear here.</div>
+        </div>
+        <button class="notification-open-btn" type="button" id="open-notifications">Open activity</button>
       </div>
       <div class="notify-list" id="notifications-list"></div>
     </div>
@@ -619,6 +858,27 @@
   </button>
 </nav>
 
+<div class="notification-backdrop" id="notification-backdrop"></div>
+<aside class="notification-sheet" id="notification-sheet" aria-hidden="true" aria-label="Goalbazi notification center">
+  <div class="notification-grab" aria-hidden="true"></div>
+  <div class="notification-sheet-head">
+    <div>
+      <div class="quote-kicker">Activity</div>
+      <h2>Notifications</h2>
+      <div class="meta-line" id="notification-sheet-subtitle">Fresh football signals, no spam.</div>
+    </div>
+    <button class="notification-close" type="button" id="notification-close" aria-label="Close notifications">&times;</button>
+  </div>
+  <div class="notification-filter-row" aria-label="Notification filters">
+    <button class="notification-filter active" type="button" data-notification-filter="all">All</button>
+    <button class="notification-filter" type="button" data-notification-filter="messages">Messages</button>
+    <button class="notification-filter" type="button" data-notification-filter="teams">Teams</button>
+    <button class="notification-filter" type="button" data-notification-filter="matches">Matches</button>
+  </div>
+  <div class="notification-feed" id="notification-feed"></div>
+  <div class="notification-footer-note">No notification spam, only football signals.</div>
+</aside>
+
 <button class="assistant-fab" id="assistant-fab" type="button" aria-label="Open Goalbazi AI">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     <path d="M9.1 6.2c-2 0-3.6 1.6-3.6 3.5 0 1 .4 1.8 1 2.4.5.5.8 1.1.8 1.8v.3"></path>
@@ -696,6 +956,8 @@
     assistantSuggestions: [],
     activeAthleteTab: "suggested",
     assistantOpen: false,
+    notifications: [],
+    notificationFilter: "all",
   };
 
   function esc(value = "") {
@@ -1186,14 +1448,7 @@
     renderGrowthCard(data);
     renderTeamChallengeCard(data);
     document.getElementById("community-meta").textContent = `${data.community.friend_count} friends · ${data.community.message_count} messages`;
-    document.getElementById("notifications-list").innerHTML = (data.notifications || []).length
-      ? data.notifications.map(item => `
-        <div class="notify-item">
-          <div class="notify-title">${esc(item.title)}</div>
-          <div class="meta-line">${esc(item.message)}</div>
-        </div>
-      `).join("")
-      : `<div class="empty-note">${esc(modeCopy("No new notifications right now.", "No notifications. The group chat is suspiciously quiet."))}</div>`;
+    renderNotifications(data.notifications || []);
   }
 
   function rateControls(userId, currentRating = "") {
@@ -1236,6 +1491,116 @@
   function modeCopy(normal, genz) {
     // Gen Z Derby keeps jokes optional: only users who choose that theme see this copy.
     return window.GoalbaziTheme?.isGenz?.() ? genz : normal;
+  }
+
+  function notificationCode(type = "") {
+    const map = {
+      direct_message: "DM",
+      friend_request: "FR",
+      friend_accepted: "OK",
+      match_reminder: "MT",
+      profile_assessment: "ST",
+      team_challenge: "TC",
+      team_challenge_status: "TC",
+      booking_pending: "AR",
+    };
+    return map[type] || "GB";
+  }
+
+  function notificationGroup(type = "") {
+    if (type === "direct_message") return "messages";
+    if (type.includes("team_challenge") || type.includes("friend")) return "teams";
+    if (type.includes("match") || type.includes("booking")) return "matches";
+    return "all";
+  }
+
+  function notificationAction(type = "") {
+    const map = {
+      direct_message: ["Reply", "#messages-panel"],
+      friend_request: ["Review", "#athletes-panel"],
+      friend_accepted: ["View athlete", "#athletes-panel"],
+      match_reminder: ["Open games", "/games"],
+      profile_assessment: ["View profile", "/profile"],
+      team_challenge: ["Respond", "#team-challenge-card"],
+      team_challenge_status: ["Open challenge", "#team-challenge-card"],
+      booking_pending: ["Check arena", "/owner"],
+    };
+    return map[type] || ["Open", "/dashboard"];
+  }
+
+  function shouldShowNotification(item) {
+    if (state.notificationFilter === "all") return true;
+    return notificationGroup(item.type || "") === state.notificationFilter;
+  }
+
+  function notificationRowHtml(item, index = 0) {
+    // Read/unread storage is intentionally frontend-only for v3.9; a DB read-state table can come later.
+    const unread = index < 2 || ["direct_message", "team_challenge", "friend_request"].includes(item.type);
+    const [actionLabel, actionHref] = notificationAction(item.type || "");
+    return `
+      <article class="notification-row ${unread ? "unread" : ""}">
+        <div class="notification-avatar">${esc(notificationCode(item.type))}</div>
+        <div>
+          <div class="notify-title">${esc(item.title || "Goalbazi update")}</div>
+          <div class="notification-message">${esc(item.message || "")}</div>
+          <div class="notification-meta-row">
+            <span class="notification-time">${esc(index === 0 ? "Just now" : `${index + 1} updates ago`)}</span>
+            <a class="notification-action" href="${esc(actionHref)}">${esc(actionLabel)}</a>
+          </div>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderNotifications(notifications = []) {
+    state.notifications = notifications;
+    const list = document.getElementById("notifications-list");
+    const feed = document.getElementById("notification-feed");
+    const summaryTitle = document.getElementById("notification-summary-title");
+    const summarySub = document.getElementById("notification-summary-sub");
+    const subtitle = document.getElementById("notification-sheet-subtitle");
+    const filtered = notifications.filter(shouldShowNotification);
+    const count = notifications.length;
+
+    summaryTitle.textContent = count
+      ? modeCopy(`${count} football update${count === 1 ? "" : "s"}`, `${count} fresh signal${count === 1 ? "" : "s"} from the pitch`)
+      : modeCopy("All caught up", "No chaos. Suspiciously peaceful.");
+    summarySub.textContent = count
+      ? (notifications[0]?.message || "Open activity to see what changed.")
+      : modeCopy("No new notifications right now.", "The group chat is suspiciously quiet.");
+    subtitle.textContent = count
+      ? modeCopy("Fresh football signals, sorted like your DMs.", "Fresh football signals. Main character dashboard.")
+      : modeCopy("No new notifications right now.", "No pings. The boots are resting.");
+
+    list.innerHTML = count
+      ? `<div class="notification-preview-list">${notifications.slice(0, 2).map(item => `
+          <div class="notification-preview">
+            <div class="notification-mini-avatar">${esc(notificationCode(item.type))}</div>
+            <div>
+              <div class="notify-title">${esc(item.title || "Goalbazi update")}</div>
+              <div class="meta-line">${esc(item.message || "")}</div>
+            </div>
+          </div>
+        `).join("")}</div>`
+      : `<div class="empty-note">${esc(modeCopy("No new notifications right now.", "No notifications. The group chat is suspiciously quiet."))}</div>`;
+
+    feed.innerHTML = filtered.length
+      ? filtered.map(notificationRowHtml).join("")
+      : `<div class="empty-note">${esc(modeCopy("Nothing in this filter yet.", "This tab is in warm-up mode."))}</div>`;
+  }
+
+  function setNotificationSheet(open) {
+    document.getElementById("notification-sheet").classList.toggle("open", open);
+    document.getElementById("notification-backdrop").classList.toggle("open", open);
+    document.getElementById("notification-sheet").setAttribute("aria-hidden", open ? "false" : "true");
+  }
+
+  function setNotificationFilter(filter) {
+    state.notificationFilter = filter;
+    document.querySelectorAll("[data-notification-filter]").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.notificationFilter === filter);
+    });
+    renderNotifications(state.notifications);
   }
 
   function insertQuickMessage(text) {
@@ -1621,6 +1986,12 @@
   document.getElementById("assistant-close").addEventListener("click", () => setAssistantOpen(false));
   document.getElementById("assistant-modal").addEventListener("click", e => {
     if (e.target.id === "assistant-modal") setAssistantOpen(false);
+  });
+  document.getElementById("open-notifications").addEventListener("click", () => setNotificationSheet(true));
+  document.getElementById("notification-close").addEventListener("click", () => setNotificationSheet(false));
+  document.getElementById("notification-backdrop").addEventListener("click", () => setNotificationSheet(false));
+  document.querySelectorAll("[data-notification-filter]").forEach(btn => {
+    btn.addEventListener("click", () => setNotificationFilter(btn.dataset.notificationFilter));
   });
   document.getElementById("player-modal").addEventListener("click", e => {
     if (e.target.id === "player-modal") closePlayerCard();
