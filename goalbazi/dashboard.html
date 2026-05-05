@@ -441,6 +441,28 @@
       justify-content: space-between;
       gap: 12px;
     }
+    .notification-brand-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+    .notification-logo-chip {
+      width: 38px;
+      height: 38px;
+      border-radius: 13px;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      background: rgba(255,255,255,.045);
+      border: 1px solid rgba(127,255,69,.18);
+      box-shadow: 0 10px 26px rgba(0,0,0,.18);
+    }
+    .notification-logo-chip img {
+      width: 24px;
+      height: 24px;
+      display: block;
+    }
     .notification-close {
       width: 38px;
       height: 38px;
@@ -556,7 +578,21 @@
         var(--panel);
     }
     .quote-kicker { color: var(--brand); font-size: .72rem; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
-    .quote-text { font-family: 'Syne', sans-serif; font-weight: 800; letter-spacing: -.04em; line-height: 1.1; font-size: clamp(1.2rem, 5vw, 1.75rem); margin-top: 8px; }
+    .quote-text { font-family: 'Syne', sans-serif; font-weight: 800; letter-spacing: -.04em; line-height: 1.1; font-size: clamp(1.2rem, 5vw, 1.75rem); margin-top: 8px; min-height: 2.35em; }
+    .quote-text.typing::after {
+      content: "";
+      display: inline-block;
+      width: 2px;
+      height: .9em;
+      margin-left: 3px;
+      background: var(--brand);
+      border-radius: 999px;
+      animation: quoteCaret .72s steps(1) infinite;
+      vertical-align: -.08em;
+    }
+    @keyframes quoteCaret {
+      50% { opacity: 0; }
+    }
     .quote-sub { color: var(--muted); font-size: .82rem; margin-top: 8px; }
     .badge-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
     .first-xi-badge { display: inline-flex; align-items: center; gap: 8px; border: 1px solid rgba(245,200,66,.26); background: rgba(245,200,66,.10); color: var(--warn); border-radius: 999px; padding: 7px 11px; font-weight: 800; font-size: .78rem; }
@@ -671,6 +707,7 @@
         bottom: calc(84px + env(safe-area-inset-bottom));
         width: auto;
         max-height: min(74vh, 620px);
+        z-index: 410;
         border-radius: 28px 28px 24px 24px;
         transform: translateY(calc(100% + 110px));
         transition: transform .24s ease;
@@ -862,10 +899,15 @@
 <aside class="notification-sheet" id="notification-sheet" aria-hidden="true" aria-label="Goalbazi notification center">
   <div class="notification-grab" aria-hidden="true"></div>
   <div class="notification-sheet-head">
-    <div>
-      <div class="quote-kicker">Activity</div>
-      <h2>Notifications</h2>
-      <div class="meta-line" id="notification-sheet-subtitle">Fresh football signals, no spam.</div>
+    <div class="notification-brand-head">
+      <div class="notification-logo-chip" aria-hidden="true">
+        <img src="/assets/goalbazi-logo.svg" alt="">
+      </div>
+      <div>
+        <div class="quote-kicker">Activity</div>
+        <h2>Notifications</h2>
+        <div class="meta-line" id="notification-sheet-subtitle">Fresh football signals, no spam.</div>
+      </div>
     </div>
     <button class="notification-close" type="button" id="notification-close" aria-label="Close notifications">&times;</button>
   </div>
@@ -874,6 +916,7 @@
     <button class="notification-filter" type="button" data-notification-filter="messages">Messages</button>
     <button class="notification-filter" type="button" data-notification-filter="teams">Teams</button>
     <button class="notification-filter" type="button" data-notification-filter="matches">Matches</button>
+    <button class="notification-filter" type="button" data-notification-filter="nudges">Nudges</button>
   </div>
   <div class="notification-feed" id="notification-feed"></div>
   <div class="notification-footer-note">No notification spam, only football signals.</div>
@@ -958,6 +1001,9 @@
     assistantOpen: false,
     notifications: [],
     notificationFilter: "all",
+    quoteIndex: 0,
+    quoteRotationTimer: null,
+    quoteTypingTimer: null,
   };
 
   function esc(value = "") {
@@ -1176,21 +1222,58 @@
     "Book the match before motivation expires."
   ];
 
+  const quoteSubjects = ["Your boots", "The squad", "Your first touch", "The group chat", "Your stamina bar", "The Sunday league script", "Your weak foot", "The captain", "The pitch", "Your next match"];
+  const quoteActions = ["is ready for", "has requested", "just unlocked", "is plotting", "deserves", "is allergic to", "came back with", "needs", "is downloading", "survived"];
+  const quotePunchlines = ["a last-minute winner", "post-match chai", "one clean first touch", "zero excuses today", "main character energy", "a tactical hydrate break", "a friendly match that gets serious", "one more player to confirm", "a comeback season", "the softest nutmeg possible"];
+  const goalbaziQuotePool = quoteSubjects.flatMap(subject =>
+    quoteActions.flatMap(action =>
+      quotePunchlines.map(punchline => `${subject} ${action} ${punchline}.`)
+    )
+  ).slice(0, 1000);
+
   function quoteOfTheDay() {
-    // Daily rotation keeps the dashboard fresh without needing database storage.
-    const start = new Date(new Date().getFullYear(), 0, 0);
-    const diff = new Date() - start;
-    const day = Math.floor(diff / 86400000);
-    return goalbaziQuotes[day % goalbaziQuotes.length];
+    return goalbaziQuotePool[Math.floor(Date.now() / 5000) % goalbaziQuotePool.length];
+  }
+
+  function typeQuote(text) {
+    const quoteEl = document.getElementById("quote-text");
+    if (!quoteEl) return;
+    clearInterval(state.quoteTypingTimer);
+    quoteEl.textContent = "";
+    quoteEl.classList.add("typing");
+    let index = 0;
+    const stepMs = Math.max(16, Math.min(36, Math.floor(1450 / Math.max(text.length, 1))));
+    state.quoteTypingTimer = setInterval(() => {
+      index += 1;
+      quoteEl.textContent = text.slice(0, index);
+      if (index >= text.length) {
+        clearInterval(state.quoteTypingTimer);
+      }
+    }, stepMs);
+  }
+
+  function rotateQuote() {
+    state.quoteIndex = (state.quoteIndex + 1) % goalbaziQuotePool.length;
+    typeQuote(goalbaziQuotePool[state.quoteIndex]);
+  }
+
+  function startQuoteRotation() {
+    // v3.10: 1000 generated quotes rotate every 5 seconds with a small typewriter effect.
+    if (state.quoteRotationTimer) return;
+    state.quoteIndex = Math.floor(Date.now() / 5000) % goalbaziQuotePool.length;
+    typeQuote(goalbaziQuotePool[state.quoteIndex] || quoteOfTheDay());
+    state.quoteRotationTimer = setInterval(rotateQuote, 5000);
   }
 
   function renderQuoteCard() {
-    const quote = quoteOfTheDay();
-    document.getElementById("quote-card").innerHTML = `
+    const card = document.getElementById("quote-card");
+    if (!card || card.querySelector("#quote-text")) return;
+    card.innerHTML = `
       <div class="quote-kicker">${window.GoalbaziTheme?.isGenz?.() ? "Daily pitch propaganda" : "Quote of the day"}</div>
-      <div class="quote-text">${esc(quote)}</div>
-      <div class="quote-sub">${window.GoalbaziTheme?.isGenz?.() ? "New quote tomorrow. Same hunger today." : "A small push to get your next match moving."}</div>
+      <div class="quote-text typing" id="quote-text"></div>
+      <div class="quote-sub">${window.GoalbaziTheme?.isGenz?.() ? "New quote every 5 seconds. Same hunger today." : "A fresh football nudge every 5 seconds."}</div>
     `;
+    startQuoteRotation();
   }
 
   function renderTeamChallengeCard(data) {
@@ -1448,7 +1531,7 @@
     renderGrowthCard(data);
     renderTeamChallengeCard(data);
     document.getElementById("community-meta").textContent = `${data.community.friend_count} friends · ${data.community.message_count} messages`;
-    renderNotifications(data.notifications || []);
+    renderNotifications(buildEngagementNotifications(data, data.notifications || []));
   }
 
   function rateControls(userId, currentRating = "") {
@@ -1493,6 +1576,63 @@
     return window.GoalbaziTheme?.isGenz?.() ? genz : normal;
   }
 
+  function dayName() {
+    return ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][new Date().getDay()];
+  }
+
+  function seededPick(items, salt = 0) {
+    const now = new Date();
+    const seed = (now.getFullYear() * 10000) + ((now.getMonth() + 1) * 100) + now.getDate() + salt;
+    return items[Math.abs(seed) % items.length];
+  }
+
+  function dailyPlayNudge() {
+    const daily = {
+      Sunday: ["Sunday football calling", "Your boots are getting emotional. Find a match or create one before the squad disappears."],
+      Monday: ["New week, new fixture", "Plan the weekend early. Create a match before everyone discovers their mysterious family function."],
+      Tuesday: ["Scout mode on", "Find athletes near you and build the squad before matchday panic begins."],
+      Wednesday: ["Midweek form check", "Update your player card, check leagues, and keep the stats looking respectful."],
+      Thursday: ["Weekend prep starts now", "Challenge another team before the best slots vanish."],
+      Friday: ["Friday football energy", "Search arenas, lock the game, and let the group chat pretend it was organized."],
+      Saturday: ["Matchday loading", "Join an open game near you. Touch grass, but with purpose."],
+    };
+    const [title, message] = daily[dayName()];
+    return { type: "nudge_games", title, message };
+  }
+
+  function buildEngagementNotifications(data, realNotifications = []) {
+    // v3.12: In-app nudges make the notification center feel alive without push-spam risk.
+    const profile = data.profile || {};
+    const community = data.community || {};
+    const games = data.games || [];
+    const arenas = data.turfs || [];
+    const nudges = [dailyPlayNudge()];
+    const possible = [
+      { type: "nudge_games", title: "Open games need energy", message: modeCopy("Check open matches and join one that fits your schedule.", "A match is probably missing your main-character cameo.") },
+      { type: "nudge_arenas", title: "Prime arena slots go fast", message: modeCopy("Search arenas near your city before the weekend rush.", "Book the arena before someone says 'bro, next week pakka'.") },
+      { type: "nudge_leagues", title: "League table check", message: modeCopy("See standings and upcoming league action.", "Check the table before the banter gets legally dangerous.") },
+      { type: "nudge_profile", title: "Player card polish", message: modeCopy("Update your position, level, and stats so athletes know your game.", "Your player card wants PR. Give it a glow-up.") },
+      { type: "nudge_rating", title: "Build trusted ratings", message: modeCopy("After you play, rate athletes and help the community stay fair.", "Rate after the match. No random slander, only verified ball knowledge.") },
+      { type: "nudge_friends", title: "Grow your football circle", message: modeCopy("Add athletes near you so it is easier to fill games.", "No squad? Scout ballers. Even Messi needed teammates.") },
+      { type: "nudge_ai", title: "Ask Goalbazi AI", message: modeCopy("Need help finding a match or arena? Ask the assistant.", "Lost in menus? Ask the bot. It has fewer excuses than humans.") },
+    ];
+    if (!games.length) nudges.push({ type: "nudge_games", title: "No match booked yet", message: modeCopy("Create or join a match to get your week moving.", "No match this week? Character development denied.") });
+    if (!arenas.length) nudges.push({ type: "nudge_arenas", title: "Find a place to play", message: modeCopy("Search arenas by city or nearby location.", "The ball needs a stage. Find an arena.") });
+    if (!profile.team) nudges.push({ type: "nudge_team", title: "Build your squad", message: modeCopy("Create or join a team so challenges feel official.", "Solo queue is brave. A squad is better.") });
+    if ((community.friend_count || 0) < 3) nudges.push({ type: "nudge_friends", title: "Add more athletes", message: modeCopy("Connect with a few players so games fill faster.", "Three more ballers and your group chat becomes dangerous.") });
+    nudges.push(seededPick(possible, realNotifications.length));
+    const unique = [];
+    const seen = new Set();
+    [...realNotifications, ...nudges].forEach(item => {
+      const key = `${item.type}:${item.title}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(item);
+      }
+    });
+    return unique.slice(0, 12);
+  }
+
   function notificationCode(type = "") {
     const map = {
       direct_message: "DM",
@@ -1503,11 +1643,20 @@
       team_challenge: "TC",
       team_challenge_status: "TC",
       booking_pending: "AR",
+      nudge_games: "GO",
+      nudge_arenas: "AR",
+      nudge_leagues: "LG",
+      nudge_team: "TM",
+      nudge_profile: "PR",
+      nudge_rating: "RT",
+      nudge_friends: "FR",
+      nudge_ai: "AI",
     };
     return map[type] || "GB";
   }
 
   function notificationGroup(type = "") {
+    if (type.startsWith("nudge_")) return "nudges";
     if (type === "direct_message") return "messages";
     if (type.includes("team_challenge") || type.includes("friend")) return "teams";
     if (type.includes("match") || type.includes("booking")) return "matches";
@@ -1524,6 +1673,14 @@
       team_challenge: ["Respond", "#team-challenge-card"],
       team_challenge_status: ["Open challenge", "#team-challenge-card"],
       booking_pending: ["Check arena", "/owner"],
+      nudge_games: ["Find games", "/games"],
+      nudge_arenas: ["Find arenas", "/turfs"],
+      nudge_leagues: ["Open leagues", "/leagues"],
+      nudge_team: ["Team hub", "#team-challenge-card"],
+      nudge_profile: ["Edit profile", "/profile"],
+      nudge_rating: ["Find athletes", "#athletes-panel"],
+      nudge_friends: ["Add athletes", "#athletes-panel"],
+      nudge_ai: ["Ask AI", "#assistant-fab"],
     };
     return map[type] || ["Open", "/dashboard"];
   }
