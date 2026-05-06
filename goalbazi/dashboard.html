@@ -1222,26 +1222,32 @@
     "Book the match before motivation expires."
   ];
 
-  const quoteFocusAreas = ["first touch", "weak foot", "stamina", "passing range", "shooting boots", "defending focus", "captain energy", "team chemistry", "matchday mood", "arena plan"];
-  const quoteActions = ["find a game near you", "call the squad", "book an arena early", "join an open match", "send a team challenge", "update your player card", "check the league table", "reply to the group chat", "warm up properly", "bring one extra player"];
-  const quoteRewards = ["the match gets easier", "the squad stops panicking", "your player card looks serious", "weekend football stays alive", "the banter becomes legal", "your team actually shows up", "the arena slot is safe", "your rating starts moving", "the comeback arc begins", "the boots forgive you"];
+  const quoteCharacters = ["your boots", "the squad", "the group chat", "your stamina bar", "your weak foot", "your player card", "the arena slot", "the league table", "the captain", "your matchday mood"];
+  const quoteProblems = ["stop ghosting the pitch", "book the arena before the excuses spawn", "create the match before motivation expires", "reply before the squad starts a court case", "bring one extra player and save the day", "update your stats before the PR disaster", "touch grass, but make it football", "send the challenge and choose chaos", "join an open game and farm XP", "drink water before your lungs uninstall"];
+  const quotePunchlines = ["character development denied", "main character energy pending", "group chat credibility restored", "side quest unlocked", "banter immunity activated", "weekend saved", "boots no longer filing complaints", "the comeback arc begins", "squad panic reduced", "football aura increased"];
+  function capitalize(text = "") {
+    return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
+  }
+  function sentenceCase(text = "") {
+    return capitalize(text).replace(/\.$/, "");
+  }
   const quoteTemplates = [
-    (focus, action, reward) => `Your ${focus} needs a plan today. ${action}, and ${reward}.`,
-    (focus, action, reward) => `Small improvement, big match energy. Work on your ${focus}, then ${action}.`,
-    (focus, action, reward) => `The squad does not need miracles. It needs your ${focus}, one good pass, and ${action}.`,
-    (focus, action, reward) => `If the excuses are warming up, ${action}. That is how ${reward}.`,
-    (focus, action, reward) => `Your ${focus} is part of the project. Show up today so ${reward}.`,
-    (focus, action, reward) => `Football is easier when someone starts. Be that person: ${action}.`,
-    (focus, action, reward) => `Do not wait for perfect form. Bring your ${focus}, play, and let ${reward}.`,
-    (focus, action, reward) => `One clean decision beats ten group chat maybes. ${action}, then play.`,
-    (focus, action, reward) => `Your next highlight starts before kickoff. Fix the ${focus} and ${action}.`,
-    (focus, action, reward) => `No dramatic speech needed. Just ${action}, protect the ${focus}, and move.`,
+    (character, problem, punchline) => `${capitalize(character)} called. They said ${problem}.`,
+    (character, problem, punchline) => `No football this week? ${capitalize(punchline)}.`,
+    (character, problem, punchline) => `The group chat has vibes, but no fixture. ${capitalize(problem)}.`,
+    (character, problem, punchline) => `${capitalize(character)} filed a complaint. Reason: ${problem}.`,
+    (character, problem, punchline) => `POV: you ${problem}. ${capitalize(punchline)}.`,
+    (character, problem, punchline) => `Today's mission: ${problem}. Reward: ${punchline}.`,
+    (character, problem, punchline) => `${capitalize(character)} is not asking for much. Just ${problem}.`,
+    (character, problem, punchline) => `Friendly match until the first nutmeg. Then ${punchline}.`,
+    (character, problem, punchline) => `If someone says "next week pakka", ${problem}.`,
+    (character, problem, punchline) => `Your football aura needs maintenance. ${sentenceCase(problem)}.`,
   ];
   const goalbaziQuotePool = quoteTemplates.flatMap((template, templateIndex) =>
-    quoteFocusAreas.flatMap((focus, focusIndex) =>
-      quoteActions.map((action, actionIndex) => {
-        const reward = quoteRewards[(templateIndex + focusIndex + actionIndex) % quoteRewards.length];
-        return template(focus, action, reward);
+    quoteCharacters.flatMap((character, characterIndex) =>
+      quoteProblems.map((problem, problemIndex) => {
+        const punchline = quotePunchlines[(templateIndex + characterIndex + problemIndex) % quotePunchlines.length];
+        return template(character, problem, punchline);
       })
     )
   ).slice(0, 1000);
