@@ -1222,12 +1222,27 @@
     "Book the match before motivation expires."
   ];
 
-  const quoteSubjects = ["Your boots", "The squad", "Your first touch", "The group chat", "Your stamina bar", "The Sunday league script", "Your weak foot", "The captain", "The pitch", "Your next match"];
-  const quoteActions = ["is ready for", "has requested", "just unlocked", "is plotting", "deserves", "is allergic to", "came back with", "needs", "is downloading", "survived"];
-  const quotePunchlines = ["a last-minute winner", "post-match chai", "one clean first touch", "zero excuses today", "main character energy", "a tactical hydrate break", "a friendly match that gets serious", "one more player to confirm", "a comeback season", "the softest nutmeg possible"];
-  const goalbaziQuotePool = quoteSubjects.flatMap(subject =>
-    quoteActions.flatMap(action =>
-      quotePunchlines.map(punchline => `${subject} ${action} ${punchline}.`)
+  const quoteFocusAreas = ["first touch", "weak foot", "stamina", "passing range", "shooting boots", "defending focus", "captain energy", "team chemistry", "matchday mood", "arena plan"];
+  const quoteActions = ["find a game near you", "call the squad", "book an arena early", "join an open match", "send a team challenge", "update your player card", "check the league table", "reply to the group chat", "warm up properly", "bring one extra player"];
+  const quoteRewards = ["the match gets easier", "the squad stops panicking", "your player card looks serious", "weekend football stays alive", "the banter becomes legal", "your team actually shows up", "the arena slot is safe", "your rating starts moving", "the comeback arc begins", "the boots forgive you"];
+  const quoteTemplates = [
+    (focus, action, reward) => `Your ${focus} needs a plan today. ${action}, and ${reward}.`,
+    (focus, action, reward) => `Small improvement, big match energy. Work on your ${focus}, then ${action}.`,
+    (focus, action, reward) => `The squad does not need miracles. It needs your ${focus}, one good pass, and ${action}.`,
+    (focus, action, reward) => `If the excuses are warming up, ${action}. That is how ${reward}.`,
+    (focus, action, reward) => `Your ${focus} is part of the project. Show up today so ${reward}.`,
+    (focus, action, reward) => `Football is easier when someone starts. Be that person: ${action}.`,
+    (focus, action, reward) => `Do not wait for perfect form. Bring your ${focus}, play, and let ${reward}.`,
+    (focus, action, reward) => `One clean decision beats ten group chat maybes. ${action}, then play.`,
+    (focus, action, reward) => `Your next highlight starts before kickoff. Fix the ${focus} and ${action}.`,
+    (focus, action, reward) => `No dramatic speech needed. Just ${action}, protect the ${focus}, and move.`,
+  ];
+  const goalbaziQuotePool = quoteTemplates.flatMap((template, templateIndex) =>
+    quoteFocusAreas.flatMap((focus, focusIndex) =>
+      quoteActions.map((action, actionIndex) => {
+        const reward = quoteRewards[(templateIndex + focusIndex + actionIndex) % quoteRewards.length];
+        return template(focus, action, reward);
+      })
     )
   ).slice(0, 1000);
 
