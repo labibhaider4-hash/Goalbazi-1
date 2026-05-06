@@ -2986,28 +2986,54 @@ def owner_dashboard_page():
     return send_from_directory(".", "owner_dashboard.html")
 
 
+@app.route("/arena/login")
+@app.route("/area/login")
+def owner_login_alias_page():
+    return redirect("/owner/login")
+
+
+@app.route("/arena/register")
+@app.route("/area/register")
+def owner_register_alias_page():
+    return redirect("/owner/register")
+
+
+@app.route("/arena/dashboard")
+@app.route("/area/dashboard")
+def owner_dashboard_alias_page():
+    return redirect("/owner/dashboard")
+
+
 @app.route("/api/owner/register", methods=["POST"])
 def api_owner_register():
-    data = request.get_json()
+    data = request.get_json() or {}
     name = data.get("name", "").strip()
     email = data.get("email", "").strip().lower()
     password = data.get("password", "")
+    confirm_password = data.get("confirm_password", "")
     phone = data.get("phone", "").strip()
     turf_name = data.get("turf_name", "").strip()
     area = data.get("area", "").strip()
-    price_per_hour = int(data.get("price_per_hour", 0))
     surface = data.get("surface", "Astroturf")
-    distance_km = float(data.get("distance_km", 0))
     upi_id = data.get("upi_id", "").strip()
     map_link = data.get("map_link", "").strip()
     description = data.get("description", "").strip()
     image_urls = serialize_image_urls(data.get("image_urls", ""))
-    latitude = float(data["latitude"]) if data.get("latitude") not in (None, "") else None
-    longitude = float(data["longitude"]) if data.get("longitude") not in (None, "") else None
-    if not all([name, email, password, turf_name, area, upi_id]):
+    if not all([name, email, password, turf_name, area, upi_id, data.get("price_per_hour")]):
         return jsonify({"error": "All fields are required"}), 400
     if len(password) < 8:
         return jsonify({"error": "Password must be at least 8 characters"}), 400
+    if confirm_password and confirm_password != password:
+        return jsonify({"error": "Passwords do not match"}), 400
+    try:
+        price_per_hour = int(data.get("price_per_hour", 0))
+        distance_km = float(data.get("distance_km", 0) or 0)
+        latitude = float(data["latitude"]) if data.get("latitude") not in (None, "") else None
+        longitude = float(data["longitude"]) if data.get("longitude") not in (None, "") else None
+    except (TypeError, ValueError):
+        return jsonify({"error": "Price, distance, and GPS values must be valid numbers"}), 400
+    if price_per_hour <= 0:
+        return jsonify({"error": "Price per hour must be greater than zero"}), 400
     existing = query("SELECT id FROM turf_owners WHERE email = %s", (email,), one=True)
     if existing:
         return jsonify({"error": "Email already registered"}), 409
@@ -3035,13 +3061,14 @@ def api_owner_register():
             )
     conn.commit()
     session["owner_id"] = owner_id
+    session.pop("user_id", None)
     log_event("owner_register", "/api/owner/register", {"owner_id": owner_id, "turf_id": turf_id})
     return jsonify({"ok": True}), 201
 
 
 @app.route("/api/owner/login", methods=["POST"])
 def api_owner_login():
-    data = request.get_json()
+    data = request.get_json() or {}
     email = data.get("email", "").strip().lower()
     password = data.get("password", "")
     owner = query("SELECT id, password_hash FROM turf_owners WHERE email = %s", (email,), one=True)
@@ -3049,6 +3076,7 @@ def api_owner_login():
         return jsonify({"error": "Invalid email or password"}), 401
     session.permanent = True
     session["owner_id"] = owner["id"]
+    session.pop("user_id", None)
     log_event("owner_login", "/api/owner/login", {"owner_id": owner["id"]})
     return jsonify({"ok": True})
 
@@ -3065,7 +3093,37 @@ def api_owner_dashboard():
     owner = query("SELECT id, name, email FROM turf_owners WHERE id = %s", (current_owner_id(),), one=True)
     turf = query("SELECT * FROM turfs WHERE owner_id = %s AND archived_at IS NULL", (current_owner_id(),), one=True)
     if not turf:
-        return jsonify({"error": "No turf found"}), 404
+        return jsonify({
+            "owner": dict(owner),
+            "setup_required": True,
+            "turf": {
+                "name": "Set up your arena",
+                "area": "Add your location",
+                "surface": "Astroturf",
+                "distance_km": 0,
+                "rating": 4.5,
+                "price_per_hour": 0,
+                "upi_id": "",
+                "map_link": "",
+                "latitude": "",
+                "longitude": "",
+                "description": "",
+                "image_urls": [],
+                "qr_base64": "",
+            },
+            "bookings": [],
+            "stats": {
+                "pending": 0,
+                "confirmed_today": 0,
+                "revenue_today": 0,
+                "total_bookings": 0,
+            },
+            "notifications": [{
+                "title": "Finish arena setup",
+                "message": "Add your arena name, price, UPI ID, photos, and location to make it visible to athletes.",
+                "type": "owner_setup",
+            }],
+        })
     today = datetime.now().date().isoformat()
     bookings = [dict(r) for r in query(
         """SELECT b.id, b.player_name, b.player_email, b.utr_number, b.amount, b.status,
@@ -3163,17 +3221,22 @@ def api_owner_settings():
     turf_name = (data.get("turf_name") or "").strip()
     area = (data.get("area") or "").strip()
     surface = (data.get("surface") or "Astroturf").strip()
-    distance_km = float(data.get("distance_km", 0) or 0)
-    rating = float(data.get("rating", 4.5) or 4.5)
-    price_per_hour = int(data.get("price_per_hour", 0) or 0)
     upi_id = (data.get("upi_id") or "").strip()
     map_link = (data.get("map_link") or "").strip()
-    latitude = float(data["latitude"]) if data.get("latitude") not in (None, "") else None
-    longitude = float(data["longitude"]) if data.get("longitude") not in (None, "") else None
     description = data.get("description", "")
     image_urls = serialize_image_urls(data.get("image_urls", ""))
+    try:
+        distance_km = float(data.get("distance_km", 0) or 0)
+        rating = float(data.get("rating", 4.5) or 4.5)
+        price_per_hour = int(data.get("price_per_hour", 0) or 0)
+        latitude = float(data["latitude"]) if data.get("latitude") not in (None, "") else None
+        longitude = float(data["longitude"]) if data.get("longitude") not in (None, "") else None
+    except (TypeError, ValueError):
+        return jsonify({"error": "Price, distance, rating, and GPS values must be valid numbers"}), 400
     if not turf_name or not area:
         return jsonify({"error": "Arena name and area are required"}), 400
+    if price_per_hour <= 0:
+        return jsonify({"error": "Price per hour must be greater than zero"}), 400
 
     conn = get_db()
     cur = conn.cursor()

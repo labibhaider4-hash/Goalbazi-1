@@ -113,6 +113,35 @@
   font-size:16px;
 }
 
+.owner-password-field {
+  position: relative;
+}
+
+.owner-password-field input {
+  padding-right: 46px;
+}
+
+.owner-password-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255,255,255,.04);
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.owner-password-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+
 /* ===== ELITE BUTTON ===== */
 
 .primary-btn{
@@ -244,7 +273,21 @@
         </label>
         <label>
           <span>Password</span>
-          <input type="password" name="password" placeholder="Min 8 characters" required>
+          <div class="owner-password-field">
+            <input id="owner-register-password" type="password" name="password" placeholder="Min 8 characters" required autocomplete="new-password">
+            <button class="owner-password-toggle" type="button" data-owner-password-toggle="owner-register-password" aria-label="Show password">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 5c5 0 8.5 4.1 9.7 5.8a2 2 0 0 1 0 2.4C20.5 14.9 17 19 12 19s-8.5-4.1-9.7-5.8a2 2 0 0 1 0-2.4C3.5 9.1 7 5 12 5Zm0 2c-4 0-6.9 3.4-8 5 1.1 1.6 4 5 8 5s6.9-3.4 8-5c-1.1-1.6-4-5-8-5Zm0 2.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5Z"/></svg>
+            </button>
+          </div>
+        </label>
+        <label>
+          <span>Confirm password</span>
+          <div class="owner-password-field">
+            <input id="owner-register-confirm-password" type="password" name="confirm_password" placeholder="Re-enter password" required autocomplete="new-password">
+            <button class="owner-password-toggle" type="button" data-owner-password-toggle="owner-register-confirm-password" aria-label="Show password">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 5c5 0 8.5 4.1 9.7 5.8a2 2 0 0 1 0 2.4C20.5 14.9 17 19 12 19s-8.5-4.1-9.7-5.8a2 2 0 0 1 0-2.4C3.5 9.1 7 5 12 5Zm0 2c-4 0-6.9 3.4-8 5 1.1 1.6 4 5 8 5s6.9-3.4 8-5c-1.1-1.6-4-5-8-5Zm0 2.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5Z"/></svg>
+            </button>
+          </div>
         </label>
         <hr style="border-color:var(--line);margin:4px 0">
         <label>
@@ -312,6 +355,15 @@
   <script>
     GoalbaziTheme.attachButton(document.getElementById("owner-register-theme-toggle"));
 
+    document.querySelectorAll("[data-owner-password-toggle]").forEach(button => {
+      button.addEventListener("click", () => {
+        const input = document.getElementById(button.dataset.ownerPasswordToggle);
+        const isHidden = input.type === "password";
+        input.type = isHidden ? "text" : "password";
+        button.setAttribute("aria-label", isHidden ? "Hide password" : "Show password");
+      });
+    });
+
     document.getElementById("owner-gps-btn").addEventListener("click", () => {
       if (!navigator.geolocation) return;
       navigator.geolocation.getCurrentPosition((pos) => {
@@ -326,6 +378,11 @@
       const btn = document.getElementById("submit-btn");
       const err = document.getElementById("error-msg");
       const data = Object.fromEntries(new FormData(e.currentTarget).entries());
+      if (data.password !== data.confirm_password) {
+        err.textContent = "Passwords do not match";
+        err.style.display = "block";
+        return;
+      }
       btn.textContent = "Creating account...";
       btn.disabled = true;
       err.style.display = "none";

@@ -66,6 +66,18 @@
     .stat-card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:var(--shadow)}
     .stat-value{font-size:2rem;font-weight:800;color:var(--brand)}
     .stat-label{color:var(--muted);font-size:.85rem;margin-top:4px}
+    .analytics-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:14px;margin-bottom:24px}
+    .analytics-card{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:18px;box-shadow:var(--shadow)}
+    .analytics-card h3{font-size:1rem;margin-bottom:12px}
+    .metric-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+    .metric-row:last-child{border-bottom:0}
+    .metric-label{color:var(--muted);font-size:.86rem}
+    .metric-value{font-weight:900;color:var(--brand)}
+    .bar-list{display:grid;gap:10px}
+    .bar-item{display:grid;gap:6px}
+    .bar-top{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font-size:.82rem;font-weight:700}
+    .bar-track{height:8px;border-radius:999px;background:var(--panel-soft);overflow:hidden;border:1px solid var(--line)}
+    .bar-fill{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--brand),var(--brand-2))}
 
     /* Tabs */
     .tabs{display:flex;gap:8px;margin-bottom:24px;border-bottom:1px solid var(--line);padding-bottom:0;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
@@ -114,6 +126,10 @@
     .slot-pending{color:#f1d66f}
     .notify-list{display:grid;gap:10px;margin-bottom:20px}
     .notify-item{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:var(--shadow)}
+    .setup-callout{display:none;background:linear-gradient(135deg,rgba(132,242,85,.12),rgba(61,232,160,.06));border:1px solid rgba(132,242,85,.22);border-radius:20px;padding:18px;margin-bottom:20px;box-shadow:var(--shadow)}
+    .setup-callout.active{display:block}
+    .setup-callout h2{font-size:1.08rem;margin-bottom:6px}
+    .setup-callout p{color:var(--muted);font-size:.9rem;line-height:1.6;margin-bottom:12px}
     .gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin-top:12px}
     .gallery-thumb{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:12px;border:1px solid var(--line)}
 
@@ -125,6 +141,7 @@
       .header-right .btn{flex:1 1 auto;min-width:max-content}
       .shell{padding:18px 12px 72px}
       .stats-row{grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
+      .analytics-grid{grid-template-columns:1fr;gap:10px}
       .stat-card{padding:16px 14px;border-radius:16px}
       .stat-value{font-size:1.55rem}
       .tabs{margin-left:-12px;margin-right:-12px;padding:0 12px}
@@ -170,7 +187,14 @@
 
 <div class="shell">
 
+  <div class="setup-callout" id="owner-setup-callout">
+    <h2>Finish your arena setup</h2>
+    <p>Add your arena name, area, price, UPI ID, photos, and GPS location. Once saved, athletes can discover it from the arena page.</p>
+    <button class="btn btn-primary btn-sm" type="button" onclick="openOwnerTab('settings')">Complete setup</button>
+  </div>
+
   <div class="stats-row" id="owner-stats"></div>
+  <div class="analytics-grid" id="owner-analytics"></div>
   <div class="notify-list" id="owner-notifications"></div>
 
   <div class="tabs">
@@ -309,7 +333,12 @@
   async function api(path, options = {}) {
     const res = await fetch(path, { headers: { "Content-Type": "application/json" }, ...options });
     if (res.status === 401) { window.location.href = "/owner/login"; return null; }
-    return res.json();
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      showToast(body.error || "Arena Partner request failed");
+      return null;
+    }
+    return body;
   }
 
   function showToast(msg) {
@@ -330,6 +359,10 @@
     document.getElementById("owner-turf-meta").textContent = `${data.turf.area} · ${data.turf.surface} · ₹${data.turf.price_per_hour}/hr`;
     document.getElementById("owner-name-display").textContent = data.owner.name;
     document.getElementById("upi-display").textContent = data.turf.upi_id || "Not set";
+    if (data.setup_required) {
+      document.getElementById("owner-turf-meta").textContent = "Complete setup to make your arena visible";
+    }
+    document.getElementById("owner-setup-callout").classList.toggle("active", Boolean(data.setup_required));
     document.getElementById("owner-notifications").innerHTML = (data.notifications || []).length
       ? data.notifications.map(item => `<div class="notify-item"><div style="font-weight:800">${item.title}</div><div class="booking-meta" style="margin-top:6px">${item.message}</div></div>`).join("")
       : "";
@@ -349,7 +382,58 @@
 
     renderBookings(data.bookings);
     renderPayments(data.bookings);
+    renderOwnerAnalytics(data);
     prefillSettings(data.turf);
+  }
+
+  function renderOwnerAnalytics(data) {
+    // v3.15: frontend analytics keep the owner dashboard useful without adding database migrations.
+    const bookings = data.bookings || [];
+    const confirmed = bookings.filter(b => b.status === "confirmed");
+    const pending = bookings.filter(b => b.status === "pending");
+    const rejected = bookings.filter(b => b.status === "rejected");
+    const totalRevenue = confirmed.reduce((sum, b) => sum + Number(b.amount || 0), 0);
+    const conversion = bookings.length ? Math.round((confirmed.length / bookings.length) * 100) : 0;
+    const slotCounts = bookings.reduce((acc, b) => {
+      acc[b.slot_time] = (acc[b.slot_time] || 0) + 1;
+      return acc;
+    }, {});
+    const topSlots = Object.entries(slotCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4);
+    const maxSlot = Math.max(1, ...topSlots.map(item => item[1]));
+    const setupScore = [
+      data.turf?.name && data.turf.name !== "Set up your arena",
+      data.turf?.area && data.turf.area !== "Add your location",
+      Number(data.turf?.price_per_hour || 0) > 0,
+      data.turf?.upi_id,
+      data.turf?.description,
+      (data.turf?.image_urls || []).length,
+      data.turf?.latitude && data.turf?.longitude,
+    ].filter(Boolean).length;
+    const setupPercent = Math.round((setupScore / 7) * 100);
+
+    document.getElementById("owner-analytics").innerHTML = `
+      <div class="analytics-card">
+        <h3>Arena analytics</h3>
+        <div class="metric-row"><span class="metric-label">Total confirmed revenue</span><span class="metric-value">₹${totalRevenue}</span></div>
+        <div class="metric-row"><span class="metric-label">Approval conversion</span><span class="metric-value">${conversion}%</span></div>
+        <div class="metric-row"><span class="metric-label">Pending reservations</span><span class="metric-value">${pending.length}</span></div>
+        <div class="metric-row"><span class="metric-label">Rejected reservations</span><span class="metric-value">${rejected.length}</span></div>
+        <div class="metric-row"><span class="metric-label">Profile completion</span><span class="metric-value">${setupPercent}%</span></div>
+      </div>
+      <div class="analytics-card">
+        <h3>Popular slots</h3>
+        <div class="bar-list">
+          ${topSlots.length ? topSlots.map(([time, count]) => `
+            <div class="bar-item">
+              <div class="bar-top"><span>${time}</span><span>${count} booking${count === 1 ? "" : "s"}</span></div>
+              <div class="bar-track"><span class="bar-fill" style="width:${Math.max(12, Math.round((count / maxSlot) * 100))}%"></span></div>
+            </div>
+          `).join("") : `<div class="empty" style="padding:12px">Popular slots will appear after bookings start.</div>`}
+        </div>
+      </div>
+    `;
   }
 
   function renderBookings(bookings) {
@@ -497,7 +581,12 @@
   document.getElementById("settings-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(e.currentTarget).entries());
-    await api("/api/owner/settings", { method: "PUT", body: JSON.stringify(data) });
+    if (!data.turf_name || !data.area || !data.price_per_hour) {
+      showToast("Arena name, area, and price are required");
+      return;
+    }
+    const saved = await api("/api/owner/settings", { method: "PUT", body: JSON.stringify(data) });
+    if (!saved) return;
     showToast("Settings saved ✓");
     await loadDashboard();
   });

@@ -76,6 +76,35 @@
   cursor: not-allowed;
 }
 
+.owner-password-field {
+  position: relative;
+}
+
+.owner-password-field input {
+  padding-right: 46px;
+}
+
+.owner-password-toggle {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255,255,255,.04);
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.owner-password-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+
 @media (max-width: 520px) {
   .auth-shell {
     align-items: start;
@@ -130,7 +159,12 @@
         </label>
         <label>
           <span>Password</span>
-          <input type="password" name="password" placeholder="••••••••" required>
+          <div class="owner-password-field">
+            <input id="owner-login-password" type="password" name="password" placeholder="Password" required autocomplete="current-password">
+            <button class="owner-password-toggle" type="button" data-owner-password-toggle="owner-login-password" aria-label="Show password">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 5c5 0 8.5 4.1 9.7 5.8a2 2 0 0 1 0 2.4C20.5 14.9 17 19 12 19s-8.5-4.1-9.7-5.8a2 2 0 0 1 0-2.4C3.5 9.1 7 5 12 5Zm0 2c-4 0-6.9 3.4-8 5 1.1 1.6 4 5 8 5s6.9-3.4 8-5c-1.1-1.6-4-5-8-5Zm0 2.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5Z"/></svg>
+            </button>
+          </div>
         </label>
         <p class="error-msg" id="error-msg"></p>
         <button class="primary-btn" type="submit" id="submit-btn">Sign in</button>
@@ -143,6 +177,15 @@
   <script src="/nav.js"></script>
   <script>
     GoalbaziTheme.attachButton(document.getElementById("owner-login-theme-toggle"));
+
+    document.querySelectorAll("[data-owner-password-toggle]").forEach(button => {
+      button.addEventListener("click", () => {
+        const input = document.getElementById(button.dataset.ownerPasswordToggle);
+        const isHidden = input.type === "password";
+        input.type = isHidden ? "text" : "password";
+        button.setAttribute("aria-label", isHidden ? "Hide password" : "Show password");
+      });
+    });
 
     document.getElementById("login-form").addEventListener("submit", async (e) => {
       e.preventDefault();
