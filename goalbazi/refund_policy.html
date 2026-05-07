@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<!-- v3.19: Public Refund and Cancellation Policy for booking trust. -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Goalbazi - Refund Policy</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/goalbazi-logo.svg">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    .policy-shell{max-width:900px;margin:0 auto;padding:34px 16px 90px}
+    .policy-card{border:1px solid var(--line);border-radius:28px;background:var(--panel);padding:24px;position:relative;z-index:1}
+    .policy-card h1{font-family:"Syne",sans-serif;font-size:clamp(2rem,8vw,4rem);line-height:.95;letter-spacing:-.08em;margin:0 0 12px}
+    .policy-card h2{margin:24px 0 8px;font-size:1.05rem}
+    .policy-card p,.policy-card li{color:var(--muted-2);line-height:1.7}
+    .policy-card ul{padding-left:18px}
+  </style>
+</head>
+<body class="goalbazi-app-bg">
+  <nav class="navbar" id="navbar"></nav>
+  <div class="nav-drawer" id="nav-drawer"></div>
+  <div class="ambient ambient-a"></div>
+  <div class="ambient ambient-b"></div>
+  <main class="policy-shell">
+    <section class="policy-card">
+      <h1>Refund & Cancellation Policy</h1>
+      <p>This beta policy explains how booking and payment issues should be handled before automated gateway refunds are added.</p>
+      <h2>Pending bookings</h2>
+      <p>If a booking is pending and the arena partner has not confirmed it, the user should contact support with the booking details and UTR/payment proof.</p>
+      <h2>Rejected bookings</h2>
+      <p>If a paid booking is rejected, the user can raise a dispute through support. Admin will review the UTR, owner response, and booking status.</p>
+      <h2>Confirmed bookings</h2>
+      <p>Confirmed bookings are expected to be honored by the arena partner. Refunds after confirmation depend on the arena cancellation rules and admin review.</p>
+      <h2>Owner payouts</h2>
+      <p>Goalbazi may calculate owner payouts after deducting platform commission. Manual payouts should be recorded in the admin payout ledger.</p>
+      <h2>Best future version</h2>
+      <p>For full launch, Goalbazi should use Razorpay/Cashfree/PhonePe gateway payments with automated payment verification, refund tracking, and marketplace settlement.</p>
+    </section>
+  </main>
+  <script src="/nav.js"></script>
+  <script>try{initNav("support")}catch{}</script>
+</body>
+</html>

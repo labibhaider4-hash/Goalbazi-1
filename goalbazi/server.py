@@ -46,6 +46,9 @@ app.permanent_session_lifetime = timedelta(days=int(os.environ.get("SESSION_DAYS
 app.config.update(
     SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=os.environ.get("PUBLIC_BASE_URL", "").startswith("https://"),
+    # v3.16: keep browser-side scripts from reading the session cookie if an XSS bug appears.
+    SESSION_COOKIE_HTTPONLY=True,
+    MAX_CONTENT_LENGTH=int(os.environ.get("MAX_REQUEST_BYTES", str(2 * 1024 * 1024))),
 )
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
@@ -67,6 +70,27 @@ SHOW_PASSWORD_RESET_LINK = os.environ.get("SHOW_PASSWORD_RESET_LINK", "").strip(
 # Production should not recreate sample arenas/leagues/teams after admin deletes
 # them. Set SEED_STARTER_DATA=true only when you intentionally want demo data.
 SEED_STARTER_DATA = os.environ.get("SEED_STARTER_DATA", "").strip().lower() in {"1", "true", "yes"}
+
+# v3.16 launch hardening: small in-memory limits protect pre-launch from spam,
+# brute force, and accidental DoS without adding a new dependency or migration service.
+RATE_LIMITS = {
+    "auth": (12, 15 * 60),
+    "forgot_password": (5, 60 * 60),
+    "message": (35, 60),
+    "friend_request": (20, 60 * 60),
+    "booking": (12, 10 * 60),
+    "rating": (30, 60 * 60),
+    "challenge": (10, 60 * 60),
+    "support": (5, 15 * 60),
+    "push": (6, 60 * 60),
+}
+_RATE_BUCKETS: dict[str, list[datetime]] = {}
+
+SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+MAX_SHORT_TEXT = 120
+MAX_LONG_TEXT = 1200
+MAX_MESSAGE_TEXT = 800
+MAX_URLS_PER_ARENA = 8
 
 
 def app_port() -> int:
@@ -110,6 +134,107 @@ def query(sql, params=(), one=False, commit=False):
     if one:
         return cur.fetchone()
     return cur.fetchall()
+
+
+# ---------------------------------------------------------------------------
+# Launch safety helpers
+# ---------------------------------------------------------------------------
+
+def security_actor_key(scope: str) -> str:
+    """Build a rate-limit key that works before and after login."""
+    actor = session.get("user_id") or session.get("owner_id") or request.remote_addr or "anonymous"
+    return f"{scope}:{actor}"
+
+
+def rate_limited(scope: str) -> bool:
+    """Return True when the current actor has exceeded a simple abuse threshold."""
+    limit, window_seconds = RATE_LIMITS.get(scope, (60, 60))
+    now = datetime.now()
+    key = security_actor_key(scope)
+    bucket = [
+        stamp for stamp in _RATE_BUCKETS.get(key, [])
+        if (now - stamp).total_seconds() < window_seconds
+    ]
+    if len(bucket) >= limit:
+        _RATE_BUCKETS[key] = bucket
+        return True
+    bucket.append(now)
+    _RATE_BUCKETS[key] = bucket
+    return False
+
+
+def require_rate_limit(scope: str):
+    """Small helper used by spam-sensitive routes to keep the UX readable."""
+    if rate_limited(scope):
+        return jsonify({"error": "Too many attempts. Please wait a little and try again."}), 429
+    return None
+
+
+def same_origin_request() -> bool:
+    """Protect cookie-authenticated writes from cross-site form/script abuse."""
+    origin = request.headers.get("Origin") or request.headers.get("Referer") or ""
+    if not origin:
+        return True
+    parsed = urlparse(origin)
+    current_host = request.host
+    return parsed.netloc == current_host
+
+
+@app.before_request
+def apply_launch_security_headers():
+    """Block risky cross-site state changes before they reach feature routes."""
+    if request.method in SAFE_METHODS:
+        return None
+    if not same_origin_request():
+        log_event("security_block_cross_origin", request.path, {"origin": request.headers.get("Origin", "")})
+        return jsonify({"error": "Blocked unsafe cross-site request"}), 403
+    return None
+
+
+@app.after_request
+def attach_security_headers(response):
+    """Add browser guardrails without changing page layouts."""
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "geolocation=(self), camera=(), microphone=()")
+    return response
+
+
+def clean_text(value, max_len=MAX_SHORT_TEXT) -> str:
+    """Normalize user text so names/descriptions cannot become huge payloads."""
+    text = re.sub(r"\s+", " ", str(value or "")).strip()
+    return text[:max_len]
+
+
+def clean_multiline(value, max_len=MAX_LONG_TEXT) -> str:
+    """Normalize longer text while preserving enough spacing for descriptions."""
+    text = str(value or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+    return text[:max_len]
+
+
+def parse_int_field(value, default=0, minimum=None, maximum=None) -> int:
+    """Safely parse integer fields from JSON forms and clamp risky values."""
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        number = default
+    if minimum is not None:
+        number = max(minimum, number)
+    if maximum is not None:
+        number = min(maximum, number)
+    return number
+
+
+def valid_url(value: str, allow_data_image: bool = False) -> bool:
+    """Allow normal web links and optional image data URLs; block javascript: style links."""
+    text = str(value or "").strip()
+    if not text:
+        return True
+    if allow_data_image and text.startswith("data:image/"):
+        return len(text) <= 1_500_000
+    parsed = urlparse(text)
+    return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
 
 
 # ---------------------------------------------------------------------------
@@ -466,6 +591,12 @@ def seed_db():
     cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS image_urls TEXT NOT NULL DEFAULT '[]'")
     cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS archived_at TEXT")
     cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS admin_note TEXT NOT NULL DEFAULT ''")
+    cur.execute("ALTER TABLE turf_owners ADD COLUMN IF NOT EXISTS owner_status TEXT NOT NULL DEFAULT 'approved'")
+    cur.execute("ALTER TABLE turf_owners ADD COLUMN IF NOT EXISTS verified_at TEXT")
+    cur.execute("ALTER TABLE turf_owners ADD COLUMN IF NOT EXISTS admin_note TEXT NOT NULL DEFAULT ''")
+    cur.execute("ALTER TABLE turfs ADD COLUMN IF NOT EXISTS owner_verified BOOLEAN NOT NULL DEFAULT TRUE")
+    # Existing arenas stay live; newly self-registered owner arenas are held for admin review.
+    cur.execute("UPDATE turfs SET owner_verified = TRUE WHERE owner_verified IS NULL")
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS analytics_events (
@@ -724,6 +855,47 @@ def seed_db():
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL,
             updated_at TEXT NOT NULL
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS user_blocks (
+            id SERIAL PRIMARY KEY,
+            blocker_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            blocked_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            created_at TEXT NOT NULL,
+            UNIQUE(blocker_id, blocked_id)
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS safety_reports (
+            id SERIAL PRIMARY KEY,
+            reporter_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            reporter_owner_id INTEGER REFERENCES turf_owners(id) ON DELETE SET NULL,
+            target_type TEXT NOT NULL,
+            target_id INTEGER,
+            reason TEXT NOT NULL,
+            details TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'open',
+            created_at TEXT NOT NULL,
+            reviewed_at TEXT
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS owner_payouts (
+            id SERIAL PRIMARY KEY,
+            owner_id INTEGER NOT NULL REFERENCES turf_owners(id) ON DELETE CASCADE,
+            payout_date TEXT NOT NULL,
+            gross_amount INTEGER NOT NULL DEFAULT 0,
+            commission_amount INTEGER NOT NULL DEFAULT 0,
+            net_amount INTEGER NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'pending',
+            payout_note TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL,
+            paid_at TEXT,
+            UNIQUE(owner_id, payout_date)
         )
     """)
 
@@ -1086,6 +1258,19 @@ def are_friends(user_a, user_b):
     return bool(row)
 
 
+def users_are_blocked(user_a, user_b) -> bool:
+    """Stop messaging/social actions when either athlete has blocked the other."""
+    row = query(
+        """SELECT id FROM user_blocks
+           WHERE (blocker_id = %s AND blocked_id = %s)
+              OR (blocker_id = %s AND blocked_id = %s)
+           LIMIT 1""",
+        (user_a, user_b, user_b, user_a),
+        one=True,
+    )
+    return bool(row)
+
+
 def can_rate_athlete(rater_id, rated_id):
     if rater_id == rated_id:
         return False, "You cannot rate yourself."
@@ -1168,15 +1353,24 @@ def parse_image_urls(raw_value):
     if not raw_value:
         return []
     if isinstance(raw_value, list):
-        return [str(item).strip() for item in raw_value if str(item).strip()]
+        return [
+            str(item).strip() for item in raw_value[:MAX_URLS_PER_ARENA]
+            if valid_url(str(item).strip(), allow_data_image=True)
+        ]
     text = str(raw_value).strip()
     try:
         data = json.loads(text)
         if isinstance(data, list):
-            return [str(item).strip() for item in data if str(item).strip()]
+            return [
+                str(item).strip() for item in data[:MAX_URLS_PER_ARENA]
+                if valid_url(str(item).strip(), allow_data_image=True)
+            ]
     except Exception:
         pass
-    return [line.strip() for line in text.replace(",", "\n").splitlines() if line.strip()]
+    return [
+        line.strip() for line in text.replace(",", "\n").splitlines()[:MAX_URLS_PER_ARENA]
+        if valid_url(line.strip(), allow_data_image=True)
+    ]
 
 
 def serialize_image_urls(raw_value):
@@ -1340,6 +1534,7 @@ def build_assistant_context(user_id):
            FROM games g
            JOIN turfs t ON t.id = g.turf_id
            WHERE t.archived_at IS NULL
+             AND COALESCE(t.owner_verified, TRUE) = TRUE
            ORDER BY g.game_date ASC, g.game_time ASC
            LIMIT 4"""
     )]
@@ -1347,6 +1542,7 @@ def build_assistant_context(user_id):
         """SELECT id, name, area, rating, price_per_hour, surface
            FROM turfs
            WHERE archived_at IS NULL
+             AND COALESCE(owner_verified, TRUE) = TRUE
              AND (LOWER(name) LIKE %s OR LOWER(area) LIKE %s)
            ORDER BY rating DESC, price_per_hour ASC
            LIMIT 4""",
@@ -1357,6 +1553,7 @@ def build_assistant_context(user_id):
             """SELECT id, name, area, rating, price_per_hour, surface
                FROM turfs
                WHERE archived_at IS NULL
+                 AND COALESCE(owner_verified, TRUE) = TRUE
                ORDER BY rating DESC, price_per_hour ASC
                LIMIT 4"""
         )]
@@ -1543,6 +1740,7 @@ def get_turfs(date_value, search="", user_lat=None, user_lng=None):
     turfs = [dict(r) for r in query(
         """SELECT * FROM turfs
            WHERE archived_at IS NULL
+             AND COALESCE(owner_verified, TRUE) = TRUE
              AND (%s = '' OR LOWER(name) LIKE %s OR LOWER(area) LIKE %s OR LOWER(surface) LIKE %s)
            ORDER BY id DESC""",
         (search, like, like, like),
@@ -1572,7 +1770,7 @@ def get_game_detail(game_id):
         SELECT g.*, t.name AS location,
                CASE g.format WHEN '11v11' THEN 11 WHEN '7v7' THEN 7 ELSE 5 END AS players_per_team
         FROM games g JOIN turfs t ON t.id = g.turf_id
-        WHERE g.id = %s AND t.archived_at IS NULL
+        WHERE g.id = %s AND t.archived_at IS NULL AND COALESCE(t.owner_verified, TRUE) = TRUE
         """,
         (game_id,), one=True,
     )
@@ -1599,7 +1797,7 @@ def get_games():
         """SELECT g.id
            FROM games g
            JOIN turfs t ON t.id = g.turf_id
-           WHERE t.archived_at IS NULL
+           WHERE t.archived_at IS NULL AND COALESCE(t.owner_verified, TRUE) = TRUE
            ORDER BY g.game_date ASC, g.game_time ASC"""
     )
     return [get_game_detail(row["id"]) for row in rows]
@@ -1634,14 +1832,32 @@ def support_page():
     return send_from_directory(".", "support.html")
 
 
+@app.route("/privacy")
+def privacy_page():
+    return send_from_directory(".", "privacy.html")
+
+
+@app.route("/terms")
+def terms_page():
+    return send_from_directory(".", "terms.html")
+
+
+@app.route("/refund-policy")
+def refund_policy_page():
+    return send_from_directory(".", "refund_policy.html")
+
+
 @app.route("/api/auth/register", methods=["POST"])
 def api_register():
-    data = request.get_json()
-    name = data.get("name", "").strip()
+    limited = require_rate_limit("auth")
+    if limited:
+        return limited
+    data = request.get_json() or {}
+    name = clean_text(data.get("name", ""), 80)
     handle = sanitize_handle(data.get("handle", ""))
     email = data.get("email", "").strip().lower()
     password = data.get("password", "")
-    location = data.get("location", "Delhi NCR").strip()
+    location = clean_text(data.get("location", "Delhi NCR"), 80)
 
     if not all([name, handle, email, password]):
         return jsonify({"error": "All fields are required"}), 400
@@ -1664,13 +1880,17 @@ def api_register():
     conn.commit()
     session.permanent = True
     session["user_id"] = user_id
+    session.pop("owner_id", None)
     log_event("auth_register", "/api/auth/register", {"user_id": user_id})
     return jsonify({"ok": True}), 201
 
 
 @app.route("/api/auth/login", methods=["POST"])
 def api_login():
-    data = request.get_json()
+    limited = require_rate_limit("auth")
+    if limited:
+        return limited
+    data = request.get_json() or {}
     email = data.get("email", "").strip().lower()
     password = data.get("password", "")
     user = query("SELECT id, password_hash FROM users WHERE email = %s", (email,), one=True)
@@ -1678,6 +1898,7 @@ def api_login():
         return jsonify({"error": "Invalid email or password"}), 401
     session.permanent = True
     session["user_id"] = user["id"]
+    session.pop("owner_id", None)
     log_event("auth_login", "/api/auth/login", {"user_id": user["id"]})
     return jsonify({"ok": True})
 
@@ -1685,6 +1906,9 @@ def api_login():
 @app.route("/api/auth/forgot-password", methods=["POST"])
 def api_forgot_password():
     """Create a one-hour reset token without revealing whether the email exists."""
+    limited = require_rate_limit("forgot_password")
+    if limited:
+        return limited
     data = request.get_json() or {}
     email = data.get("email", "").strip().lower()
     response = {
@@ -1726,6 +1950,9 @@ def api_forgot_password():
 @app.route("/api/auth/reset-password", methods=["POST"])
 def api_reset_password():
     """Validate a reset token, set the new password, and mark the token as used."""
+    limited = require_rate_limit("auth")
+    if limited:
+        return limited
     data = request.get_json() or {}
     token = data.get("token", "").strip()
     password = data.get("password", "")
@@ -1754,6 +1981,7 @@ def api_reset_password():
     conn.commit()
     session.permanent = True
     session["user_id"] = reset["user_id"]
+    session.pop("owner_id", None)
     log_event("password_reset_complete", "/api/auth/reset-password", {"user_id": reset["user_id"]})
     return jsonify({"ok": True})
 
@@ -1836,11 +2064,14 @@ def api_logout():
 @app.route("/api/support", methods=["POST"])
 def api_support_request():
     """Collect support and bug reports even from users who cannot log in."""
+    limited = require_rate_limit("support")
+    if limited:
+        return limited
     data = request.get_json() or {}
-    name = data.get("name", "").strip()
+    name = clean_text(data.get("name", ""), 80)
     email = data.get("email", "").strip().lower()
-    category = data.get("category", "support").strip() or "support"
-    message = data.get("message", "").strip()
+    category = clean_text(data.get("category", "support"), 40) or "support"
+    message = clean_multiline(data.get("message", ""), MAX_LONG_TEXT)
     if len(message) < 8:
         return jsonify({"error": "Please describe the issue in a little more detail."}), 400
     user_id = current_user_id()
@@ -1991,16 +2222,22 @@ def api_profile_update():
 @login_required
 def api_create_game():
     """Create a match and auto-add the creator as confirmed organizer."""
-    data = request.get_json()
-    turf_id = int(data["turf_id"])
-    if not query("SELECT id FROM turfs WHERE id = %s AND archived_at IS NULL", (turf_id,), one=True):
+    limited = require_rate_limit("booking")
+    if limited:
+        return limited
+    data = request.get_json() or {}
+    turf_id = parse_int_field(data.get("turf_id"), 0, minimum=1)
+    if not query("SELECT id FROM turfs WHERE id = %s AND archived_at IS NULL AND COALESCE(owner_verified, TRUE) = TRUE", (turf_id,), one=True):
         return jsonify({"error": "Arena not found"}), 404
+    title = clean_text(data.get("title", "Open Goalbazi match"), 90)
+    if not title:
+        return jsonify({"error": "Match title is required"}), 400
     kickoff = datetime.fromisoformat(f"{data['date']}T{data['time']}:00").isoformat()
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
         "INSERT INTO games (title, format, skill_level, visibility, game_date, game_time, kickoff_at, turf_id, created_by) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
-        (data["title"], data["format"], data["skill"], data["visibility"], data["date"], data["time"], kickoff, turf_id, current_user_id()),
+        (title, clean_text(data.get("format", "5v5"), 20), clean_text(data.get("skill", "Intermediate"), 40), clean_text(data.get("visibility", "Public"), 30), data["date"], data["time"], kickoff, turf_id, current_user_id()),
     )
     game_id = cur.fetchone()["id"]
     user = get_profile(current_user_id())
@@ -2029,11 +2266,17 @@ def api_game_detail(game_id):
 @app.route("/api/games/<int:game_id>/messages", methods=["POST"])
 @login_required
 def api_post_message(game_id):
-    data = request.get_json()
+    limited = require_rate_limit("message")
+    if limited:
+        return limited
+    data = request.get_json() or {}
     user = get_profile(current_user_id())
+    message = clean_multiline(data.get("message", ""), MAX_MESSAGE_TEXT)
+    if not message:
+        return jsonify({"error": "Message cannot be empty"}), 400
     query(
         "INSERT INTO game_messages (game_id, sender_name, message, is_system, created_at) VALUES (%s,%s,%s,0,%s)",
-        (game_id, user["name"], data["message"], datetime.now().isoformat()),
+        (game_id, user["name"], message, datetime.now().isoformat()),
         commit=True,
     )
     log_event("game_message", f"/api/games/{game_id}/messages", {"game_id": game_id})
@@ -2088,13 +2331,22 @@ def api_leave_game(game_id):
 @app.route("/api/bookings/<int:slot_id>", methods=["POST"])
 @login_required
 def api_book_slot(slot_id):
+    limited = require_rate_limit("booking")
+    if limited:
+        return limited
     data = request.get_json() or {}
-    utr_number = data.get("utr_number", "").strip()
-    amount = data.get("amount", 0)
+    utr_number = clean_text(data.get("utr_number", ""), 80)
+    amount = parse_int_field(data.get("amount", 0), 0, minimum=0, maximum=200000)
     user = get_profile(current_user_id())
     conn = get_db()
     cur = conn.cursor()
-    slot = query("SELECT * FROM turf_slots WHERE id = %s", (slot_id,), one=True)
+    slot = query(
+        """SELECT ts.* FROM turf_slots ts
+           JOIN turfs t ON t.id = ts.turf_id
+           WHERE ts.id = %s AND t.archived_at IS NULL AND COALESCE(t.owner_verified, TRUE) = TRUE""",
+        (slot_id,),
+        one=True,
+    )
     if not slot:
         return jsonify({"error": "Slot not found"}), 404
     if slot["is_booked"] or slot["status"] != "available":
@@ -2150,6 +2402,8 @@ def api_admin_overview():
         {"value": query("SELECT COUNT(*) FROM users", one=True)["count"], "label": "Total users"},
         {"value": query("SELECT COUNT(*) FROM users WHERE last_seen_at >= %s", (active_since,), one=True)["count"], "label": "Active now"},
         {"value": query("SELECT COUNT(*) FROM profile_assessments WHERE status = 'pending'", one=True)["count"], "label": "Pending approvals"},
+        {"value": query("SELECT COUNT(*) FROM safety_reports WHERE status = 'open'", one=True)["count"], "label": "Open reports"},
+        {"value": query("SELECT COUNT(*) FROM turfs WHERE archived_at IS NULL AND owner_verified = FALSE", one=True)["count"], "label": "Arena reviews"},
         {"value": query("SELECT COUNT(*) FROM games g JOIN turfs t ON t.id = g.turf_id WHERE t.archived_at IS NULL", one=True)["count"], "label": "Total games"},
         {"value": query("SELECT COUNT(*) FROM turf_slots ts JOIN turfs t ON t.id = ts.turf_id WHERE ts.is_booked = 1 AND t.archived_at IS NULL", one=True)["count"], "label": "Bookings"},
         {"value": query("SELECT COUNT(*) FROM game_messages WHERE is_system = 0", one=True)["count"], "label": "Chat messages"},
@@ -2562,7 +2816,7 @@ def api_admin_turfs():
     archived_turfs = [dict(r) for r in query("SELECT * FROM turfs WHERE archived_at IS NOT NULL ORDER BY archived_at DESC, id DESC")]
     for turf in archived_turfs:
         turf["image_urls"] = parse_image_urls(turf.get("image_urls"))
-    owners = [dict(r) for r in query("SELECT id, name FROM turf_owners ORDER BY name ASC")]
+    owners = [dict(r) for r in query("SELECT id, name, owner_status, verified_at FROM turf_owners ORDER BY name ASC")]
     players = [dict(r) for r in query("SELECT id, name FROM users ORDER BY name ASC LIMIT 200")]
     return jsonify({"turfs": turfs, "archived_turfs": archived_turfs, "owners": owners, "players": players})
 
@@ -2592,6 +2846,112 @@ def api_admin_messages():
            ORDER BY gm.id DESC LIMIT 100"""
     )]
     return jsonify({"messages": messages})
+
+
+@app.route("/api/admin/safety-reports")
+@admin_required
+def api_admin_safety_reports():
+    """Admin moderation queue for user/owner abuse reports."""
+    reports = [dict(r) for r in query(
+        """SELECT sr.*, u.name AS reporter_user_name, o.name AS reporter_owner_name
+           FROM safety_reports sr
+           LEFT JOIN users u ON u.id = sr.reporter_user_id
+           LEFT JOIN turf_owners o ON o.id = sr.reporter_owner_id
+           ORDER BY sr.id DESC
+           LIMIT 150"""
+    )]
+    return jsonify({"reports": reports})
+
+
+@app.route("/api/admin/payment-ledger")
+@admin_required
+def api_admin_payment_ledger():
+    """Show every manual UTR booking payment before Razorpay is connected."""
+    rows = [dict(r) for r in query(
+        """SELECT b.id AS booking_id, b.player_name, b.player_email, b.utr_number, b.amount,
+                  b.status, b.created_at, ts.slot_date, ts.slot_time,
+                  t.id AS turf_id, t.name AS arena_name, t.area,
+                  o.id AS owner_id, o.name AS owner_name, o.email AS owner_email
+           FROM bookings b
+           JOIN turf_slots ts ON ts.id = b.slot_id
+           JOIN turfs t ON t.id = ts.turf_id
+           LEFT JOIN turf_owners o ON o.id = t.owner_id
+           ORDER BY b.id DESC
+           LIMIT 250"""
+    )]
+    for row in rows:
+        row["commission_amount"] = round((row.get("amount") or 0) * 0.10)
+        row["owner_net_amount"] = max(0, (row.get("amount") or 0) - row["commission_amount"])
+    return jsonify({"payments": rows})
+
+
+@app.route("/api/admin/payout-summary")
+@admin_required
+def api_admin_payout_summary():
+    """Daily owner payout summary from confirmed bookings; safe for manual settlement."""
+    payout_date = request.args.get("date", datetime.now().date().isoformat())
+    rows = [dict(r) for r in query(
+        """SELECT o.id AS owner_id, o.name AS owner_name, o.email AS owner_email,
+                  COUNT(b.id) AS confirmed_bookings,
+                  COALESCE(SUM(b.amount), 0) AS gross_amount
+           FROM turf_owners o
+           JOIN turfs t ON t.owner_id = o.id
+           JOIN turf_slots ts ON ts.turf_id = t.id
+           JOIN bookings b ON b.slot_id = ts.id AND b.status = 'confirmed'
+           WHERE ts.slot_date = %s
+           GROUP BY o.id, o.name, o.email
+           ORDER BY gross_amount DESC""",
+        (payout_date,),
+    )]
+    payouts = []
+    for row in rows:
+        gross = int(row.get("gross_amount") or 0)
+        commission = round(gross * 0.10)
+        existing = query(
+            "SELECT status, payout_note, paid_at FROM owner_payouts WHERE owner_id = %s AND payout_date = %s",
+            (row["owner_id"], payout_date),
+            one=True,
+        )
+        payouts.append({
+            **row,
+            "payout_date": payout_date,
+            "gross_amount": gross,
+            "commission_amount": commission,
+            "net_amount": max(0, gross - commission),
+            "status": existing["status"] if existing else "pending",
+            "payout_note": existing["payout_note"] if existing else "",
+            "paid_at": existing["paid_at"] if existing else "",
+        })
+    return jsonify({"payouts": payouts, "payout_date": payout_date})
+
+
+@app.route("/api/admin/payouts/mark-paid", methods=["POST"])
+@admin_required
+def api_admin_mark_payout_paid():
+    """Record manual owner settlement until gateway split-settlements are added."""
+    data = request.get_json() or {}
+    owner_id = parse_int_field(data.get("owner_id"), 0, minimum=1)
+    payout_date = clean_text(data.get("payout_date") or datetime.now().date().isoformat(), 20)
+    gross = parse_int_field(data.get("gross_amount"), 0, minimum=0)
+    commission = parse_int_field(data.get("commission_amount"), 0, minimum=0)
+    net = parse_int_field(data.get("net_amount"), max(0, gross - commission), minimum=0)
+    note = clean_multiline(data.get("payout_note", ""), 500)
+    query(
+        """INSERT INTO owner_payouts
+           (owner_id, payout_date, gross_amount, commission_amount, net_amount, status, payout_note, created_at, paid_at)
+           VALUES (%s,%s,%s,%s,%s,'paid',%s,%s,%s)
+           ON CONFLICT (owner_id, payout_date) DO UPDATE SET
+             gross_amount = EXCLUDED.gross_amount,
+             commission_amount = EXCLUDED.commission_amount,
+             net_amount = EXCLUDED.net_amount,
+             status = 'paid',
+             payout_note = EXCLUDED.payout_note,
+             paid_at = EXCLUDED.paid_at""",
+        (owner_id, payout_date, gross, commission, net, note, datetime.now().isoformat(), datetime.now().isoformat()),
+        commit=True,
+    )
+    log_event("admin_mark_payout_paid", "/api/admin/payouts/mark-paid", {"owner_id": owner_id, "payout_date": payout_date, "net_amount": net})
+    return jsonify({"ok": True})
 
 
 @app.route("/api/admin/ratings")
@@ -3006,18 +3366,21 @@ def owner_dashboard_alias_page():
 
 @app.route("/api/owner/register", methods=["POST"])
 def api_owner_register():
+    limited = require_rate_limit("auth")
+    if limited:
+        return limited
     data = request.get_json() or {}
-    name = data.get("name", "").strip()
+    name = clean_text(data.get("name", ""), 90)
     email = data.get("email", "").strip().lower()
     password = data.get("password", "")
     confirm_password = data.get("confirm_password", "")
-    phone = data.get("phone", "").strip()
-    turf_name = data.get("turf_name", "").strip()
-    area = data.get("area", "").strip()
-    surface = data.get("surface", "Astroturf")
-    upi_id = data.get("upi_id", "").strip()
-    map_link = data.get("map_link", "").strip()
-    description = data.get("description", "").strip()
+    phone = clean_text(data.get("phone", ""), 30)
+    turf_name = clean_text(data.get("turf_name", ""), 100)
+    area = clean_text(data.get("area", ""), 100)
+    surface = clean_text(data.get("surface", "Astroturf"), 50)
+    upi_id = clean_text(data.get("upi_id", ""), 120)
+    map_link = clean_text(data.get("map_link", ""), 500)
+    description = clean_multiline(data.get("description", ""), 1000)
     image_urls = serialize_image_urls(data.get("image_urls", ""))
     if not all([name, email, password, turf_name, area, upi_id, data.get("price_per_hour")]):
         return jsonify({"error": "All fields are required"}), 400
@@ -3034,20 +3397,22 @@ def api_owner_register():
         return jsonify({"error": "Price, distance, and GPS values must be valid numbers"}), 400
     if price_per_hour <= 0:
         return jsonify({"error": "Price per hour must be greater than zero"}), 400
+    if map_link and not valid_url(map_link):
+        return jsonify({"error": "Map link must be a valid https:// or http:// URL"}), 400
     existing = query("SELECT id FROM turf_owners WHERE email = %s", (email,), one=True)
     if existing:
         return jsonify({"error": "Email already registered"}), 409
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
-        "INSERT INTO turf_owners (name, email, phone, password_hash) VALUES (%s,%s,%s,%s) RETURNING id",
+        "INSERT INTO turf_owners (name, email, phone, password_hash, owner_status) VALUES (%s,%s,%s,%s,'pending') RETURNING id",
         (name, email, phone, hash_password(password)),
     )
     owner_id = cur.fetchone()["id"]
     cur.execute(
         """INSERT INTO turfs
-           (name, area, distance_km, surface, rating, price_per_hour, owner_id, upi_id, map_link, latitude, longitude, description, image_urls, archived_at)
-           VALUES (%s,%s,%s,%s,4.5,%s,%s,%s,%s,%s,%s,%s,%s,NULL) RETURNING id""",
+           (name, area, distance_km, surface, rating, price_per_hour, owner_id, upi_id, map_link, latitude, longitude, description, image_urls, archived_at, owner_verified)
+           VALUES (%s,%s,%s,%s,4.5,%s,%s,%s,%s,%s,%s,%s,%s,NULL,FALSE) RETURNING id""",
         (turf_name, area, distance_km, surface, price_per_hour, owner_id, upi_id, map_link, latitude, longitude, description, image_urls),
     )
     turf_id = cur.fetchone()["id"]
@@ -3068,6 +3433,9 @@ def api_owner_register():
 
 @app.route("/api/owner/login", methods=["POST"])
 def api_owner_login():
+    limited = require_rate_limit("auth")
+    if limited:
+        return limited
     data = request.get_json() or {}
     email = data.get("email", "").strip().lower()
     password = data.get("password", "")
@@ -3117,6 +3485,9 @@ def api_owner_dashboard():
                 "confirmed_today": 0,
                 "revenue_today": 0,
                 "total_bookings": 0,
+                "gross_confirmed": 0,
+                "estimated_commission": 0,
+                "estimated_payout": 0,
             },
             "notifications": [{
                 "title": "Finish arena setup",
@@ -3135,6 +3506,8 @@ def api_owner_dashboard():
     pending_count = sum(1 for b in bookings if b["status"] == "pending")
     confirmed_today = sum(1 for b in bookings if b["status"] == "confirmed" and b["slot_date"] == today)
     revenue_today = sum(b["amount"] for b in bookings if b["status"] == "confirmed" and b["slot_date"] == today)
+    gross_confirmed = sum(b["amount"] for b in bookings if b["status"] == "confirmed")
+    estimated_commission = round(gross_confirmed * 0.10)
     turf_data = dict(turf)
     turf_data["image_urls"] = parse_image_urls(turf_data.get("image_urls"))
     return jsonify({
@@ -3146,9 +3519,51 @@ def api_owner_dashboard():
             "confirmed_today": confirmed_today,
             "revenue_today": revenue_today,
             "total_bookings": len(bookings),
+            "gross_confirmed": gross_confirmed,
+            "estimated_commission": estimated_commission,
+            "estimated_payout": max(0, gross_confirmed - estimated_commission),
         },
         "notifications": get_notifications(),
     })
+
+
+@app.route("/api/owner/payouts")
+@owner_required
+def api_owner_payouts():
+    """Arena Partner payout view for manual daily settlement transparency."""
+    owner_id = current_owner_id()
+    rows = [dict(r) for r in query(
+        """SELECT ts.slot_date AS payout_date,
+                  COUNT(b.id) AS confirmed_bookings,
+                  COALESCE(SUM(b.amount), 0) AS gross_amount
+           FROM turfs t
+           JOIN turf_slots ts ON ts.turf_id = t.id
+           JOIN bookings b ON b.slot_id = ts.id AND b.status = 'confirmed'
+           WHERE t.owner_id = %s
+           GROUP BY ts.slot_date
+           ORDER BY ts.slot_date DESC
+           LIMIT 30""",
+        (owner_id,),
+    )]
+    payouts = []
+    for row in rows:
+        gross = int(row.get("gross_amount") or 0)
+        commission = round(gross * 0.10)
+        recorded = query(
+            "SELECT status, payout_note, paid_at FROM owner_payouts WHERE owner_id = %s AND payout_date = %s",
+            (owner_id, row["payout_date"]),
+            one=True,
+        )
+        payouts.append({
+            **row,
+            "gross_amount": gross,
+            "commission_amount": commission,
+            "net_amount": max(0, gross - commission),
+            "status": recorded["status"] if recorded else "pending",
+            "payout_note": recorded["payout_note"] if recorded else "",
+            "paid_at": recorded["paid_at"] if recorded else "",
+        })
+    return jsonify({"payouts": payouts})
 
 
 @app.route("/api/owner/bookings/<int:booking_id>/approve", methods=["POST"])
@@ -3217,13 +3632,13 @@ def api_owner_slots():
 @owner_required
 def api_owner_settings():
     """Save Arena Partner settings and ensure the arena stays visible to athletes."""
-    data = request.get_json()
-    turf_name = (data.get("turf_name") or "").strip()
-    area = (data.get("area") or "").strip()
-    surface = (data.get("surface") or "Astroturf").strip()
-    upi_id = (data.get("upi_id") or "").strip()
-    map_link = (data.get("map_link") or "").strip()
-    description = data.get("description", "")
+    data = request.get_json() or {}
+    turf_name = clean_text(data.get("turf_name"), 100)
+    area = clean_text(data.get("area"), 100)
+    surface = clean_text(data.get("surface") or "Astroturf", 50)
+    upi_id = clean_text(data.get("upi_id"), 120)
+    map_link = clean_text(data.get("map_link"), 500)
+    description = clean_multiline(data.get("description", ""), 1000)
     image_urls = serialize_image_urls(data.get("image_urls", ""))
     try:
         distance_km = float(data.get("distance_km", 0) or 0)
@@ -3237,6 +3652,8 @@ def api_owner_settings():
         return jsonify({"error": "Arena name and area are required"}), 400
     if price_per_hour <= 0:
         return jsonify({"error": "Price per hour must be greater than zero"}), 400
+    if map_link and not valid_url(map_link):
+        return jsonify({"error": "Map link must be a valid https:// or http:// URL"}), 400
 
     conn = get_db()
     cur = conn.cursor()
@@ -3267,8 +3684,8 @@ def api_owner_settings():
     if not turf:
         cur.execute(
             """INSERT INTO turfs
-               (name, area, distance_km, surface, rating, price_per_hour, owner_id, upi_id, map_link, latitude, longitude, description, image_urls, archived_at)
-               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NULL)
+               (name, area, distance_km, surface, rating, price_per_hour, owner_id, upi_id, map_link, latitude, longitude, description, image_urls, archived_at, owner_verified)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NULL,FALSE)
                RETURNING id""",
             (
                 turf_name,
@@ -3358,8 +3775,8 @@ def serve_nav_js():
 def api_public_stats():
     return jsonify({
         "players": query("SELECT COUNT(*) FROM users", one=True)["count"],
-        "games": query("SELECT COUNT(*) FROM games g JOIN turfs t ON t.id = g.turf_id WHERE t.archived_at IS NULL", one=True)["count"],
-        "turfs": query("SELECT COUNT(*) FROM turfs WHERE archived_at IS NULL", one=True)["count"],
+        "games": query("SELECT COUNT(*) FROM games g JOIN turfs t ON t.id = g.turf_id WHERE t.archived_at IS NULL AND COALESCE(t.owner_verified, TRUE) = TRUE", one=True)["count"],
+        "turfs": query("SELECT COUNT(*) FROM turfs WHERE archived_at IS NULL AND COALESCE(owner_verified, TRUE) = TRUE", one=True)["count"],
         "leagues": query("SELECT COUNT(*) FROM leagues WHERE archived_at IS NULL", one=True)["count"],
     })
 
@@ -3490,10 +3907,13 @@ def api_player_profile(player_id):
 @app.route("/api/ratings", methods=["POST"])
 @login_required
 def api_submit_rating():
-    data = request.get_json()
-    game_id = int(data.get("game_id"))
-    rated_id = int(data.get("rated_id"))
-    rating = int(data.get("rating"))
+    limited = require_rate_limit("rating")
+    if limited:
+        return limited
+    data = request.get_json() or {}
+    game_id = parse_int_field(data.get("game_id"), 0, minimum=1)
+    rated_id = parse_int_field(data.get("rated_id"), 0, minimum=1)
+    rating = parse_int_field(data.get("rating"), 0)
     if not 1 <= rating <= 10:
         return jsonify({"error": "Rating must be 1-10"}), 400
     if rated_id == current_user_id():
@@ -3535,9 +3955,12 @@ def api_submit_rating():
 @app.route("/api/open-ratings", methods=["POST"])
 @login_required
 def api_submit_open_rating():
-    data = request.get_json()
-    rated_id = int(data.get("rated_id"))
-    rating = int(data.get("rating"))
+    limited = require_rate_limit("rating")
+    if limited:
+        return limited
+    data = request.get_json() or {}
+    rated_id = parse_int_field(data.get("rated_id"), 0, minimum=1)
+    rating = parse_int_field(data.get("rating"), 0)
     if not 1 <= rating <= 10:
         return jsonify({"error": "Rating must be 1-10"}), 400
     if rated_id == current_user_id():
@@ -3651,10 +4074,15 @@ def api_friends():
 @app.route("/api/friends/request", methods=["POST"])
 @login_required
 def api_friend_request():
-    data = request.get_json()
-    target_id = int(data.get("user_id"))
+    limited = require_rate_limit("friend_request")
+    if limited:
+        return limited
+    data = request.get_json() or {}
+    target_id = parse_int_field(data.get("user_id"), 0, minimum=1)
     if target_id == current_user_id():
         return jsonify({"error": "Cannot add yourself"}), 400
+    if users_are_blocked(current_user_id(), target_id):
+        return jsonify({"error": "This connection is blocked"}), 403
     if not query("SELECT id FROM users WHERE id = %s", (target_id,), one=True):
         return jsonify({"error": "Player not found"}), 404
     one_id, two_id = normalize_friend_pair(current_user_id(), target_id)
@@ -3706,11 +4134,64 @@ def api_cancel_friendship(friendship_id):
     return jsonify({"ok": True})
 
 
+@app.route("/api/users/<int:user_id>/block", methods=["POST"])
+@login_required
+def api_block_user(user_id):
+    """Let athletes protect themselves from harassment without waiting for admin."""
+    if user_id == current_user_id():
+        return jsonify({"error": "You cannot block yourself"}), 400
+    if not query("SELECT id FROM users WHERE id = %s", (user_id,), one=True):
+        return jsonify({"error": "Player not found"}), 404
+    query(
+        """INSERT INTO user_blocks (blocker_id, blocked_id, created_at)
+           VALUES (%s,%s,%s)
+           ON CONFLICT (blocker_id, blocked_id) DO NOTHING""",
+        (current_user_id(), user_id, datetime.now().isoformat()),
+        commit=True,
+    )
+    log_event("user_block", f"/api/users/{user_id}/block", {"blocked_id": user_id})
+    return jsonify({"ok": True})
+
+
+@app.route("/api/users/<int:user_id>/block", methods=["DELETE"])
+@login_required
+def api_unblock_user(user_id):
+    query("DELETE FROM user_blocks WHERE blocker_id = %s AND blocked_id = %s", (current_user_id(), user_id), commit=True)
+    log_event("user_unblock", f"/api/users/{user_id}/block", {"blocked_id": user_id})
+    return jsonify({"ok": True})
+
+
+@app.route("/api/safety/reports", methods=["POST"])
+def api_create_safety_report():
+    """Store reports for admin review from athletes or arena partners."""
+    limited = require_rate_limit("support")
+    if limited:
+        return limited
+    if "user_id" not in session and "owner_id" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    data = request.get_json() or {}
+    target_type = clean_text(data.get("target_type", "general"), 40)
+    target_id = parse_int_field(data.get("target_id"), 0, minimum=0)
+    reason = clean_text(data.get("reason", "safety"), 80)
+    details = clean_multiline(data.get("details", ""), 1000)
+    query(
+        """INSERT INTO safety_reports
+           (reporter_user_id, reporter_owner_id, target_type, target_id, reason, details, created_at)
+           VALUES (%s,%s,%s,%s,%s,%s,%s)""",
+        (session.get("user_id"), session.get("owner_id"), target_type, target_id or None, reason, details, datetime.now().isoformat()),
+        commit=True,
+    )
+    log_event("safety_report_create", "/api/safety/reports", {"target_type": target_type, "target_id": target_id})
+    return jsonify({"ok": True, "message": "Report received. Goalbazi admin will review it."}), 201
+
+
 @app.route("/api/direct-messages")
 @login_required
 def api_direct_messages():
     other_user_id = request.args.get("user_id", type=int)
     if other_user_id:
+        if users_are_blocked(current_user_id(), other_user_id):
+            return jsonify({"messages": []})
         messages = [dict(r) for r in query(
             """SELECT dm.id, dm.message, dm.created_at, dm.sender_id, dm.receiver_id,
                       su.name AS sender_name
@@ -3752,13 +4233,18 @@ def api_direct_messages():
 @app.route("/api/direct-messages", methods=["POST"])
 @login_required
 def api_send_direct_message():
-    data = request.get_json()
-    receiver_id = int(data.get("receiver_id"))
-    message = data.get("message", "").strip()
+    limited = require_rate_limit("message")
+    if limited:
+        return limited
+    data = request.get_json() or {}
+    receiver_id = parse_int_field(data.get("receiver_id"), 0, minimum=1)
+    message = clean_multiline(data.get("message", ""), MAX_MESSAGE_TEXT)
     if not message:
         return jsonify({"error": "Message cannot be empty"}), 400
     if receiver_id == current_user_id():
         return jsonify({"error": "Cannot message yourself"}), 400
+    if users_are_blocked(current_user_id(), receiver_id):
+        return jsonify({"error": "You cannot message this athlete"}), 403
     if not query("SELECT id FROM users WHERE id = %s", (receiver_id,), one=True):
         return jsonify({"error": "Player not found"}), 404
     query(
@@ -3776,13 +4262,16 @@ def api_send_direct_message():
 @app.route("/api/team-challenges", methods=["POST"])
 @login_required
 def api_create_team_challenge():
+    limited = require_rate_limit("challenge")
+    if limited:
+        return limited
     data = request.get_json() or {}
     my_team = get_user_team(current_user_id())
     if not my_team:
         return jsonify({"error": "Join a team before sending challenges."}), 400
     if not user_can_manage_team(current_user_id(), my_team["id"]):
         return jsonify({"error": "Only a team captain or manager can challenge another team."}), 403
-    opponent_team_id = int(data.get("opponent_team_id") or 0)
+    opponent_team_id = parse_int_field(data.get("opponent_team_id"), 0, minimum=1)
     if opponent_team_id == my_team["id"]:
         return jsonify({"error": "Choose another team to challenge."}), 400
     opponent = query("SELECT id, name FROM teams WHERE id = %s AND archived_at IS NULL", (opponent_team_id,), one=True)
@@ -3811,7 +4300,7 @@ def api_create_team_challenge():
             (data.get("format") or "5v5").strip(),
             (data.get("proposed_date") or "").strip(),
             (data.get("proposed_time") or "").strip(),
-            (data.get("message") or "").strip()[:300],
+            clean_multiline(data.get("message", ""), 300),
             now,
             now,
         ),
@@ -3876,8 +4365,11 @@ def api_assistant_messages():
 @login_required
 def api_assistant_reply():
     """Store user message, generate AI/fallback reply, and save assistant memory."""
+    limited = require_rate_limit("message")
+    if limited:
+        return limited
     data = request.get_json() or {}
-    message = (data.get("message") or "").strip()
+    message = clean_multiline(data.get("message", ""), 1200)
     if not message:
         return jsonify({"error": "Message cannot be empty"}), 400
     if len(message) > 1200:
@@ -3923,6 +4415,9 @@ def api_push_public_key():
 @login_required
 def api_push_subscribe():
     """Store a phone/browser push subscription for direct-message notifications."""
+    limited = require_rate_limit("push")
+    if limited:
+        return limited
     data = request.get_json() or {}
     endpoint = (data.get("endpoint") or "").strip()
     keys = data.get("keys") or {}
@@ -3962,19 +4457,19 @@ def api_push_subscribe():
 @app.route("/api/admin/turfs", methods=["POST"])
 @admin_required
 def api_admin_add_turf():
-    data = request.get_json()
+    data = request.get_json() or {}
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
-        """INSERT INTO turfs (name, area, distance_km, surface, rating, price_per_hour, upi_id, map_link, latitude, longitude, owner_id, description, image_urls)
-           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
-        (data["name"], data["area"], float(data.get("distance_km",0)),
-         data.get("surface","Astroturf"), float(data.get("rating",4.5)),
-         int(data.get("price_per_hour",500)), data.get("upi_id",""), data.get("map_link", ""),
+        """INSERT INTO turfs (name, area, distance_km, surface, rating, price_per_hour, upi_id, map_link, latitude, longitude, owner_id, description, image_urls, owner_verified)
+           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,TRUE) RETURNING id""",
+        (clean_text(data.get("name", ""), 100), clean_text(data.get("area", ""), 100), float(data.get("distance_km",0)),
+         clean_text(data.get("surface","Astroturf"), 50), float(data.get("rating",4.5)),
+         int(data.get("price_per_hour",500)), clean_text(data.get("upi_id",""), 120), clean_text(data.get("map_link", ""), 500),
          float(data["latitude"]) if data.get("latitude") not in (None, "") else None,
          float(data["longitude"]) if data.get("longitude") not in (None, "") else None,
          int(data["owner_id"]) if data.get("owner_id") not in (None, "") else None,
-         data.get("description", ""), serialize_image_urls(data.get("image_urls", ""))),
+         clean_multiline(data.get("description", ""), 1000), serialize_image_urls(data.get("image_urls", ""))),
     )
     turf_id = cur.fetchone()["id"]
     # Seed slots for next 7 days
@@ -3994,21 +4489,28 @@ def api_admin_add_turf():
 @app.route("/api/admin/turfs/<int:turf_id>", methods=["PUT"])
 @admin_required
 def api_admin_edit_turf(turf_id):
-    data = request.get_json()
+    data = request.get_json() or {}
     query(
         """UPDATE turfs SET name=%s, area=%s, distance_km=%s, surface=%s,
            rating=%s, price_per_hour=%s, upi_id=%s, map_link=%s, latitude=%s, longitude=%s, owner_id=COALESCE(%s, owner_id),
-           description=%s, image_urls=%s, admin_note=%s WHERE id=%s""",
-        (data["name"], data["area"], float(data.get("distance_km",0)),
-         data.get("surface","Astroturf"), float(data.get("rating",4.5)),
-         int(data.get("price_per_hour",500)), data.get("upi_id",""), data.get("map_link", ""),
+           description=%s, image_urls=%s, admin_note=%s, owner_verified=%s WHERE id=%s""",
+        (clean_text(data.get("name", ""), 100), clean_text(data.get("area", ""), 100), float(data.get("distance_km",0)),
+         clean_text(data.get("surface","Astroturf"), 50), float(data.get("rating",4.5)),
+         int(data.get("price_per_hour",500)), clean_text(data.get("upi_id",""), 120), clean_text(data.get("map_link", ""), 500),
          float(data["latitude"]) if data.get("latitude") not in (None, "") else None,
          float(data["longitude"]) if data.get("longitude") not in (None, "") else None,
          int(data["owner_id"]) if data.get("owner_id") not in (None, "") else None,
-         data.get("description", ""), serialize_image_urls(data.get("image_urls", "")),
-         str(data.get("admin_note", "") or "").strip()[:1000], turf_id),
+         clean_multiline(data.get("description", ""), 1000), serialize_image_urls(data.get("image_urls", "")),
+         clean_multiline(data.get("admin_note", ""), 1000), bool(data.get("owner_verified", True)), turf_id),
         commit=True,
     )
+    if data.get("owner_verified"):
+        query(
+            """UPDATE turf_owners SET owner_status = 'approved', verified_at = COALESCE(verified_at, %s)
+               WHERE id = (SELECT owner_id FROM turfs WHERE id = %s)""",
+            (datetime.now().isoformat(), turf_id),
+            commit=True,
+        )
     log_event("admin_edit_turf", f"/api/admin/turfs/{turf_id}", {"turf_id": turf_id})
     return jsonify({"ok": True})
 
@@ -4056,10 +4558,12 @@ def api_admin_permanent_delete_turf(turf_id):
 @app.route("/api/owner/qr", methods=["POST"])
 @owner_required
 def api_owner_upload_qr():
-    data = request.get_json()
+    data = request.get_json() or {}
     qr_b64 = data.get("qr_base64", "")
     if len(qr_b64) > 2_000_000:
         return jsonify({"error": "Image too large"}), 400
+    if qr_b64 and not valid_url(qr_b64, allow_data_image=True):
+        return jsonify({"error": "QR image must be a valid image upload"}), 400
     query("UPDATE turfs SET qr_base64=%s WHERE owner_id=%s AND archived_at IS NULL", (qr_b64, current_owner_id()), commit=True)
     log_event("owner_upload_qr", "/api/owner/qr")
     return jsonify({"ok": True})
@@ -4070,7 +4574,7 @@ def api_slot_info_updated(slot_id):
     info = query(
         """SELECT t.upi_id, t.price_per_hour, t.name as turf_name, t.qr_base64, t.map_link
            FROM turf_slots ts JOIN turfs t ON t.id = ts.turf_id
-           WHERE ts.id = %s AND t.archived_at IS NULL""",
+           WHERE ts.id = %s AND t.archived_at IS NULL AND COALESCE(t.owner_verified, TRUE) = TRUE""",
         (slot_id,), one=True,
     )
     if not info:

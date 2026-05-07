@@ -18,6 +18,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Goalbazi">
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
   <style>
     :root {
       --bg:#09110e; --bg-2:#050807; --panel:#13201b; --panel-soft:#172822;
@@ -31,8 +32,15 @@
       --brand:#56b82b; --brand-2:#a8e774; --danger:#d4553f;
       --shadow:0 24px 90px rgba(51,84,61,.12);
     }
+    html[data-theme="genz"] {
+      --bg:#12091f; --bg-2:#05040b; --panel:#1a1028; --panel-soft:#241737;
+      --line:rgba(255,255,255,.14); --text:#fff8ff; --muted:#cab8df;
+      --brand:#7fff45; --brand-2:#ff7adc; --danger:#ff876e;
+      --shadow:0 26px 110px rgba(255,122,220,.14);
+    }
     *{box-sizing:border-box;margin:0;padding:0}
-    html,body{font-family:"Manrope",sans-serif;background:radial-gradient(circle at 15% 20%,rgba(132,242,85,.10),transparent 24%),linear-gradient(180deg,var(--bg) 0%,var(--bg-2) 100%);color:var(--text);min-height:100vh;overflow-x:hidden}
+    html,body{width:100%;max-width:100%;font-family:"Manrope",sans-serif;background:radial-gradient(circle at 15% 20%,rgba(132,242,85,.10),transparent 24%),linear-gradient(180deg,var(--bg) 0%,var(--bg-2) 100%);color:var(--text);min-height:100vh;overflow-x:hidden}
+    html[data-theme="genz"] body{background:radial-gradient(circle at 12% 12%,rgba(127,255,69,.18),transparent 24%),radial-gradient(circle at 84% 18%,rgba(255,122,220,.18),transparent 28%),linear-gradient(135deg,var(--bg) 0%,var(--bg-2) 100%)}
     body::before{content:"";position:fixed;inset:-12%;pointer-events:none;z-index:0;opacity:.13;transform:rotate(-7deg);background:linear-gradient(rgba(160,255,190,.12) 1px,transparent 1px),linear-gradient(90deg,rgba(160,255,190,.08) 1px,transparent 1px);background-size:74px 74px;mask-image:radial-gradient(circle at 50% 44%,black 0%,transparent 72%);animation:ownerPitchDrift 30s linear infinite}
     body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.18;background:linear-gradient(115deg,transparent 0 34%,rgba(132,242,85,.10) 46%,transparent 58%);filter:blur(14px);animation:ownerSoftSweep 14s ease-in-out infinite alternate}
     .ambient{position:fixed;border-radius:50%;pointer-events:none;filter:blur(80px);opacity:.5;z-index:0}
@@ -45,21 +53,23 @@
     @media (prefers-reduced-motion:reduce){body::before,body::after,.ambient-a,.ambient-b{animation:none!important}}
 
     /* Header */
-    .header{position:relative;z-index:10;background:var(--panel);border-bottom:1px solid var(--line);padding:16px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+    .header{position:relative;z-index:10;background:var(--panel);border-bottom:1px solid var(--line);padding:16px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;max-width:100%}
     .header-left{display:flex;align-items:center;gap:14px;min-width:0}
     .header-logo{display:flex;align-items:center;gap:9px;font-size:1.1rem;font-weight:800;color:var(--brand);white-space:nowrap}
     .header-logo img{width:34px;height:34px;object-fit:contain;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid var(--line);padding:3px}
     .turf-name{font-size:1rem;font-weight:700;overflow-wrap:anywhere}
     .turf-meta{color:var(--muted);font-size:.82rem;margin-top:2px}
-    .header-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+    .header-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;min-width:0}
     .btn{padding:10px 16px;border-radius:12px;border:none;font-weight:700;font-size:.88rem;cursor:pointer}
     .btn-primary{background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#08110d}
     .btn-ghost{background:var(--panel-soft);color:var(--text);border:1px solid var(--line)}
     .btn-danger{background:rgba(255,131,102,.1);color:var(--danger);border:1px solid rgba(255,131,102,.2)}
     .btn-sm{padding:6px 12px;font-size:.8rem;border-radius:8px}
+    .owner-home-btn{display:inline-grid;place-items:center;width:38px;min-width:38px;padding:6px}
+    .owner-home-btn img{width:20px;height:20px;display:block;object-fit:contain}
 
     /* Layout */
-    .shell{position:relative;z-index:1;max-width:1200px;margin:0 auto;padding:28px 20px}
+    .shell{position:relative;z-index:1;max-width:1200px;width:100%;margin:0 auto;padding:28px 20px;overflow:hidden}
 
     /* Stats */
     .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px}
@@ -86,12 +96,12 @@
     .tab.active{color:var(--brand);border-bottom-color:var(--brand)}
 
     /* Cards */
-    .table-card{background:var(--panel);border:1px solid var(--line);border-radius:20px;overflow-x:auto;box-shadow:var(--shadow);margin-bottom:20px}
+    .table-card{background:var(--panel);border:1px solid var(--line);border-radius:20px;overflow:hidden;box-shadow:var(--shadow);margin-bottom:20px;max-width:100%}
     .card-head{padding:18px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);gap:12px;flex-wrap:wrap}
     .card-head h3{font-size:1rem;font-weight:800}
-    table{width:100%;border-collapse:collapse}
+    table{width:100%;border-collapse:collapse;table-layout:auto}
     th{text-align:left;padding:12px 16px;color:var(--muted);font-size:.8rem;font-weight:700;border-bottom:1px solid var(--line)}
-    td{padding:12px 16px;border-bottom:1px solid var(--line);font-size:.9rem;vertical-align:middle}
+    td{padding:12px 16px;border-bottom:1px solid var(--line);font-size:.9rem;vertical-align:middle;overflow-wrap:anywhere}
     tr:last-child td{border-bottom:none}
     tr:hover td{background:var(--panel-soft)}
     .empty{color:var(--muted);padding:32px;text-align:center;font-size:.9rem}
@@ -113,7 +123,7 @@
 
     /* UPI info */
     .upi-card{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:24px;box-shadow:var(--shadow);margin-bottom:20px}
-    .upi-id{font-size:1.4rem;font-weight:800;color:var(--brand);margin:8px 0}
+    .upi-id{font-size:1.4rem;font-weight:800;color:var(--brand);margin:8px 0;overflow-wrap:anywhere}
     .upi-note{color:var(--muted);font-size:.88rem;line-height:1.6}
 
     /* Slots manager */
@@ -135,10 +145,10 @@
 
     @media(max-width:700px){
       .header{flex-direction:column;align-items:stretch;padding:14px 16px}
-      .header-left{width:100%}
+      .header-left{width:100%;align-items:flex-start}
       .header-logo{font-size:1rem;white-space:nowrap}
       .header-right{width:100%;justify-content:flex-start;gap:8px}
-      .header-right .btn{flex:1 1 auto;min-width:max-content}
+      .header-right .btn{flex:1 1 calc(50% - 8px);min-width:0}
       .shell{padding:18px 12px 72px}
       .stats-row{grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
       .analytics-grid{grid-template-columns:1fr;gap:10px}
@@ -151,7 +161,8 @@
       .booking-meta{overflow-wrap:anywhere}
       .action-row .btn{flex:1 1 120px}
       td,th{padding:10px 12px;font-size:.82rem}
-      table{min-width:560px}
+      table{min-width:0}
+      th:nth-child(2),td:nth-child(2){display:none}
       #settings-form > div{grid-template-columns:1fr !important}
       #settings-form button[type="submit"]{width:100%;justify-self:stretch !important}
       input,select,textarea{font-size:16px !important}
@@ -161,6 +172,25 @@
     @media(max-width:420px){
       .stats-row{grid-template-columns:1fr}
       .header-right .btn{width:100%;justify-content:center}
+      .owner-home-btn{width:auto!important;flex:0 0 44px!important}
+    }
+    html[data-theme="genz"] .stat-card,
+    html[data-theme="genz"] .analytics-card,
+    html[data-theme="genz"] .booking-card,
+    html[data-theme="genz"] .upi-card,
+    html[data-theme="genz"] .table-card,
+    html[data-theme="genz"] .setup-callout,
+    html[data-theme="genz"] .notify-item {
+      border-color: rgba(255,122,220,.24);
+      box-shadow: 0 22px 80px rgba(255,122,220,.11);
+    }
+    html[data-theme="genz"] .btn-primary {
+      background: linear-gradient(135deg, #7fff45, #4de8ff 48%, #ff7adc);
+      color: #090912;
+    }
+    html[data-theme="genz"] .tab.active {
+      color: #7fff45;
+      border-bottom-color: #ff7adc;
     }
   </style>
 </head>
@@ -180,7 +210,7 @@
   <div class="header-right">
     <button class="btn btn-ghost btn-sm" id="owner-theme-toggle" type="button" data-theme-toggle></button>
     <span style="color:var(--muted);font-size:.85rem" id="owner-name-display"></span>
-    <button class="btn btn-ghost btn-sm" onclick="window.location.href='/'">Landing page</button>
+    <button class="btn btn-ghost btn-sm owner-home-btn" onclick="window.location.href='/'" aria-label="Home" title="Home"><img src="/assets/goalbazi-logo.svg" alt=""></button>
     <button class="btn btn-ghost btn-sm" id="logout-btn">Log out</button>
   </div>
 </div>
@@ -190,7 +220,7 @@
   <div class="setup-callout" id="owner-setup-callout">
     <h2>Finish your arena setup</h2>
     <p>Add your arena name, area, price, UPI ID, photos, and GPS location. Once saved, athletes can discover it from the arena page.</p>
-    <button class="btn btn-primary btn-sm" type="button" onclick="openOwnerTab('settings')">Complete setup</button>
+    <button class="btn btn-primary btn-sm" type="button" id="owner-setup-button">Complete setup</button>
   </div>
 
   <div class="stats-row" id="owner-stats"></div>
@@ -201,6 +231,7 @@
     <button class="tab active" data-tab="bookings">Bookings</button>
     <button class="tab" data-tab="slots">Manage slots</button>
     <button class="tab" data-tab="upi">UPI & Payments</button>
+    <button class="tab" data-tab="payouts">Payouts</button>
       <button class="tab" data-tab="settings">Arena settings</button>
   </div>
 
@@ -243,6 +274,15 @@
         <tbody id="payments-body"></tbody>
       </table>
     </div>
+  </div>
+
+  <!-- Payouts tab -->
+  <div class="tab-content" id="tab-payouts" style="display:none">
+    <div class="upi-card">
+      <h3>Daily payout summary</h3>
+      <div class="upi-note">Confirmed bookings are grouped by day. Current beta estimate uses a 10% Goalbazi commission before final payout.</div>
+    </div>
+    <div id="owner-payouts-list"></div>
   </div>
 
   <!-- Settings tab -->
@@ -421,6 +461,7 @@
         <div class="metric-row"><span class="metric-label">Pending reservations</span><span class="metric-value">${pending.length}</span></div>
         <div class="metric-row"><span class="metric-label">Rejected reservations</span><span class="metric-value">${rejected.length}</span></div>
         <div class="metric-row"><span class="metric-label">Profile completion</span><span class="metric-value">${setupPercent}%</span></div>
+        <div class="metric-row"><span class="metric-label">Estimated payout</span><span class="metric-value">₹${data.stats?.estimated_payout || 0}</span></div>
       </div>
       <div class="analytics-card">
         <h3>Popular slots</h3>
@@ -498,6 +539,26 @@
     `).join("") || '<tr><td colspan="5" class="empty">No confirmed payments yet</td></tr>';
   }
 
+  async function loadOwnerPayouts() {
+    const data = await api("/api/owner/payouts");
+    if (!data) return;
+    document.getElementById("owner-payouts-list").innerHTML = (data.payouts || []).map(payout => `
+      <div class="booking-card">
+        <div class="booking-top">
+          <div>
+            <div class="booking-title">${payout.payout_date}</div>
+            <div class="booking-meta">${payout.confirmed_bookings} confirmed bookings · ${payout.status}</div>
+          </div>
+          <span class="pill ${payout.status === "paid" ? "pill-confirmed" : "pill-pending"}">${payout.status}</span>
+        </div>
+        <div class="metric-row"><span class="metric-label">Gross received</span><span class="metric-value">₹${payout.gross_amount}</span></div>
+        <div class="metric-row"><span class="metric-label">Goalbazi commission</span><span class="metric-value">₹${payout.commission_amount}</span></div>
+        <div class="metric-row"><span class="metric-label">Your payout</span><span class="metric-value">₹${payout.net_amount}</span></div>
+        ${payout.payout_note ? `<div class="booking-meta" style="margin-top:10px">Note: ${payout.payout_note}</div>` : ""}
+      </div>
+    `).join("") || `<div class="empty">Payouts will appear after confirmed bookings.</div>`;
+  }
+
   function prefillSettings(turf) {
     document.getElementById("settings-name").value = turf.name;
     document.getElementById("settings-area").value = turf.area;
@@ -556,6 +617,7 @@
       document.getElementById(`tab-${tab.dataset.tab}`).style.display = "block";
       window.location.hash = tab.dataset.tab;
       if (tab.dataset.tab === "slots") loadSlots();
+      if (tab.dataset.tab === "payouts") loadOwnerPayouts();
     });
   });
 
@@ -563,6 +625,8 @@
     const btn = document.querySelector(`.tab[data-tab="${name}"]`) || document.querySelector(".tab");
     if (btn) btn.click();
   }
+  window.openOwnerTab = openOwnerTab;
+  document.getElementById("owner-setup-button")?.addEventListener("click", () => openOwnerTab("settings"));
 
   // Slot date filter
   const today = new Date().toISOString().slice(0, 10);

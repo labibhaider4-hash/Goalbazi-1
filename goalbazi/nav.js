@@ -450,6 +450,8 @@ function initNav(activePage) {
     { id: "profile",   label: "Profile",   href: "/profile" },
     { id: "about",     label: "About",     href: "/about" },
     { id: "support",   label: "Support",   href: "/support" },
+    { id: "privacy",   label: "Privacy",   href: "/privacy" },
+    { id: "terms",     label: "Terms",     href: "/terms" },
   ];
 
   const navbar = document.getElementById("navbar");

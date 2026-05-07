@@ -340,6 +340,10 @@
         <button class="tab-btn" data-tab="teams">Teams</button>
         <button class="tab-btn" data-tab="leagues">Leagues</button>
         <button class="tab-btn" data-tab="arenas">Arenas</button>
+        <button class="tab-btn" data-tab="payments">Payments</button>
+        <button class="tab-btn" data-tab="payouts">Payouts</button>
+        <button class="tab-btn" data-tab="reports">Reports</button>
+        <button class="tab-btn" data-tab="policies">Policies</button>
         <button class="tab-btn" data-tab="ratings">Ratings</button>
         <a class="tab-btn" href="/dashboard" style="text-decoration:none">Back to dashboard</a>
         <button class="tab-btn" id="logout-btn">Log out</button>
@@ -543,6 +547,66 @@
       </div>
       <div class="items-grid" id="ratings-grid"></div>
     </section>
+
+    <section class="section-card" id="tab-payments">
+      <div class="section-head">
+        <div>
+          <div class="section-title">Payment ledger</div>
+          <div class="section-sub">Manual UTR payment records until Razorpay/Cashfree is connected.</div>
+        </div>
+      </div>
+      <div class="items-grid" id="payments-grid"></div>
+    </section>
+
+    <section class="section-card" id="tab-payouts">
+      <div class="section-head">
+        <div>
+          <div class="section-title">Owner payouts</div>
+          <div class="section-sub">End-of-day owner settlement summary. Current commission estimate: 10%.</div>
+        </div>
+        <input id="payout-date" type="date" style="max-width:180px">
+      </div>
+      <div class="items-grid" id="payouts-grid"></div>
+    </section>
+
+    <section class="section-card" id="tab-reports">
+      <div class="section-head">
+        <div>
+          <div class="section-title">Reports & disputes</div>
+          <div class="section-sub">Safety reports, payment disputes, and support issues for admin review.</div>
+        </div>
+      </div>
+      <div class="items-grid" id="reports-grid"></div>
+    </section>
+
+    <section class="section-card" id="tab-policies">
+      <div class="section-head">
+        <div>
+          <div class="section-title">Launch policies</div>
+          <div class="section-sub">Legal pages and operating rules users should see before payments scale.</div>
+        </div>
+      </div>
+      <div class="items-grid">
+        <div class="item-card">
+          <div class="item-title">Required public pages</div>
+          <div class="item-meta">These pages are now available and should be reviewed before launch.</div>
+          <div class="action-row" style="margin-top:12px">
+            <a class="mini-btn primary" href="/privacy" target="_blank" style="text-decoration:none">Privacy Policy</a>
+            <a class="mini-btn primary" href="/terms" target="_blank" style="text-decoration:none">Terms</a>
+            <a class="mini-btn primary" href="/refund-policy" target="_blank" style="text-decoration:none">Refund Policy</a>
+            <a class="mini-btn primary" href="/support" target="_blank" style="text-decoration:none">Support</a>
+          </div>
+        </div>
+        <div class="item-card">
+          <div class="item-title">Payment rule before Razorpay</div>
+          <div class="item-meta">Manual UTR payments are beta-only. Admin must verify payment disputes and owner payouts from the ledger.</div>
+        </div>
+        <div class="item-card">
+          <div class="item-title">Best version later</div>
+          <div class="item-meta">Use Razorpay/Cashfree marketplace settlements, email/phone verification, and automated refunds before large-scale paid launch.</div>
+        </div>
+      </div>
+    </section>
   </div>
 
   <script src="/nav.js"></script>
@@ -564,6 +628,9 @@
       ratings: [],
       arenas: [],
       archivedArenas: [],
+      payments: [],
+      payouts: [],
+      reports: [],
       playersForTeams: [],
       profileAssessments: [],
       activity: [],
@@ -1275,6 +1342,73 @@
       `).join("") || `<div class="item-card"><div class="item-meta">No ratings yet.</div></div>`;
     }
 
+    async function loadPayments() {
+      const data = await api("/api/admin/payment-ledger");
+      if (!data) return;
+      state.payments = data.payments || [];
+      document.getElementById("payments-grid").innerHTML = state.payments.map(payment => `
+        <div class="item-card">
+          <div class="item-top">
+            <div>
+              <div class="item-title">${esc(payment.player_name)} → ${esc(payment.arena_name)}</div>
+              <div class="item-meta">${esc(payment.slot_date)} ${esc(payment.slot_time)} · ${esc(payment.status)} · UTR: ${esc(payment.utr_number || "missing")}</div>
+            </div>
+            <div class="item-title">₹${esc(payment.amount || 0)}</div>
+          </div>
+          <div class="item-meta">Owner: ${esc(payment.owner_name || "Unassigned")} · Goalbazi 10%: ₹${esc(payment.commission_amount)} · Owner net: ₹${esc(payment.owner_net_amount)}</div>
+        </div>
+      `).join("") || `<div class="item-card"><div class="item-meta">No payments recorded yet.</div></div>`;
+    }
+
+    async function loadPayouts() {
+      const dateInput = document.getElementById("payout-date");
+      if (!dateInput.value) dateInput.value = new Date().toISOString().slice(0, 10);
+      const data = await api(`/api/admin/payout-summary?date=${encodeURIComponent(dateInput.value)}`);
+      if (!data) return;
+      state.payouts = data.payouts || [];
+      document.getElementById("payouts-grid").innerHTML = state.payouts.map(payout => `
+        <div class="item-card">
+          <div class="item-top">
+            <div>
+              <div class="item-title">${esc(payout.owner_name)}</div>
+              <div class="item-meta">${esc(payout.confirmed_bookings)} confirmed bookings · ${esc(payout.status)}</div>
+            </div>
+            <div class="item-title">₹${esc(payout.net_amount)}</div>
+          </div>
+          <div class="item-meta">Gross: ₹${esc(payout.gross_amount)} · Goalbazi commission: ₹${esc(payout.commission_amount)} · Date: ${esc(payout.payout_date)}</div>
+          <div class="action-row" style="margin-top:12px">
+            <button class="mini-btn primary" type="button" onclick='markPayoutPaid(${JSON.stringify(payout)})'>Mark paid</button>
+          </div>
+        </div>
+      `).join("") || `<div class="item-card"><div class="item-meta">No confirmed owner payouts for this date.</div></div>`;
+    }
+
+    async function markPayoutPaid(payout) {
+      const note = prompt("Add payout proof/note, for example UTR or bank reference:", payout.payout_note || "");
+      if (note === null) return;
+      await api("/api/admin/payouts/mark-paid", { method: "POST", body: JSON.stringify({ ...payout, payout_note: note }) });
+      toast("Payout marked paid");
+      await loadPayouts();
+    }
+
+    async function loadReports() {
+      const data = await api("/api/admin/safety-reports");
+      if (!data) return;
+      state.reports = data.reports || [];
+      document.getElementById("reports-grid").innerHTML = state.reports.map(report => `
+        <div class="item-card">
+          <div class="item-top">
+            <div>
+              <div class="item-title">${esc(report.reason)} · ${esc(report.target_type)}</div>
+              <div class="item-meta">By ${esc(report.reporter_user_name || report.reporter_owner_name || "Unknown")} · ${esc(formatDate(report.created_at))}</div>
+            </div>
+            <span class="type-pill">${esc(report.status)}</span>
+          </div>
+          <div class="item-meta">${esc(report.details || "No extra detail.")}</div>
+        </div>
+      `).join("") || `<div class="item-card"><div class="item-meta">No reports yet.</div></div>`;
+    }
+
     document.getElementById("create-user-form").addEventListener("submit", async event => {
       event.preventDefault();
       const data = formObject(event.currentTarget);
@@ -1326,9 +1460,14 @@
         if (state.activeTab === "teams") await loadTeams();
         if (state.activeTab === "leagues") await loadLeagues();
         if (state.activeTab === "arenas") await loadArenas();
+        if (state.activeTab === "payments") await loadPayments();
+        if (state.activeTab === "payouts") await loadPayouts();
+        if (state.activeTab === "reports") await loadReports();
         if (state.activeTab === "ratings") await loadRatings();
       });
     });
+
+    document.getElementById("payout-date").addEventListener("change", loadPayouts);
 
     document.getElementById("logout-btn").addEventListener("click", async () => {
       await fetch("/api/auth/logout", { method: "POST" });
@@ -1349,6 +1488,7 @@
     window.deleteArena = deleteArena;
     window.restoreArena = restoreArena;
     window.permanentlyDeleteArena = permanentlyDeleteArena;
+    window.markPayoutPaid = markPayoutPaid;
     window.selectUser = selectUser;
     window.approveProfileAssessment = approveProfileAssessment;
     window.rejectProfileAssessment = rejectProfileAssessment;
